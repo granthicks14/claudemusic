@@ -1,15 +1,15 @@
-const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "marimba", "fx"];
+const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "marimba", "arp", "fx"];
 
 const DEFAULT_TRACK_VOLUME = {
   kick: 1, snare: 0.9, hihat: 0.6, openhat: 0.6, tom: 0.85, perc: 0.55, crash: 0.8,
   bass: 0.9, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.55, horn: 0.7,
-  organ: 0.6, vocal: 0.65, kalimba: 0.7, marimba: 0.65, fx: 0.6,
+  organ: 0.6, vocal: 0.65, kalimba: 0.7, marimba: 0.65, arp: 0.55, fx: 0.6,
 };
 
 const BASE_VELOCITY = {
   kick: 1, snare: 0.9, hihat: 0.7, openhat: 0.7, tom: 0.85, perc: 0.6, crash: 0.9,
   bass: 0.8, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.6, horn: 0.75,
-  organ: 0.65, vocal: 0.7, kalimba: 0.75, marimba: 0.7, fx: 0.8,
+  organ: 0.65, vocal: 0.7, kalimba: 0.75, marimba: 0.7, arp: 0.65, fx: 0.8,
 };
 
 const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "fx"];
@@ -17,7 +17,7 @@ const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash"
 const DEFAULT_REVERB_SEND = {
   kick: 0, bass: 0, snare: 0.22, hihat: 0.08, openhat: 0.15, tom: 0.2, perc: 0.15, crash: 0.35,
   piano: 0.22, lead: 0.28, pad: 0.4, stab: 0.22, guitar: 0.18, strings: 0.35, horn: 0.22,
-  organ: 0.28, vocal: 0.32, kalimba: 0.25, marimba: 0.28, fx: 0.45,
+  organ: 0.28, vocal: 0.32, kalimba: 0.25, marimba: 0.28, arp: 0.3, fx: 0.45,
 };
 
 class BeatEngine {
@@ -58,6 +58,12 @@ class BeatEngine {
 
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = 0.9;
+      // A master-bus "grit" stage - a mild waveshaper genres can dial in to
+      // taste (0 = bypassed/identity curve). Modern hard trap/rap masters
+      // are driven a little warm/saturated on purpose for extra harmonic
+      // bite that reads on small speakers, not just cranked louder.
+      this.gritShaper = this.ctx.createWaveShaper();
+      this.gritShaper.curve = this.makeIdentityCurve();
       this.compressor = this.ctx.createDynamicsCompressor();
       this.compressor.threshold.value = -12;
       this.compressor.knee.value = 6;
@@ -68,7 +74,16 @@ class BeatEngine {
       this.analyser.fftSize = 256;
       this.analyser.smoothingTimeConstant = 0.8;
       this.compressor.connect(this.analyser);
-      this.masterGain.connect(this.compressor).connect(this.ctx.destination);
+      this.masterGain.connect(this.gritShaper).connect(this.compressor).connect(this.ctx.destination);
+
+      // A parallel tap of the fully-mixed signal (post grit/compressor, the
+      // same processing the speakers get) as a MediaStream, so the video
+      // export feature can record real audio straight out of the engine
+      // instead of needing a second, separate render pass.
+      if (this.ctx.createMediaStreamDestination) {
+        this.mediaStreamDest = this.ctx.createMediaStreamDestination();
+        this.compressor.connect(this.mediaStreamDest);
+      }
 
       this.duckBus = this.ctx.createGain();
       this.duckBus.gain.value = 1;
@@ -597,10 +612,87 @@ class BeatEngine {
     noise.stop(time + 1.4);
   }
 
-  // A rising filtered-noise sweep - the classic "riser" transition FX
-  // producers drop in right before a chorus/drop to build anticipation.
-  playFxRiser(time, vel) {
+  // Transition/impact FX - riser is the classic pre-drop/pre-chorus sweep;
+  // siren and impact are newer additions researched from modern hard-trap
+  // production (the "police siren" ad-lib stab and the cinematic "trailer
+  // hit" that Travis Scott/Playboi Carti-adjacent producers drop on a beat
+  // switch or a hard downbeat).
+  playFxRiser(time, vel, flavor) {
     const ctx = this.ctx;
+
+    if (flavor === "siren") {
+      // A classic trap "police siren": a sawtooth sweeping up and back
+      // down in pitch a couple of times, run through a bandpass to keep
+      // it from sounding like a bare oscillator.
+      const dur = 1.4;
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(400, time);
+      osc.frequency.linearRampToValueAtTime(1400, time + dur * 0.4);
+      osc.frequency.linearRampToValueAtTime(500, time + dur * 0.75);
+      osc.frequency.linearRampToValueAtTime(1600, time + dur);
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 1500;
+      bp.Q.value = 2.5;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.4, time + 0.08);
+      gain.gain.linearRampToValueAtTime(vel * 0.4, time + dur - 0.1);
+      gain.gain.linearRampToValueAtTime(0.0001, time + dur);
+      osc.connect(bp).connect(gain).connect(this.dest("fx"));
+      osc.start(time);
+      osc.stop(time + dur + 0.05);
+      return;
+    }
+
+    if (flavor === "impact") {
+      // A cinematic "trailer hit": a low sub thump, a bright noise crash,
+      // and a slow-swelling reversed-sounding tail - the kind of huge,
+      // ominous downbeat stab used to punctuate a hard beat switch.
+      const dur = 2.2;
+      const sub = ctx.createOscillator();
+      sub.type = "sine";
+      sub.frequency.setValueAtTime(90, time);
+      sub.frequency.exponentialRampToValueAtTime(35, time + 0.5);
+      const subGain = ctx.createGain();
+      subGain.gain.setValueAtTime(vel * 0.9, time);
+      subGain.gain.exponentialRampToValueAtTime(0.001, time + 1.2);
+      sub.connect(subGain).connect(this.dest("fx"));
+      sub.start(time);
+      sub.stop(time + 1.3);
+
+      const crash = ctx.createBufferSource();
+      crash.buffer = this.makeNoiseBuffer(0.4);
+      const crashFilter = ctx.createBiquadFilter();
+      crashFilter.type = "highpass";
+      crashFilter.frequency.value = 3000;
+      const crashGain = ctx.createGain();
+      crashGain.gain.setValueAtTime(vel * 0.5, time);
+      crashGain.gain.exponentialRampToValueAtTime(0.001, time + 0.35);
+      crash.connect(crashFilter).connect(crashGain).connect(this.dest("fx"));
+      crash.start(time);
+      crash.stop(time + 0.4);
+
+      const swell = ctx.createBufferSource();
+      swell.buffer = this.makeNoiseBuffer(dur);
+      const swellFilter = ctx.createBiquadFilter();
+      swellFilter.type = "bandpass";
+      swellFilter.Q.value = 0.8;
+      swellFilter.frequency.setValueAtTime(150, time);
+      swellFilter.frequency.exponentialRampToValueAtTime(2500, time + dur);
+      const swellGain = ctx.createGain();
+      swellGain.gain.setValueAtTime(0.0001, time);
+      swellGain.gain.linearRampToValueAtTime(vel * 0.35, time + dur * 0.9);
+      swellGain.gain.linearRampToValueAtTime(0.0001, time + dur);
+      swell.connect(swellFilter).connect(swellGain).connect(this.dest("fx"));
+      swell.start(time);
+      swell.stop(time + dur + 0.1);
+      return;
+    }
+
+    // "riser" (default): a rising filtered-noise sweep, the classic
+    // pre-drop/pre-chorus transition FX producers use to build anticipation.
     const dur = 1.8;
     const noise = ctx.createBufferSource();
     noise.buffer = this.makeNoiseBuffer(dur + 0.2);
@@ -651,6 +743,47 @@ class BeatEngine {
       knock.connect(knockFilter).connect(knockGain).connect(this.dest("bass"));
       knock.start(time);
       knock.stop(time + 0.02);
+      return;
+    } else if (flavor === "hard808") {
+      // Modern hard-trap 808s use parallel distortion: a clean sub layer
+      // keeps the low end powerful and undistorted (distorting the whole
+      // signal loses low-frequency punch), while a second, heavily
+      // saturated copy is blended in on top purely for harmonic "bite" -
+      // the aggression that actually reads on phone/laptop speakers.
+      const ringTime = Math.max(durationSeconds, 1.3);
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq * 1.8, time);
+      osc.frequency.exponentialRampToValueAtTime(freq, time + 0.07);
+      gain.gain.setValueAtTime(vel, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + ringTime);
+      osc.connect(gain).connect(this.dest("bass"));
+      osc.start(time);
+      osc.stop(time + ringTime + 0.05);
+
+      const grit = ctx.createOscillator();
+      grit.type = "sine";
+      grit.frequency.setValueAtTime(freq * 1.8, time);
+      grit.frequency.exponentialRampToValueAtTime(freq, time + 0.07);
+      const gritShaper = ctx.createWaveShaper();
+      gritShaper.curve = this.makeDistortionCurve(35);
+      const gritGain = ctx.createGain();
+      gritGain.gain.setValueAtTime(vel * 0.45, time);
+      gritGain.gain.exponentialRampToValueAtTime(0.001, time + Math.min(ringTime, 0.9));
+      grit.connect(gritShaper).connect(gritGain).connect(this.dest("bass"));
+      grit.start(time);
+      grit.stop(time + ringTime + 0.05);
+
+      const knock = ctx.createBufferSource();
+      knock.buffer = this.makeNoiseBuffer(0.02);
+      const knockFilter = ctx.createBiquadFilter();
+      knockFilter.type = "highpass";
+      knockFilter.frequency.value = 1600;
+      const knockGain = ctx.createGain();
+      knockGain.gain.setValueAtTime(vel * 0.4, time);
+      knockGain.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
+      knock.connect(knockFilter).connect(knockGain).connect(this.dest("bass"));
+      knock.start(time);
+      knock.stop(time + 0.025);
       return;
     } else if (flavor === "synth") {
       osc.type = "sawtooth";
@@ -818,6 +951,35 @@ class BeatEngine {
       curve[i] = ((3 + k) * x * 20 * (Math.PI / 180)) / (Math.PI + k * Math.abs(x));
     }
     return curve;
+  }
+
+  makeIdentityCurve() {
+    const samples = 256;
+    const curve = new Float32Array(samples);
+    for (let i = 0; i < samples; i++) curve[i] = (i * 2) / samples - 1;
+    return curve;
+  }
+
+  // A dry/wet-blended saturation curve for the master bus - amount 0 is a
+  // true bypass (identity curve), higher amounts blend in more of a
+  // waveshaped signal for the "driven a little warm" master-bus character
+  // modern hard trap/rap mixes lean on for extra harmonic bite.
+  setGrit(amount) {
+    if (!this.gritShaper) return;
+    const clamped = Math.max(0, Math.min(1, amount || 0));
+    if (clamped <= 0) {
+      this.gritShaper.curve = this.makeIdentityCurve();
+      return;
+    }
+    const samples = 256;
+    const curve = new Float32Array(samples);
+    const k = 18;
+    for (let i = 0; i < samples; i++) {
+      const x = (i * 2) / samples - 1;
+      const driven = ((3 + k) * x * 20 * (Math.PI / 180)) / (Math.PI + k * Math.abs(x));
+      curve[i] = (1 - clamped) * x + clamped * driven;
+    }
+    this.gritShaper.curve = curve;
   }
 
   // Karplus-Strong plucked-string synthesis: a short filtered noise burst
@@ -1369,6 +1531,49 @@ class BeatEngine {
       osc.start(time);
       osc.stop(time + dur + 0.1);
     }
+  }
+
+  // A dedicated arpeggiator voice: short, plucky, and bright rather than a
+  // sustained lead - real arps are built from fast, staccato note runs, so
+  // the synthesis needs a fast decay baked in even when the sequencer feeds
+  // it a longer note value, the same way a real arpeggiator plugin retriggers
+  // on every step regardless of the underlying chord's length.
+  playArpVoice(time, freq, durationSeconds, vel, flavor) {
+    const ctx = this.ctx;
+    const dest = this.dest("arp");
+    const dur = Math.min(durationSeconds, 0.16);
+
+    if (flavor === "pulse") {
+      // A duller, warmer square-wave arp - classic 8-bit/chiptune-adjacent
+      // arpeggio character instead of a bright trance pluck.
+      const osc = ctx.createOscillator();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(freq, time);
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(2600, time);
+      filter.frequency.exponentialRampToValueAtTime(500, time + dur);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.8, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      osc.connect(filter).connect(gain).connect(dest);
+      osc.start(time);
+      osc.stop(time + dur + 0.03);
+      return;
+    }
+
+    // "arp" (default): a bright, thin unison-saw pluck - the classic
+    // trance/house arpeggio timbre, deliberately much shorter and brighter
+    // than the "supersaw" lead flavor.
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(6000, time);
+    filter.frequency.exponentialRampToValueAtTime(1200, time + dur);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(vel * 0.7, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+    filter.connect(gain).connect(dest);
+    this.addUnisonVoices(freq, 3, 8, "sawtooth", filter, time, time + dur + 0.03);
   }
 
   playPianoVoice(time, freq, durationSeconds, vel, flavor) {
@@ -1971,7 +2176,7 @@ class BeatEngine {
         else if (inst === "tom") this.playTom(t, vel);
         else if (inst === "crash") this.playCrash(t, vel);
         else if (inst === "perc") this.playPerc(t, vel, flavors.perc);
-        else if (inst === "fx") this.playFxRiser(t, vel);
+        else if (inst === "fx") this.playFxRiser(t, vel, flavors.fx);
         continue;
       }
 
@@ -2005,6 +2210,7 @@ class BeatEngine {
         else if (inst === "guitar") this.playGuitarVoice(t, freq, noteDur, vel, flavors.guitar);
         else if (inst === "kalimba") this.playKalimbaVoice(t, freq, noteDur, vel, flavors.kalimba);
         else if (inst === "marimba") this.playMarimbaVoice(t, freq, noteDur, vel, flavors.marimba);
+        else if (inst === "arp") this.playArpVoice(t, freq, noteDur, vel, flavors.arp);
       }
     }
   }

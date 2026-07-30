@@ -27,18 +27,24 @@ const automationClearBtn = document.getElementById("automation-clear");
 const promptInput = document.getElementById("prompt-input");
 const promptGenerateBtn = document.getElementById("prompt-generate");
 const promptStatus = document.getElementById("prompt-status");
+const exportReelBtn = document.getElementById("export-reel-btn");
+const reelDurationSelect = document.getElementById("reel-duration");
+const reelOverlay = document.getElementById("reel-overlay");
+const reelCanvas = document.getElementById("reel-canvas");
+const reelStatus = document.getElementById("reel-status");
+const reelCancelBtn = document.getElementById("reel-cancel");
 
 const DRUM_ORDER = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "fx"];
-const MELODIC_ORDER = ["bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "marimba"];
-const MONO_INSTRUMENTS = ["bass", "lead", "guitar", "kalimba", "marimba"];
+const MELODIC_ORDER = ["bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "marimba", "arp"];
+const MONO_INSTRUMENTS = ["bass", "lead", "guitar", "kalimba", "marimba", "arp"];
 
 const TRACK_LABELS = {
   kick: "Kick", snare: "Snare", hihat: "Hi-Hat", openhat: "Open Hat", tom: "Tom", perc: "Perc", crash: "Crash", fx: "FX Riser",
   bass: "Bass", piano: "Piano", lead: "Melody", pad: "Pad", stab: "Stab", guitar: "Guitar", strings: "Strings", horn: "Horn",
-  organ: "Organ", vocal: "Vocal", kalimba: "Kalimba", marimba: "Marimba",
+  organ: "Organ", vocal: "Vocal", kalimba: "Kalimba", marimba: "Marimba", arp: "Arp",
 };
 
-const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, strings: 4, horn: 1, organ: 4, vocal: 1, kalimba: 1, marimba: 1 };
+const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, strings: 4, horn: 1, organ: 4, vocal: 1, kalimba: 1, marimba: 1, arp: 1 };
 
 const STYLE_ACCENTS = {
   hiphop: "#ff6b6b", trap: "#a55eea", house: "#26de81", rock: "#fd9644", reggaeton: "#fed330", lofi: "#45aaf2",
@@ -52,7 +58,7 @@ const TRACK_COLOR = {
   kick: "#ff6b6b", snare: "#feca57", hihat: "#48dbfb", openhat: "#0abde3", tom: "#ff9f43",
   perc: "#1dd1a1", crash: "#c8d6e5", fx: "#c8d6e5", bass: "#a55eea", piano: "#00d2d3", lead: "#ff9ff3", pad: "#54a0ff",
   stab: "#f368e0", guitar: "#ff6348", strings: "#7bed9f", horn: "#eccc68", organ: "#e58e26", vocal: "#ff7f9f", kalimba: "#fdcb6e",
-  marimba: "#55efc4",
+  marimba: "#55efc4", arp: "#74b9ff",
 };
 
 let selectedStyleId = null;
@@ -161,6 +167,8 @@ function selectStyle(id) {
   const sidechainOn = SIDECHAIN_DEFAULT_ON.has(id);
   engine.setSidechain(sidechainOn);
   sidechainBtn.classList.toggle("on", sidechainOn);
+
+  engine.setGrit(baseStyle.grit || 0);
 
   shuffleStatus.textContent = "";
   workspace.hidden = false;
@@ -793,6 +801,177 @@ function stopVisualizer() {
   }
   visualizerCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
 }
+
+// ---- Export to a vertical (9:16) video for Reels/TikTok/Shorts ----
+// Draws an animated, genre-branded visualizer to a portrait canvas, taps
+// the real mixed audio straight out of the engine's master bus via a
+// MediaStreamAudioDestinationNode, and records both together with
+// MediaRecorder - a real, playable video file the browser can produce
+// entirely client-side, no server/render farm needed.
+
+function pickReelMimeType() {
+  if (!window.MediaRecorder || !MediaRecorder.isTypeSupported) return "";
+  const candidates = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+  for (const type of candidates) {
+    if (MediaRecorder.isTypeSupported(type)) return type;
+  }
+  return "";
+}
+
+function drawReelFrame(ctx, elapsedSec, durationSec) {
+  const w = reelCanvas.width;
+  const h = reelCanvas.height;
+  const accent = STYLE_ACCENTS[selectedStyleId] || "#a55eea";
+
+  ctx.fillStyle = "#0b0b12";
+  ctx.fillRect(0, 0, w, h);
+
+  const glow = ctx.createRadialGradient(w / 2, h * 0.4, 30, w / 2, h * 0.4, h * 0.75);
+  glow.addColorStop(0, accent + "50");
+  glow.addColorStop(1, "#0b0b1200");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, w, h);
+
+  if (engine.analyser) {
+    const data = new Uint8Array(engine.analyser.frequencyBinCount);
+    engine.analyser.getByteFrequencyData(data);
+    const barCount = 36;
+    const barGap = 7;
+    const barWidth = (w - 100) / barCount - barGap;
+    const baseY = h * 0.6;
+    ctx.fillStyle = accent;
+    for (let i = 0; i < barCount; i++) {
+      const dataIndex = Math.floor((i / barCount) * data.length * 0.7);
+      const value = data[dataIndex] / 255;
+      const barHeight = Math.max(5, value * h * 0.24);
+      const x = 50 + i * (barWidth + barGap);
+      ctx.fillRect(x, baseY - barHeight, barWidth, barHeight * 2);
+    }
+  }
+
+  const style = STYLES[selectedStyleId];
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "700 58px sans-serif";
+  ctx.fillText(style ? style.name : "Beat Studio", w / 2, h * 0.2);
+
+  ctx.font = "400 26px sans-serif";
+  ctx.fillStyle = "#c9c9d8";
+  const tempo = Math.round(Number(tempoSlider.value));
+  const keyLabel = keySelect.value + (keySelect.dataset.octave || "");
+  ctx.fillText(`${tempo} BPM  ·  ${keyLabel}`, w / 2, h * 0.26);
+
+  ctx.font = "700 30px sans-serif";
+  ctx.fillStyle = accent;
+  ctx.fillText("BEAT STUDIO", w / 2, h * 0.92);
+
+  const barY = h * 0.965;
+  const barW = w * 0.7;
+  const barX = (w - barW) / 2;
+  ctx.fillStyle = "#2a2a3a";
+  ctx.fillRect(barX, barY, barW, 6);
+  ctx.fillStyle = accent;
+  ctx.fillRect(barX, barY, barW * Math.min(1, elapsedSec / durationSec), 6);
+}
+
+let reelAnimFrame = null;
+
+async function exportReel() {
+  if (!currentPattern || !selectedStyleId) return;
+
+  engine.ensureContext();
+
+  if (!window.MediaRecorder || !reelCanvas.captureStream || !engine.mediaStreamDest) {
+    reelOverlay.hidden = false;
+    reelStatus.textContent = "Sorry, video export isn't supported in this browser. Try Chrome, Edge, or Firefox.";
+    reelCancelBtn.textContent = "Close";
+    reelCancelBtn.onclick = () => { reelOverlay.hidden = true; };
+    return;
+  }
+
+  const duration = Number(reelDurationSelect.value);
+  const ctx = reelCanvas.getContext("2d");
+
+  exportReelBtn.disabled = true;
+  reelCancelBtn.textContent = "Cancel";
+  reelOverlay.hidden = false;
+  reelStatus.textContent = "Starting recording…";
+
+  if (engine.isPlaying) engine.stop();
+  engine.onStep = highlightStep;
+  engine.start(currentPattern, activeStyle, currentFlavors, Number(tempoSlider.value));
+  playBtn.textContent = "■ Stop";
+  playBtn.classList.add("playing");
+  startVisualizer();
+
+  const videoStream = reelCanvas.captureStream(30);
+  const combined = new MediaStream([...videoStream.getVideoTracks(), ...engine.mediaStreamDest.stream.getAudioTracks()]);
+
+  const mimeType = pickReelMimeType();
+  const recorder = new MediaRecorder(combined, mimeType ? { mimeType } : undefined);
+  const chunks = [];
+  recorder.ondataavailable = (e) => {
+    if (e.data && e.data.size > 0) chunks.push(e.data);
+  };
+
+  let cancelled = false;
+  reelCancelBtn.onclick = () => {
+    cancelled = true;
+    if (recorder.state !== "inactive") recorder.stop();
+  };
+
+  const finished = new Promise((resolve) => {
+    recorder.onstop = resolve;
+  });
+
+  const startTime = performance.now();
+  function frame() {
+    const elapsed = (performance.now() - startTime) / 1000;
+    drawReelFrame(ctx, elapsed, duration);
+    reelStatus.textContent = `Recording… ${Math.min(duration, elapsed).toFixed(0)}s / ${duration}s`;
+    if (elapsed < duration && !cancelled) {
+      reelAnimFrame = requestAnimationFrame(frame);
+    } else if (recorder.state !== "inactive") {
+      recorder.stop();
+    }
+  }
+
+  recorder.start();
+  reelAnimFrame = requestAnimationFrame(frame);
+
+  await finished;
+  if (reelAnimFrame) {
+    cancelAnimationFrame(reelAnimFrame);
+    reelAnimFrame = null;
+  }
+
+  engine.stop();
+  playBtn.textContent = "▶ Play";
+  playBtn.classList.remove("playing");
+  stopVisualizer();
+  exportReelBtn.disabled = false;
+
+  if (cancelled || !chunks.length) {
+    reelStatus.textContent = cancelled ? "Cancelled." : "Recording failed - no data captured.";
+    setTimeout(() => { reelOverlay.hidden = true; }, 1200);
+    return;
+  }
+
+  const blob = new Blob(chunks, { type: mimeType || "video/webm" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `beatstudio-${selectedStyleId}-reel.webm`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+
+  reelStatus.textContent = "Downloaded! Check your downloads folder.";
+  setTimeout(() => { reelOverlay.hidden = true; }, 1800);
+}
+
+exportReelBtn.addEventListener("click", exportReel);
 
 // Every explicit "give me a beat" action (Generate Beat, or the prompt
 // box) re-rolls each instrument's sound alongside the new pattern, so a

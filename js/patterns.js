@@ -1,13 +1,13 @@
 const STEPS_PER_BAR = 16;
 
-const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14 };
+const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14, arp: 18 };
 
 const FLAVOR_POOLS = {
   kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy"],
   snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered"],
   hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808"],
   perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle"],
-  bass: ["warm", "synth", "808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright"],
+  bass: ["warm", "synth", "808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright"],
   piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord"],
   lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm"],
   pad: ["warm", "ensemble", "airy", "glass", "choir", "dark"],
@@ -19,6 +19,8 @@ const FLAVOR_POOLS = {
   vocal: ["ooh", "ahh", "ay", "oh", "choir"],
   kalimba: ["kalimba", "musicbox", "steeldrum"],
   marimba: ["marimba", "vibraphone"],
+  arp: ["arp", "pulse"],
+  fx: ["riser", "siren", "impact"],
 };
 
 // Tags each flavor by sonic character (warm/bright/dark) so a shuffle can
@@ -33,7 +35,7 @@ const FLAVOR_TAGS = {
   snare: { crisp: "bright", clap: "bright", fat: "warm", rimshot: "bright", trapsnap: "bright", brush: "warm", gated: "dark", acoustic: "warm", ghost: "dark", layered: "dark" },
   hihat: { bright: "bright", dark: "dark", vinyl: "warm", metallic: "bright", analog: "warm", tape: "warm", sizzle: "bright", lofi808: "dark" },
   perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright" },
-  bass: { warm: "warm", synth: "bright", "808": "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm" },
+  bass: { warm: "warm", synth: "bright", "808": "dark", hard808: "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm" },
   piano: { electric: "bright", pluck: "bright", grand: "warm", rhodes: "warm", wurlitzer: "warm", upright: "warm", celesta: "bright", toy: "bright", harpsichord: "bright" },
   lead: { square: "bright", saw: "bright", bell: "bright", flute: "warm", supersaw: "bright", pluck: "bright", sine: "warm", chip: "bright", brasslead: "warm", fm: "bright" },
   pad: { warm: "warm", ensemble: "warm", airy: "bright", glass: "bright", choir: "warm", dark: "dark" },
@@ -45,6 +47,8 @@ const FLAVOR_TAGS = {
   vocal: { ooh: "warm", ahh: "warm", ay: "bright", oh: "warm", choir: "warm" },
   kalimba: { kalimba: "warm", musicbox: "bright", steeldrum: "bright" },
   marimba: { marimba: "warm", vibraphone: "bright" },
+  arp: { arp: "bright", pulse: "warm" },
+  fx: { riser: "bright", siren: "dark", impact: "dark" },
 };
 
 const FLAVOR_PALETTES = ["warm", "bright", "dark"];
@@ -270,7 +274,7 @@ const STYLES = {
     key: "C2",
     scale: "minor",
     progressions: [[0, 5], [0, 3], [0, 4], [0, 5, 3, 4]],
-    defaultFlavors: { kick: "808", snare: "clap", hihat: "bright", bass: "808", lead: "bell", stab: "bell-chord", vocal: "ooh" },
+    defaultFlavors: { kick: "808", snare: "clap", hihat: "bright", bass: "808", lead: "bell", stab: "bell-chord", vocal: "ooh", fx: "riser" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash", "fx"],
       main: {
@@ -334,7 +338,7 @@ const STYLES = {
     key: "C2",
     scale: "dorian",
     progressions: [[0, 3, 4, 0], [0, 3], [0, 6, 3, 0], [0, 4, 3, 0]],
-    defaultFlavors: { kick: "fourfloor", snare: "clap", hihat: "bright", perc: "conga", bass: "synth", piano: "pluck", pad: "ensemble", lead: "saw", stab: "square-chord", vocal: "ahh" },
+    defaultFlavors: { kick: "fourfloor", snare: "clap", hihat: "bright", perc: "conga", bass: "synth", piano: "pluck", pad: "ensemble", lead: "saw", stab: "square-chord", vocal: "ahh", fx: "riser" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc", "crash", "fx"],
       main: {
@@ -718,7 +722,7 @@ const STYLES = {
     key: "E1",
     scale: "minor",
     progressions: [[0, 4], [0, 3], [0, 5], [0, 6, 3, 4]],
-    defaultFlavors: { kick: "gritty", snare: "fat", hihat: "metallic", bass: "wobble", stab: "square-chord", vocal: "ahh" },
+    defaultFlavors: { kick: "gritty", snare: "fat", hihat: "metallic", bass: "wobble", stab: "square-chord", vocal: "ahh", fx: "impact" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash", "fx"],
       main: {
@@ -972,7 +976,7 @@ const STYLES = {
     key: "E1",
     scale: "minor",
     progressions: [[0, 3, 4, 0], [0, 5, 3, 4], [0, 4], [0, 6, 3, 4]],
-    defaultFlavors: { kick: "acoustic", snare: "crisp", hihat: "bright", bass: "reese", pad: "airy", stab: "square-chord" },
+    defaultFlavors: { kick: "acoustic", snare: "crisp", hihat: "bright", bass: "reese", pad: "airy", stab: "square-chord", arp: "pulse" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash"],
       main: {
@@ -1004,9 +1008,10 @@ const STYLES = {
         optionalProbability: 0.35,
       }],
     },
-    melodic: { monoInstruments: ["bass"], chordInstruments: ["pad", "stab"] },
+    melodic: { monoInstruments: ["bass", "arp"], chordInstruments: ["pad", "stab"] },
     melody: {
       bass: { motifBars: 1, noteLengths: [[4,3],[8,2],[16,1]], restProbability: 0.25, chordToneProbability: 0.85, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1],[3,1]], variationProbability: 0.25 },
+      arp: { motifBars: 1, noteLengths: [[1,6],[2,2]], restProbability: 0.4, chordToneProbability: 0.9, chordTonePool: [[0,3],[2,2],[4,2],[7,2]], passingTonePool: [[1,1]], variationProbability: 0.15 },
     },
     chords: {
       pad: {
@@ -1031,7 +1036,7 @@ const STYLES = {
     key: "A1",
     scale: "minor",
     progressions: [[0, 5, 3, 4], [0, 3, 4, 0], [0, 6, 3, 4], [0, 3]],
-    defaultFlavors: { kick: "fourfloor", snare: "fat", hihat: "bright", bass: "synth", lead: "brasslead", pad: "warm", stab: "square-chord" },
+    defaultFlavors: { kick: "fourfloor", snare: "fat", hihat: "bright", bass: "synth", lead: "brasslead", pad: "warm", stab: "square-chord", arp: "arp" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash"],
       main: {
@@ -1063,10 +1068,11 @@ const STYLES = {
         optionalProbability: 0.3,
       }],
     },
-    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["pad", "stab"] },
+    melodic: { monoInstruments: ["bass", "lead", "arp"], chordInstruments: ["pad", "stab"] },
     melody: {
       bass: { motifBars: 2, noteLengths: [[4,3],[8,2]], restProbability: 0.2, chordToneProbability: 0.9, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.25 },
       lead: { motifBars: 2, noteLengths: [[4,2],[6,3],[8,2]], restProbability: 0.3, chordToneProbability: 0.75, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.35 },
+      arp: { motifBars: 1, noteLengths: [[1,6],[2,2]], restProbability: 0.05, chordToneProbability: 0.95, chordTonePool: [[0,3],[2,2],[4,2],[7,2]], passingTonePool: [[1,1]], variationProbability: 0.1 },
     },
     chords: {
       pad: {
@@ -1084,19 +1090,28 @@ const STYLES = {
 
   rap: {
     name: "Rap",
-    description: "Deep 808, a bouncy triplet-feel kick, sparse drums, an Auto-Tune-style hook and kalimba melody.",
-    tempo: { min: 130, max: 145, default: 138 },
+    description: "Hard-hitting distorted 808, aggressive hi-hat rolls, a driven master bus, an Auto-Tune-style hook and kalimba melody.",
+    tempo: { min: 132, max: 152, default: 142 },
     swing: 0.15,
     humanize: { timingMs: 3, velocityJitter: 0.13 },
     key: "C2",
     scale: "minor",
+    // A little master-bus saturation on top of everything else below - the
+    // "driven warm on purpose" character modern hard trap/rap masters lean
+    // on for extra harmonic bite, researched from how current hard-rap
+    // records (Travis Scott/Future/Playboi Carti-adjacent production) are
+    // actually mixed, not just "louder."
+    grit: 0.3,
     progressions: [[0, 5, 3, 4], [0, 3, 4, 0], [0, 4], [0, 6, 3, 4]],
-    defaultFlavors: { kick: "808", snare: "trapsnap", hihat: "dark", bass: "808", kalimba: "kalimba", vocal: "ahh", stab: "bell-chord" },
+    defaultFlavors: { kick: "gritty", snare: "trapsnap", hihat: "metallic", bass: "hard808", kalimba: "kalimba", vocal: "ahh", stab: "bell-chord", fx: "siren" },
     drums: {
       // Modeled on the Kanye West "808s & Heartbreak" legacy (TR-808,
       // minor-key minimalism, Auto-Tuned melodic hooks) and Lil Baby-style
-      // modern melodic trap, where "less is more" on the drums so the
-      // melody and vocal hook carry the record.
+      // modern melodic trap, plus current hard-trap/rage production
+      // (Travis Scott, Future, Playboi Carti-adjacent): the drums stay
+      // sparse so the hook carries the record, but the hi-hats roll harder
+      // and more often, and the 808/kick hit with real distortion instead
+      // of staying clean - "less is more" on arrangement, not on impact.
       instruments: ["kick", "snare", "hihat", "openhat", "fx"],
       main: {
         core: {
@@ -1111,8 +1126,8 @@ const STYLES = {
           openhat: [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,0],
         },
         optionalProbability: 0.25,
-        hihatRollSteps: [11],
-        hihatRollProbability: 0.35,
+        hihatRollSteps: [3, 7, 11, 15],
+        hihatRollProbability: 0.5,
       },
       mainVariants: [{
         core: {
@@ -1127,8 +1142,8 @@ const STYLES = {
           openhat: [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,0],
         },
         optionalProbability: 0.25,
-        hihatRollSteps: [5],
-        hihatRollProbability: 0.35,
+        hihatRollSteps: [1, 5, 9, 13],
+        hihatRollProbability: 0.5,
       }],
     },
     melodic: { monoInstruments: ["bass", "kalimba"], chordInstruments: ["vocal", "stab"] },
@@ -1171,14 +1186,55 @@ function rollNoteTrack(core, optional, probability) {
   });
 }
 
-function resolveChordBarTrack(instKey, cfg, barRootDegree) {
+// Chordal instruments (piano, pad, stab, strings, organ, vocal) used to
+// resolve to the exact same register and the exact same voicing shape on
+// every single generation - a pad in particular is typically one whole-bar
+// chord with a flat-out 0% optional-hit probability, meaning it was
+// mathematically guaranteed to sound identical forever. Three independent,
+// per-generation variations now apply generically to every chordal
+// instrument in every genre (no per-genre content authoring needed):
+// register jitter (same +/- one octave idea already used for melodies),
+// a voicing-richness bonus (occasionally stacks an extra third on top for
+// a lusher chord), and - for any chord that happens to be a single
+// whole-bar sustain, which is exactly what every pad in this app is -
+// an optional split into two half-bar chords with real harmonic motion
+// between them instead of one static block of sound.
+function resolveChordBarTrack(instKey, cfg, barRootDegree, opts = {}) {
+  const { registerOffset = 0, voicingBonus = 0, splitMotion = null } = opts;
   const raw = rollNoteTrack(cfg.core, cfg.optional, cfg.optionalProbability);
-  const register = REGISTER[instKey];
-  return raw.map((spec) => {
+  const register = REGISTER[instKey] + registerOffset;
+  const resolved = raw.map((spec) => {
     if (!spec) return null;
     const root = barRootDegree + register + spec.degreeOffset;
-    return { degrees: chordDegrees(root, spec.size), len: spec.len };
+    const size = Math.max(2, spec.size + voicingBonus);
+    return { degrees: chordDegrees(root, size), len: spec.len };
   });
+
+  if (splitMotion !== null) {
+    for (let i = 0; i < resolved.length; i++) {
+      const note = resolved[i];
+      if (note && note.len === STEPS_PER_BAR && i + STEPS_PER_BAR <= resolved.length) {
+        const half = STEPS_PER_BAR / 2;
+        const secondRoot = barRootDegree + register + splitMotion;
+        resolved[i] = { degrees: note.degrees, len: half };
+        resolved[i + half] = { degrees: chordDegrees(secondRoot, note.degrees.length), len: half };
+        break;
+      }
+    }
+  }
+  return resolved;
+}
+
+function pickChordVariety(style) {
+  const variety = {};
+  for (const inst of style.melodic.chordInstruments || []) {
+    variety[inst] = {
+      registerOffset: pickWeighted([[-7, 1], [0, 3], [7, 1]]),
+      voicingBonus: pickWeighted([[0, 3], [1, 2], [2, 1]]),
+      splitMotion: Math.random() < 0.45 ? pickWeighted([[4, 1], [-3, 1], [3, 1], [-4, 1]]) : null,
+    };
+  }
+  return variety;
 }
 
 function buildStructure(bars) {
@@ -1234,7 +1290,7 @@ function buildDrumBar(style, variant) {
   return bar;
 }
 
-function buildChordBar(style, variant, barRootDegree) {
+function buildChordBar(style, variant, barRootDegree, chordVariety) {
   const bar = {};
   const chordInstruments = style.melodic.chordInstruments || [];
   for (const inst of chordInstruments) {
@@ -1242,9 +1298,10 @@ function buildChordBar(style, variant, barRootDegree) {
       bar[inst] = new Array(STEPS_PER_BAR).fill(null);
       continue;
     }
-    bar[inst] = resolveChordBarTrack(inst, style.chords[inst], barRootDegree);
+    const v = (chordVariety && chordVariety[inst]) || {};
+    bar[inst] = resolveChordBarTrack(inst, style.chords[inst], barRootDegree, v);
     if (variant === "fill" && inst === "stab") {
-      bar[inst][0] = { degrees: chordDegrees(barRootDegree + REGISTER.stab, 3), len: 2 };
+      bar[inst][0] = { degrees: chordDegrees(barRootDegree + REGISTER.stab + (v.registerOffset || 0), 3 + (v.voicingBonus || 0)), len: 2 };
     }
   }
   return bar;
@@ -1288,7 +1345,8 @@ function generateVariation(rawStyle, bars) {
     instruments[inst] = [].concat(...drumBars.map((b) => b[inst] || new Array(STEPS_PER_BAR).fill(false)));
   }
 
-  const chordBars = structure.map((variant, i) => buildChordBar(style, variant, barRootDegrees[i]));
+  const chordVariety = pickChordVariety(style);
+  const chordBars = structure.map((variant, i) => buildChordBar(style, variant, barRootDegrees[i], chordVariety));
   for (const inst of style.melodic.chordInstruments) {
     instruments[inst] = [].concat(...chordBars.map((b) => b[inst] || new Array(STEPS_PER_BAR).fill(null)));
   }
@@ -1322,14 +1380,14 @@ const SONG_SECTIONS = [
 
 const INSTRUMENT_PRIORITY = [
   "kick", "hihat", "snare", "bass", "piano", "organ", "pad", "lead", "kalimba", "marimba",
-  "guitar", "openhat", "perc", "stab", "strings", "horn", "vocal", "crash", "tom", "fx",
+  "guitar", "arp", "openhat", "perc", "stab", "strings", "horn", "vocal", "crash", "tom", "fx",
 ];
 
 // Volume automation: rather than leaving a track's fader flat for the
 // whole song, atmospheric/feature instruments swell into choruses, dip
 // for the bridge breakdown, and fade in/out over the intro and outro -
 // the same "automate a level over the arrangement" move a real mix uses.
-const AUTOMATION_INSTRUMENTS = ["pad", "strings", "organ", "lead", "vocal", "kalimba", "marimba"];
+const AUTOMATION_INSTRUMENTS = ["pad", "strings", "organ", "lead", "vocal", "kalimba", "marimba", "arp"];
 
 function generateAutomationCurve(barMetas) {
   const points = [];
@@ -1406,7 +1464,8 @@ function generateSongVariation(rawStyle) {
   const drumVariant = barMetas.map((b) => (b.pos === b.len - 1 ? "fill" : "main"));
 
   const drumBars = barMetas.map((_, i) => buildDrumBar(style, drumVariant[i]));
-  const chordBars = barMetas.map((_, i) => buildChordBar(style, drumVariant[i], barRootDegrees[i]));
+  const chordVariety = pickChordVariety(style);
+  const chordBars = barMetas.map((_, i) => buildChordBar(style, drumVariant[i], barRootDegrees[i], chordVariety));
 
   const activeSets = barMetas.map((b) => {
     const count = Math.max(2, Math.round(layerFractionForBar(b) * totalInstruments));

@@ -1,6 +1,6 @@
 # Beat Studio
 
-Describe the beat you want in plain English, or pick from 15 genres, and get either a quick loop or a full ~2-minute song with a real intro/verse/chorus/bridge/outro arrangement — drums, bass, piano, organ, lead, guitar, kalimba, marimba, strings, horns, vocal chops, pads, synth stabs, and an FX riser — then edit and mix it like a mini DAW, right in the browser. Everything is synthesized live with the Web Audio API; no audio files or dependencies required.
+Describe the beat you want in plain English, or pick from 15 genres, and get either a quick loop or a full ~2-minute song with a real intro/verse/chorus/bridge/outro arrangement — drums, bass, piano, organ, lead, guitar, kalimba, marimba, arp, strings, horns, vocal chops, pads, synth stabs, and FX — then edit and mix it like a mini DAW, right in the browser, and export it as a vertical video for Reels/TikTok/Shorts. Everything is synthesized live with the Web Audio API; no audio files or dependencies required.
 
 ## Run it
 
@@ -17,7 +17,7 @@ Then visit `http://localhost:8000`.
 - `js/theory.js` — scales (including phrygian for drill's dark mode), keys, chord building, note-name/frequency conversion.
 - `js/patterns.js` — per-genre templates for drums and chordal instruments, each style's key/scale/chord progression, the per-instrument sound-flavor pools that get auto-shuffled on every generation, two arrangement builders (a short intro/main/fill loop, and a full verse/chorus **song structure**), and the **motif-based melody generator** that drives bass, lead, and guitar.
 - `js/audio-engine.js` — synthesizes every instrument live, including a **Karplus-Strong physically-modeled plucked string** for every guitar and pluck-style bass voice, a vibrato string voice, an Amapiano-style log-drum bass, and an LFO wobble bass. Also runs the mixer (volume/mute/solo/reverb send per track) and the mix bus: sidechain ducking, a glue compressor, and a reverb send effect.
-- `js/app.js` — the channel rack UI, the free-form piano roll editor (drag to draw/resize/move notes), and the "describe your beat" prompt parser.
+- `js/app.js` — the channel rack UI, the free-form piano roll editor (drag to draw/resize/move notes), the "describe your beat" prompt parser, and the vertical-video exporter (`MediaRecorder` + `canvas.captureStream`).
 
 ## Describe the beat you want
 
@@ -42,6 +42,14 @@ Direct feedback: regenerating (or picking the same genre again after a refresh) 
 - **The core drum groove** — every genre now has a second, hand-built alternate groove alongside the original (a different kick/snare/hi-hat placement that's still authentic to the genre — e.g. Drill's alternate keeps the signature beat-3 snare lock but shifts the kick's slide points; House's alternate keeps the four-on-the-floor kick that defines the genre but changes the snare/clap/hat pattern around it), and one of the two is picked at random each generation, on top of the existing per-hit optional-fill randomization.
 
 All four roll independently on every "Generate Beat" click, every prompt-box generation, and every fresh genre pick — so two beats in the same genre, generated seconds apart, can now differ in tempo, key, chord changes, and rhythmic backbone, on top of the instrument sounds and melody that already varied.
+
+**A specific, sharper version of the same bug**: chordal instruments (piano, pad, stab, strings, organ, vocal) had it worse than melody instruments — a pad, in particular, is a single whole-bar chord with the optional-hit probability set to a flat 0%, which is mathematically guaranteed to sound identical forever, and every genre's pad used the literal same voicing shape. R&B's piano and pad were the reported case, but the same root cause existed everywhere a chordal instrument appears. Three generic fixes now apply automatically to every chordal instrument in every genre (no per-genre content authoring needed, since this is a code-level fix, not new hand-written patterns):
+
+- **Register jitter** — the same +/- one octave idea melodies already use, so a chord instrument doesn't sit in the exact same register on every generation.
+- **Voicing richness** — a per-generation chance to stack an extra third onto every chord (plain triad vs. a lusher 7th/9th voicing), so the harmonic color itself varies.
+- **Whole-bar-sustain splitting** — any chord that's a single note spanning the full bar (which is what every pad in this app is) has a real chance of splitting into two half-bar chords with genuine harmonic motion between them (a small, tasteful set of relative moves) instead of staying one static block of sound for the whole bar.
+
+Verified directly: across 8 back-to-back generations, R&B's piano and pad each produced 8 distinct results (previously they'd have been identical or near-identical every time), and the same held true across every other genre's chordal instruments.
 
 ## A full song, not just a loop
 
@@ -73,7 +81,11 @@ Fifteen styles, each modeled on real production conventions researched for this 
 - **Jersey Club** *(new)* — a bouncy triplet-feel "kick-back" pattern (approximated on the 16-step grid the way most club edits actually chop it), heavily chopped vocal hooks as the lead element, dry and punchy.
 - **Drum & Bass** *(new)* — fast syncopated breakbeat-style drums at ~172 BPM and a growling Reese bass (a stack of four detuned sawtooths beating against each other — the real technique behind the classic DnB bass sound).
 - **Synthwave** *(new)* — 80s gated drums, an analog synth bass and a brass-lead hook (a resonant bandpass-emphasized saw, the 80s synth-brass-stab timbre synthwave leans on), a lush arpeggiated pad/stab bed.
-- **Rap** *(new)* — researched specifically from Kanye West and Lil Baby's production. Deep 808 bass (the *808s & Heartbreak* legacy: TR-808-driven, minor-key, minimalist), sparse drums that deliberately leave room for the hook rather than competing with it (Lil Baby-style "less is more"), a bouncy triplet-feel kick/hi-hat pattern approximating the 1/12-note ("triplet") quantization Lil Baby's records are known for, an Auto-Tune-style sung vocal hook, and a repeating kalimba melody — the kalimba/melodic-loop sound that's become a signature of modern melodic trap.
+- **Rap** — researched from Kanye West and Lil Baby's *808s & Heartbreak*-era minimalism, plus a second pass researching current hard-trap/rage production (Travis Scott, Future, Playboi Carti-adjacent) to make it hit harder: a genuinely distorted 808 (parallel distortion — a clean sub layer for low-end power plus a heavily saturated layer blended on top purely for harmonic bite, so it stays powerful instead of just getting louder), a saturated kick, hi-hat rolls that fire far more often and on more subdivisions than before, and a touch of master-bus saturation (see below) — while keeping the sparse arrangement and the Auto-Tune-style vocal hook and kalimba ostinato that make it feel like a real melodic-trap record, not just louder drums.
+
+## Master-bus "grit": genres that are supposed to sound driven
+
+A new per-genre `grit` amount feeds a dry/wet-blended saturation stage on the master bus (0 = fully bypassed, an exact identity curve — most genres). Rap dials in a meaningful amount of it, researched from how current hard-trap/rap masters are actually mixed: driven a little warm on purpose, for harmonic bite that reads even on small phone speakers, not just turned up louder. It sits after every other processing stage and before the final compressor, so it colors the whole mix consistently rather than just one element.
 
 ## Real melodies, not random notes — and no more stuck-on-one-pitch lead
 
@@ -105,7 +117,7 @@ Researched how large sample-library instruments (the GarageBand approach: dozens
 - **Vocal** — 5 flavors: added a fourth vowel, **Oh**, and **Choir** (a 3-voice detuned formant stack instead of one voice).
 - **Kalimba** — 3 flavors: added **Steel Drum** (a different inharmonic partial ratio set for a Caribbean-steel-pan character).
 
-That's over 110 total instrument/flavor combinations, every one of them a real, distinct signal path rather than a palette swap.
+That's 120 total instrument/flavor combinations, every one of them a real, distinct signal path rather than a palette swap.
 
 ## Instruments that actually sound played: physically-modeled strings
 
@@ -126,7 +138,8 @@ Also added a soft mallet-strike transient to the piano voice (the "hammer hittin
 - **Vocal** — since real vocal samples aren't available in a dependency-free browser app, this is built with **formant synthesis**: a sawtooth source through three parallel bandpass filters tuned to vowel formant frequencies (three vowel presets now: "ooh," "ahh," "ay"), the same technique speech synthesizers use to fake a sung vowel. Present by default on the genres where vocal chops are a genuine signature sound (house, trap, reggaeton, dubstep, phonk, Jersey Club, Rap), and addable to any other genre via the prompt box.
 - **Kalimba** *(new)* — a plucked-tine tuned-percussion voice (a noise "thumb pluck" transient plus inharmonic sine partials, with a "Music Box" variant), driven by a *different* melody generator than the other lead instruments: low variation, tight rhythm, so it repeats as a genuine ostinato loop rather than an evolving motif — matching how kalimba/melodic-loop hooks actually function in modern rap and Afrobeats records, where they're a hypnotic repeating figure, not a developing melody.
 - **Marimba** *(new)* — a mallet-percussion voice: a soft, low-passed strike transient (rounder than the kalimba's metal-tine click, since a mallet compresses against a wooden bar rather than snapping a tine) plus a fundamental/fourth-harmonic sine pair, matching how a real marimba bar is tuned. The **Vibraphone** flavor adds the slow pulsating tremolo a rotating resonator fan gives a real vibraphone — the one clear audible difference from the marimba's dry wooden tone. Layered in as a sparse, low-density ostinato alongside the existing melody on Lo-Fi Chill and Afrobeats, the two genres where a mallet instrument is genuinely idiomatic (Nujabes-style lo-fi glockenspiel touches; African mallet/log-drum textures).
-- **FX Riser** *(new)* — a rising bandpass-filtered noise sweep, the classic pre-drop/pre-chorus transition effect. In Full Song mode it's placed automatically one bar before every chorus, regardless of that bar's instrument density, because a section-change riser is a deliberate arrangement choice, not something that should get masked out by the general layering system.
+- **Arp** *(new)* — a dedicated arpeggiator voice, deliberately built to sound short and staccato (a fast decay baked into the synthesis itself, independent of the note length the sequencer feeds it) rather than reusing the sustained Lead voice, because a real arp is a fast run of retriggered notes, not a held tone. Two flavors: a bright unison-saw pluck (classic trance/house arp) and a duller square-wave **Pulse** (chiptune-adjacent). Added to Synthwave and Drum & Bass, where a fast arpeggiated line is genuinely idiomatic.
+- **FX** — a rising bandpass-filtered noise **Riser**, the classic pre-drop/pre-chorus transition effect (in Full Song mode it's placed automatically one bar before every chorus, regardless of that bar's instrument density, because a section-change riser is a deliberate arrangement choice that shouldn't get masked by the general layering system); plus two new flavors researched from modern hard-trap FX use — a **Siren** (a sawtooth sweeping up and back down through a bandpass, the classic trap "police siren" ad-lib stab) and an **Impact** (a sub thump + noise crash + slow noise swell, the cinematic "trailer hit" used to punctuate a hard beat switch).
 
 ## Mixing: how producers actually make a beat sound good
 
@@ -183,6 +196,16 @@ Every hit also gets small randomized pitch/decay/timing/velocity variation at pl
 ## A live audio visualizer, and a look tied to the genre you pick
 
 A real frequency visualizer (Web Audio's `AnalyserNode`, tapped straight off the master bus after the compressor) animates while a beat plays — no fake/decorative animation, it's reading the actual output. The workspace panel's border and glow also pick up the selected genre's accent color instead of staying one fixed color for every style, so the whole page feels like it belongs to the beat you're making.
+
+## Export a vertical video for Reels / TikTok / Shorts
+
+"🎥 Export Reel" in the transport renders the current beat as a real, downloadable video file, entirely client-side — no server, no render farm:
+
+- A portrait (9:16) canvas draws a genre-branded animation live while the beat plays: a frequency visualizer driven by the same real `AnalyserNode` data as the on-page visualizer, the genre name, current tempo/key, and a progress bar.
+- The canvas is captured as a video track (`canvas.captureStream`) and combined with the actual mixed audio, tapped straight off the engine's master bus via a `MediaStreamAudioDestinationNode` (the same fully-processed signal — EQ, sidechain, grit, compressor and all — that comes out of the speakers, not a separate re-render).
+- Both tracks are recorded together with `MediaRecorder` into a `.webm` file, then automatically downloaded — pick a 15/30/60 second length, hit export, and a file lands in your downloads folder named after the genre.
+
+Recording restarts playback from the top of the pattern so the clip always begins at the start of the beat, and the whole thing can be cancelled mid-recording without leaving playback or the UI in a broken state. Browser note: this relies on `MediaRecorder` + `canvas.captureStream`, which Chrome, Edge, and Firefox all support; the export button will say so plainly if a browser doesn't.
 
 ## A note on the vocal instrument
 

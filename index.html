@@ -56,6 +56,17 @@
           <label for="master-slider">Master</label>
           <input type="range" id="master-slider" min="0" max="100" value="90">
         </div>
+
+        <div class="transport-field">
+          <label for="reel-duration">Reel length</label>
+          <select id="reel-duration">
+            <option value="15">15s</option>
+            <option value="30" selected>30s</option>
+            <option value="60">60s</option>
+          </select>
+        </div>
+
+        <button id="export-reel-btn" class="transport-btn" title="Render a vertical video of this beat to download for Instagram Reels / TikTok / Shorts">🎥 Export Reel</button>
       </div>
 
       <p id="shuffle-status" class="shuffle-status"></p>
@@ -93,6 +104,14 @@
         </div>
       </div>
     </section>
+  </div>
+
+  <div id="reel-overlay" class="reel-overlay" hidden>
+    <div class="reel-modal">
+      <canvas id="reel-canvas" width="720" height="1280"></canvas>
+      <p id="reel-status" class="reel-status">Preparing...</p>
+      <button id="reel-cancel" class="transport-btn">Cancel</button>
+    </div>
   </div>
 
   <script src="js/theory.js"></script>

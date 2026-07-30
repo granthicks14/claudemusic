@@ -141,6 +141,14 @@ Also added a soft mallet-strike transient to the piano voice (the "hammer hittin
 - **Arp** *(new)* — a dedicated arpeggiator voice, deliberately built to sound short and staccato (a fast decay baked into the synthesis itself, independent of the note length the sequencer feeds it) rather than reusing the sustained Lead voice, because a real arp is a fast run of retriggered notes, not a held tone. Two flavors: a bright unison-saw pluck (classic trance/house arp) and a duller square-wave **Pulse** (chiptune-adjacent). Added to Synthwave and Drum & Bass, where a fast arpeggiated line is genuinely idiomatic.
 - **FX** — a rising bandpass-filtered noise **Riser**, the classic pre-drop/pre-chorus transition effect (in Full Song mode it's placed automatically one bar before every chorus, regardless of that bar's instrument density, because a section-change riser is a deliberate arrangement choice that shouldn't get masked by the general layering system); plus two new flavors researched from modern hard-trap FX use — a **Siren** (a sawtooth sweeping up and back down through a bandpass, the classic trap "police siren" ad-lib stab) and an **Impact** (a sub thump + noise crash + slow noise swell, the cinematic "trailer hit" used to punctuate a hard beat switch).
 
+## "Free kits," researched and synthesized rather than imported
+
+The brief asked for free instrument kits — worth being upfront about how that request maps onto this app: everything here is synthesized live with the Web Audio API by design ("no audio files or dependencies," stated up top), so no actual sample packs get loaded in, licensed or otherwise. What this round actually did was research the *circuit/synthesis behavior* of some of the most famous, most-documented drum machines and orchestral instrument kits ever made — public knowledge, reverse-engineered and modeled endlessly in the free-synthesis world, not a copyrighted recording — and built new, genuinely distinct flavors from that research, the same way the TR-808 research in an earlier round became the true-808 kick/bass fix:
+
+- **Roland TR-909** — the house/techno drum machine. The kick preset is punchier and more mid-focused than the 808, with the 909's signature separate click-attack layer. The snare is bright, snappy, and slightly metallic. The hi-hat is the biggest departure from how every other hat in the app is built: a real 909 hat isn't filtered noise at all, it's **six square-wave oscillators at specific inharmonic frequency ratios**, summed and high-passed — that oscillator cluster (implemented exactly that way here) is what actually gives a 909 hat its ringing metallic character. Now House's default kit.
+- **LinnDrum** — the deep, round, slightly boomier 80s drum-machine kick and cleaner mid-focused snare that defined a huge amount of 80s pop and synth production. Now Synthwave's default kit.
+- **Timpani** and **Clarinet** — researched from a General MIDI-style free orchestral instrument set. Timpani (a new Percussion flavor) has the characteristic slight downward pitch glide right at the mallet strike that a real tuned drum head produces. Clarinet (a new Horn flavor) uses a **square wave** instead of the sawtooth every brass flavor uses — a cylindrical, reed-and-closed-end woodwind bore acoustically suppresses even harmonics, and a square wave is exactly that (odd harmonics only), which is the actual acoustic reason a clarinet reads as hollow/woody rather than brassy, not just a different filter setting.
+
 ## Mixing: how producers actually make a beat sound good
 
 Three techniques pulled directly from mixing research, applied to every beat:
@@ -179,7 +187,9 @@ Bass, lead, guitar, piano, organ, pad, stab, strings, horn, and vocal are stored
 
 Every melodic/chordal track gets a new **A** button (next to Mute/Solo) that opens a volume-automation editor — a draggable curve across the entire arrangement, exactly like an automation clip in a real DAW: click empty space to add a point, drag a point to move it, click a point to delete it, and "Reset to Flat" clears it back to a constant level. This is genuinely applied at playback, not just visual — the engine reads the curve every step and scales that instrument's volume accordingly, live, even while a beat is already playing.
 
-In **Full Song** mode, atmospheric and feature instruments (pad, strings, organ, lead, vocal, kalimba) get a sensible automation curve generated automatically — quiet in the intro, swelling into each chorus, dipping for the bridge breakdown, fading out over the outro — because that's the kind of thing a mix actually needs over a multi-minute arrangement; short loops are left flat since a 4-bar loop has nowhere to "build" to. You can always override the generated curve by hand.
+In **Full Song** mode, atmospheric and feature instruments (pad, strings, organ, lead, vocal, kalimba, marimba, arp) get a sensible automation curve generated automatically — quiet in the intro, swelling into each chorus, dipping for the bridge breakdown, fading out over the outro — because that's the kind of thing a mix actually needs over a multi-minute arrangement; short loops are left flat since a 4-bar loop has nowhere to "build" to. You can always override the generated curve by hand.
+
+**Bass was one of the only instruments that never got this treatment**, and it showed: reported as "the bass sounds too aggressive in parts it's not supposed to." With every atmospheric instrument dipping down to ~15-30% through a hushed intro or bridge and bass staying pinned at full, constant velocity the whole time, bass would stick out disproportionately in exactly the sections meant to feel stripped-back. Bass now gets its own automation curve too, using the same intro/verse/chorus/bridge/outro shape but blended back toward full level (roughly a 60-100% range instead of atmospheric instruments' 15-100%) — present and foundational throughout, the way a bass should be, but with real pullback so a quiet section actually reads as quiet.
 
 ## Editing it like a DAW
 
@@ -199,13 +209,30 @@ A real frequency visualizer (Web Audio's `AnalyserNode`, tapped straight off the
 
 ## Export a vertical video for Reels / TikTok / Shorts
 
-"🎥 Export Reel" in the transport renders the current beat as a real, downloadable video file, entirely client-side — no server, no render farm:
+"🎥 Export Reel" in the transport renders the current beat as a real, downloadable video file, entirely client-side — no server, no render farm. The visuals got a substantial pass this round, from a static-looking bar chart to something that actually reacts to the beat like a real music-video render:
 
-- A portrait (9:16) canvas draws a genre-branded animation live while the beat plays: a frequency visualizer driven by the same real `AnalyserNode` data as the on-page visualizer, the genre name, current tempo/key, and a progress bar.
-- The canvas is captured as a video track (`canvas.captureStream`) and combined with the actual mixed audio, tapped straight off the engine's master bus via a `MediaStreamAudioDestinationNode` (the same fully-processed signal — EQ, sidechain, grit, compressor and all — that comes out of the speakers, not a separate re-render).
-- Both tracks are recorded together with `MediaRecorder` into a `.webm` file, then automatically downloaded — pick a 15/30/60 second length, hit export, and a file lands in your downloads folder named after the genre.
+- **True Reels resolution** — a 1080×1920 portrait canvas, not a downscaled preview.
+- **A circular radial visualizer** instead of a plain row of bars — 72 bars arranged in a ring around a center point, each driven by the same real `AnalyserNode` frequency data as the on-page visualizer, with a glowing inner ring.
+- **A kick-reactive pulse.** The background glow and the inner ring genuinely scale up on every kick hit (tracked live off the actual pattern data as it plays, decaying smoothly between hits), so the video visibly breathes with the beat instead of just showing generic audio-reactive noise.
+- **A live section badge** in Full Song mode — a small pill reading INTRO / VERSE 1 / CHORUS 1 / BRIDGE / etc., pulled from the real arrangement data, so the video narrates where it is in the song.
+- **Instrument-activity dots** — a row of small dots, one per instrument actually present in the genre, that light up in that instrument's own track color on the exact steps it's sounding, so the video visibly reflects the real arrangement rather than an abstract visualizer.
+- Genre name, tempo/key, the Beat Studio wordmark, and a glowing progress bar round it out.
 
-Recording restarts playback from the top of the pattern so the clip always begins at the start of the beat, and the whole thing can be cancelled mid-recording without leaving playback or the UI in a broken state. Browser note: this relies on `MediaRecorder` + `canvas.captureStream`, which Chrome, Edge, and Firefox all support; the export button will say so plainly if a browser doesn't.
+Under the hood: the canvas is captured as a video track (`canvas.captureStream`) and combined with the actual mixed audio, tapped straight off the engine's master bus via a `MediaStreamAudioDestinationNode` (the same fully-processed signal — EQ, sidechain, grit, compressor and all — that comes out of the speakers, not a separate re-render). Both tracks are recorded together with `MediaRecorder` into a `.webm` file, then automatically downloaded — pick a 15/30/60 second length, hit export, and a file lands in your downloads folder named after the genre. Recording restarts playback from the top of the pattern so the clip always begins at the start of the beat, and the whole thing can be cancelled mid-recording without leaving playback or the UI in a broken state.
+
+**A real bug caught while building this:** the export overlay's CSS set `display: flex` directly on the same class the `hidden` attribute was supposed to toggle, which meant the browser's built-in `[hidden] { display: none }` rule silently lost the specificity fight — the overlay was invisible but still `display: flex`, and it sat on top of the entire page blocking every click, `hidden` or not. Caught by an automated click test rather than eyeballing it, and fixed with an explicit `.reel-overlay[hidden] { display: none }` rule.
+
+Browser note: this relies on `MediaRecorder` + `canvas.captureStream`, which Chrome, Edge, and Firefox all support; the export button will say so plainly if a browser doesn't.
+
+## A cleaner, more scannable beat editor
+
+The channel rack got a real visual pass, not just new features:
+
+- **Beat-level gridlines.** Previously the grid only marked bar boundaries; now there's a second, subtler line on every beat (every 4 steps) layered underneath, so you can actually parse where in the bar a hit or note falls at a glance instead of squinting across a wall of undifferentiated cells.
+- **Color-coded rows.** Every track row now has a left-edge accent stripe in that instrument's own color (matching its hit marks/note bars), plus a matching glow on its color swatch, so scanning down a busy arrangement to find "the bass row" or "the hi-hat row" is immediate instead of reading labels one by one.
+- **Taller, more comfortable rows** with bigger click targets on every hit/note, and slightly larger mute/solo/automation buttons with a proper hover state instead of static flat icons.
+- **Alternating row shading** for easier left-to-right tracking across a wide, scrollable grid.
+- Widened the label column so longer instrument names (Kalimba, Marimba) stop getting cut off to "Kalim…".
 
 ## A note on the vocal instrument
 

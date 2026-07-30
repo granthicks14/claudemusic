@@ -287,6 +287,16 @@ class BeatEngine {
       subkick: { startFreq: 68, endFreq: 26, decay: 0.75 },
       gritty: { startFreq: 110, endFreq: 50, decay: 0.4 },
       roomy: { startFreq: 115, endFreq: 42, decay: 0.5 },
+      // Researched from two of the most-documented, most-imitated drum
+      // machines ever built (their circuit behavior is public knowledge,
+      // reverse-engineered and modeled endlessly in free/open synthesis
+      // projects) rather than any copyrighted recording: the Roland TR-909
+      // kick is punchier and more mid-range than an 808, with a distinct
+      // audible click from its separate attack circuit; the LinnDrum kick
+      // is a deep, round 80s thud with more body and less low-click than
+      // either the 909 or the 808.
+      "909": { startFreq: 150, endFreq: 58, decay: 0.22 },
+      linn: { startFreq: 105, endFreq: 42, decay: 0.4 },
     };
     const p = presets[flavor] || presets.boombap;
     const jitter = 0.92 + Math.random() * 0.16;
@@ -359,6 +369,23 @@ class BeatEngine {
       click.start(time);
       click.stop(time + 0.02);
     }
+
+    if (flavor === "909") {
+      // The 909's kick circuit layers a distinct high-passed click from a
+      // separate attack path on top of the pitched body - that click is
+      // most of what makes it read as "909" rather than a generic kick.
+      const click = ctx.createBufferSource();
+      click.buffer = this.makeNoiseBuffer(0.015);
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 3200;
+      const clickGain = ctx.createGain();
+      clickGain.gain.setValueAtTime(vel * 0.4, time);
+      clickGain.gain.exponentialRampToValueAtTime(0.001, time + 0.015);
+      click.connect(hp).connect(clickGain).connect(this.dest("kick"));
+      click.start(time);
+      click.stop(time + 0.018);
+    }
   }
 
   playSnare(time, vel, flavor) {
@@ -374,6 +401,11 @@ class BeatEngine {
       acoustic: { noiseHp: 900, noiseDecay: 0.28, toneFreq: 180, toneDecay: 0.18 },
       ghost: { noiseHp: 2200, noiseDecay: 0.05, toneFreq: 0, toneDecay: 0 },
       layered: { noiseHp: 2600, noiseDecay: 0.16, toneFreq: 165, toneDecay: 0.22 },
+      // TR-909: bright, snappy, slightly metallic - the crisp techno/house
+      // snare character. LinnDrum: a cleaner, more mid-focused 80s pop
+      // snare with a touch more tail than the 909's short snap.
+      "909snare": { noiseHp: 2200, noiseDecay: 0.16, toneFreq: 205, toneDecay: 0.1 },
+      linn: { noiseHp: 1500, noiseDecay: 0.24, toneFreq: 195, toneDecay: 0.16 },
     };
     const p = presets[flavor] || presets.crisp;
 
@@ -432,8 +464,33 @@ class BeatEngine {
       sizzle: { hp: 9500, lp: null, peak: 11000 },
       lofi808: { hp: 7000, lp: 10500 },
     };
-    const p = presets[flavor] || presets.bright;
     const decay = open ? 0.32 + Math.random() * 0.1 : 0.05 + Math.random() * 0.02;
+
+    if (flavor === "909") {
+      // The real TR-909 hat isn't noise at all - it's six square-wave
+      // oscillators at specific inharmonic frequency ratios, summed and
+      // high-passed. That oscillator cluster (rather than filtered noise)
+      // is exactly what gives it that recognizable metallic, slightly
+      // ringing character instead of a plain hiss.
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.5, time);
+      gain.gain.exponentialRampToValueAtTime(0.01, time + decay);
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 8000;
+      hp.connect(gain).connect(this.dest(trackKey));
+      for (const ratio of [1, 1.48, 1.8, 2.55, 3.9, 5.43]) {
+        const osc = ctx.createOscillator();
+        osc.type = "square";
+        osc.frequency.value = 205 * ratio;
+        osc.connect(hp);
+        osc.start(time);
+        osc.stop(time + decay + 0.02);
+      }
+      return;
+    }
+
+    const p = presets[flavor] || presets.bright;
 
     const noise = ctx.createBufferSource();
     noise.buffer = this.makeNoiseBuffer(0.5);
@@ -582,6 +639,37 @@ class BeatEngine {
       osc.connect(bp).connect(gain).connect(this.dest("perc"));
       osc.start(time);
       osc.stop(time + 0.9);
+      return;
+    }
+    if (flavor === "timpani") {
+      // An orchestral tuned drum: a low fundamental with the characteristic
+      // slight downward pitch glide right at the strike (the head briefly
+      // reads sharp under mallet impact), plus a soft lowpassed mallet
+      // attack transient - part of researching a free, well-documented
+      // General MIDI-style orchestral kit for genuinely new percussion.
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      const freq = 110;
+      osc.frequency.setValueAtTime(freq * 1.08, time);
+      osc.frequency.exponentialRampToValueAtTime(freq, time + 0.1);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.9, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.8);
+      osc.connect(gain).connect(this.dest("perc"));
+      osc.start(time);
+      osc.stop(time + 0.85);
+
+      const strike = ctx.createBufferSource();
+      strike.buffer = this.makeNoiseBuffer(0.03);
+      const strikeFilter = ctx.createBiquadFilter();
+      strikeFilter.type = "lowpass";
+      strikeFilter.frequency.value = 900;
+      const strikeGain = ctx.createGain();
+      strikeGain.gain.setValueAtTime(vel * 0.3, time);
+      strikeGain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+      strike.connect(strikeFilter).connect(strikeGain).connect(this.dest("perc"));
+      strike.start(time);
+      strike.stop(time + 0.035);
       return;
     }
     const noise = ctx.createBufferSource();
@@ -1276,6 +1364,31 @@ class BeatEngine {
         osc.start(time);
         osc.stop(time + dur + 0.05);
       }
+      return;
+    }
+
+    if (flavor === "clarinet") {
+      // A clarinet's cylindrical bore (closed at the reed end) acoustically
+      // suppresses even harmonics, leaving only the odd ones - a square
+      // wave is exactly that: odd harmonics only, none of the even ones a
+      // sawtooth (used for the brass flavors) has. That's the real acoustic
+      // reason a clarinet reads as hollow/woody rather than brassy, and
+      // it's a genuinely different synthesis path, not just a filter swap.
+      const dur = Math.min(durationSeconds, 0.55);
+      const osc = ctx.createOscillator();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(freq, time);
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 1100;
+      bp.Q.value = 2.2;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.75, time + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      osc.connect(bp).connect(gain).connect(dest);
+      osc.start(time);
+      osc.stop(time + dur + 0.05);
       return;
     }
 

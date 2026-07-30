@@ -3,10 +3,10 @@ const STEPS_PER_BAR = 16;
 const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14, arp: 18 };
 
 const FLAVOR_POOLS = {
-  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy"],
-  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered"],
-  hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808"],
-  perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle"],
+  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "909", "linn"],
+  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn"],
+  hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909"],
+  perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani"],
   bass: ["warm", "synth", "808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright"],
   piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord"],
   lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm"],
@@ -14,7 +14,7 @@ const FLAVOR_POOLS = {
   stab: ["pluck-chord", "square-chord", "bell-chord", "brass-chord", "organ-chord", "string-chord"],
   guitar: ["clean", "power", "muted", "nylon", "acoustic", "jazz", "funk", "twelvestring"],
   strings: ["soul", "orchestral", "staccato", "synth", "pizzicato", "tremolo"],
-  horn: ["brass", "soft", "muted", "sax", "trumpetstab", "section"],
+  horn: ["brass", "soft", "muted", "sax", "trumpetstab", "section", "clarinet"],
   organ: ["drawbar", "gospel", "church", "combo"],
   vocal: ["ooh", "ahh", "ay", "oh", "choir"],
   kalimba: ["kalimba", "musicbox", "steeldrum"],
@@ -31,10 +31,10 @@ const FLAVOR_POOLS = {
 // applied to a shuffle, so "Generate Beat" lands on a beat that sounds like
 // one production instead of several unrelated instruments stacked together.
 const FLAVOR_TAGS = {
-  kick: { boombap: "warm", "808": "dark", fourfloor: "bright", acoustic: "warm", lofi: "warm", deep: "dark", snappy: "bright", click: "bright", punch: "bright", subkick: "dark", gritty: "dark", roomy: "warm" },
-  snare: { crisp: "bright", clap: "bright", fat: "warm", rimshot: "bright", trapsnap: "bright", brush: "warm", gated: "dark", acoustic: "warm", ghost: "dark", layered: "dark" },
-  hihat: { bright: "bright", dark: "dark", vinyl: "warm", metallic: "bright", analog: "warm", tape: "warm", sizzle: "bright", lofi808: "dark" },
-  perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright" },
+  kick: { boombap: "warm", "808": "dark", fourfloor: "bright", acoustic: "warm", lofi: "warm", deep: "dark", snappy: "bright", click: "bright", punch: "bright", subkick: "dark", gritty: "dark", roomy: "warm", "909": "bright", linn: "warm" },
+  snare: { crisp: "bright", clap: "bright", fat: "warm", rimshot: "bright", trapsnap: "bright", brush: "warm", gated: "dark", acoustic: "warm", ghost: "dark", layered: "dark", "909snare": "bright", linn: "warm" },
+  hihat: { bright: "bright", dark: "dark", vinyl: "warm", metallic: "bright", analog: "warm", tape: "warm", sizzle: "bright", lofi808: "dark", "909": "bright" },
+  perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright", timpani: "dark" },
   bass: { warm: "warm", synth: "bright", "808": "dark", hard808: "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm" },
   piano: { electric: "bright", pluck: "bright", grand: "warm", rhodes: "warm", wurlitzer: "warm", upright: "warm", celesta: "bright", toy: "bright", harpsichord: "bright" },
   lead: { square: "bright", saw: "bright", bell: "bright", flute: "warm", supersaw: "bright", pluck: "bright", sine: "warm", chip: "bright", brasslead: "warm", fm: "bright" },
@@ -42,7 +42,7 @@ const FLAVOR_TAGS = {
   stab: { "pluck-chord": "bright", "square-chord": "bright", "bell-chord": "bright", "brass-chord": "warm", "organ-chord": "warm", "string-chord": "warm" },
   guitar: { clean: "bright", power: "dark", muted: "dark", nylon: "warm", acoustic: "warm", jazz: "warm", funk: "bright", twelvestring: "bright" },
   strings: { soul: "warm", orchestral: "warm", staccato: "bright", synth: "bright", pizzicato: "bright", tremolo: "dark" },
-  horn: { brass: "bright", soft: "warm", muted: "dark", sax: "warm", trumpetstab: "bright", section: "bright" },
+  horn: { brass: "bright", soft: "warm", muted: "dark", sax: "warm", trumpetstab: "bright", section: "bright", clarinet: "warm" },
   organ: { drawbar: "warm", gospel: "dark", church: "dark", combo: "bright" },
   vocal: { ooh: "warm", ahh: "warm", ay: "bright", oh: "warm", choir: "warm" },
   kalimba: { kalimba: "warm", musicbox: "bright", steeldrum: "bright" },
@@ -338,7 +338,7 @@ const STYLES = {
     key: "C2",
     scale: "dorian",
     progressions: [[0, 3, 4, 0], [0, 3], [0, 6, 3, 0], [0, 4, 3, 0]],
-    defaultFlavors: { kick: "fourfloor", snare: "clap", hihat: "bright", perc: "conga", bass: "synth", piano: "pluck", pad: "ensemble", lead: "saw", stab: "square-chord", vocal: "ahh", fx: "riser" },
+    defaultFlavors: { kick: "909", snare: "909snare", hihat: "909", perc: "conga", bass: "synth", piano: "pluck", pad: "ensemble", lead: "saw", stab: "square-chord", vocal: "ahh", fx: "riser" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc", "crash", "fx"],
       main: {
@@ -1036,7 +1036,7 @@ const STYLES = {
     key: "A1",
     scale: "minor",
     progressions: [[0, 5, 3, 4], [0, 3, 4, 0], [0, 6, 3, 4], [0, 3]],
-    defaultFlavors: { kick: "fourfloor", snare: "fat", hihat: "bright", bass: "synth", lead: "brasslead", pad: "warm", stab: "square-chord", arp: "arp" },
+    defaultFlavors: { kick: "linn", snare: "linn", hihat: "bright", bass: "synth", lead: "brasslead", pad: "warm", stab: "square-chord", arp: "arp" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash"],
       main: {
@@ -1389,7 +1389,18 @@ const INSTRUMENT_PRIORITY = [
 // the same "automate a level over the arrangement" move a real mix uses.
 const AUTOMATION_INSTRUMENTS = ["pad", "strings", "organ", "lead", "vocal", "kalimba", "marimba", "arp"];
 
-function generateAutomationCurve(barMetas) {
+// intensity scales how far a track pulls back in quiet sections - 1 is
+// the full atmospheric swing (down to ~30% in an intro/bridge), while a
+// lower intensity blends the curve back toward a constant 1. Bass needed
+// its own, much gentler version of this: without any automation at all it
+// was one of the only instruments still hammering at full, unchanging
+// velocity straight through a hushed bridge or intro while everything
+// else (pads, strings, lead) tastefully dipped - reported as "the bass
+// sounds too aggressive in parts it's not supposed to." Bass is still
+// foundational and shouldn't vanish the way an atmospheric pad does, but
+// it does deserve *some* pullback so a quiet section actually reads as
+// quiet instead of just missing its other instruments.
+function generateAutomationCurve(barMetas, intensity = 1) {
   const points = [];
   let lastValue = null;
   for (let i = 0; i < barMetas.length; i++) {
@@ -1404,6 +1415,8 @@ function generateAutomationCurve(barMetas) {
     else if (b.type === "outro") value = 0.7 - 0.55 * (b.pos / span);
     else value = 0.7;
 
+    value = 1 - (1 - value) * intensity;
+
     if (points.length === 0 || Math.abs(value - lastValue) > 0.05 || i === barMetas.length - 1) {
       points.push({ step, value: Math.max(0, Math.min(1, value)) });
       lastValue = value;
@@ -1416,8 +1429,11 @@ function generateAutomation(style, barMetas) {
   const automation = {};
   for (const inst of AUTOMATION_INSTRUMENTS) {
     if (style.melodic.chordInstruments.includes(inst) || style.melodic.monoInstruments.includes(inst)) {
-      automation[inst] = generateAutomationCurve(barMetas);
+      automation[inst] = generateAutomationCurve(barMetas, 1);
     }
+  }
+  if (style.melodic.monoInstruments.includes("bass")) {
+    automation.bass = generateAutomationCurve(barMetas, 0.45);
   }
   return automation;
 }

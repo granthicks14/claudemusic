@@ -240,7 +240,7 @@ function trackHeaderHTML(track) {
     ? `<button class="track-btn auto-btn ${hasAutomation ? "has-automation" : ""} ${openAutomationInst === track ? "on" : ""}" data-action="automation" data-track="${track}" title="Edit volume over the song">A</button>`
     : "";
   return `
-    <span class="track-color" style="background:${TRACK_COLOR[track]}"></span>
+    <span class="track-color" style="background:${TRACK_COLOR[track]};box-shadow:0 0 5px 1px ${TRACK_COLOR[track]}"></span>
     <button class="track-name" data-track="${track}" title="Open piano roll">${TRACK_LABELS[track]}</button>
     <button class="track-btn mute-btn ${state.muted ? "on" : ""}" data-action="mute" data-track="${track}">M</button>
     <button class="track-btn solo-btn ${state.solo ? "on" : ""}" data-action="solo" data-track="${track}">S</button>
@@ -250,9 +250,17 @@ function trackHeaderHTML(track) {
   `;
 }
 
+// Two layered grids: a faint line on every beat (quarter-note, every 4
+// steps) so the eye can actually parse rhythm placement at a glance
+// instead of a wall of undifferentiated cells, plus the stronger existing
+// line on every bar boundary on top.
 function barDividerBackground(bars) {
   const barPct = 100 / bars;
-  return `repeating-linear-gradient(to right, rgba(255,255,255,0.09) 0, rgba(255,255,255,0.09) 1px, transparent 1px, transparent ${barPct}%)`;
+  const beatPct = 100 / (bars * 4);
+  return [
+    `repeating-linear-gradient(to right, rgba(255,255,255,0.055) 0, rgba(255,255,255,0.055) 1px, transparent 1px, transparent ${beatPct}%)`,
+    `repeating-linear-gradient(to right, rgba(255,255,255,0.12) 0, rgba(255,255,255,0.12) 1.5px, transparent 1.5px, transparent ${barPct}%)`,
+  ].join(", ");
 }
 
 function noteNameFor(track, note) {
@@ -304,12 +312,13 @@ function renderHitMarks(lane, track, steps) {
 function renderStepGrid() {
   stepGrid.innerHTML = "";
   const steps = selectedBars * STEPS_PER_BAR;
-  stepGrid.style.gridTemplateColumns = `248px repeat(${steps}, 1fr)`;
-  sectionRow.style.gridTemplateColumns = `248px repeat(${steps}, 1fr)`;
+  stepGrid.style.gridTemplateColumns = `264px repeat(${steps}, 1fr)`;
+  sectionRow.style.gridTemplateColumns = `264px repeat(${steps}, 1fr)`;
 
-  for (const track of activeRows()) {
+  activeRows().forEach((track, rowIndex) => {
     const header = document.createElement("div");
-    header.className = "track-header";
+    header.className = "track-header" + (rowIndex % 2 ? " alt" : "");
+    header.style.borderLeftColor = TRACK_COLOR[track] || "transparent";
     header.innerHTML = trackHeaderHTML(track);
     stepGrid.appendChild(header);
 
@@ -319,15 +328,15 @@ function renderStepGrid() {
     lane.style.backgroundImage = barDividerBackground(selectedBars);
 
     if (DRUM_ORDER.includes(track)) {
-      lane.className = "rack-lane drum-lane";
+      lane.className = "rack-lane drum-lane" + (rowIndex % 2 ? " alt" : "");
       renderHitMarks(lane, track, steps);
     } else {
-      lane.className = "rack-lane melodic-lane";
+      lane.className = "rack-lane melodic-lane" + (rowIndex % 2 ? " alt" : "");
       if (openPianoRollInst === track) lane.classList.add("editing");
       renderNoteBars(lane, track, steps);
     }
     stepGrid.appendChild(lane);
-  }
+  });
 
   const playhead = document.createElement("div");
   playhead.id = "playhead";
@@ -818,60 +827,179 @@ function pickReelMimeType() {
   return "";
 }
 
-function drawReelFrame(ctx, elapsedSec, durationSec) {
+// Kick-driven "pulse" and per-step active-instrument tracking, read by the
+// reel's animation loop so the video actually reacts to the beat instead
+// of just showing a generic, beat-agnostic visualizer - the difference
+// between a real music-video look and a stock audio-bars gif.
+let reelPulse = 0;
+const reelActiveInstruments = new Set();
+const REEL_DOT_INSTRUMENTS = ["kick", "snare", "hihat", "bass", "lead", "piano", "guitar", "vocal"];
+
+function reelStepHook(step) {
+  const pattern = currentPattern;
+  if (!pattern) return;
+  if (pattern.instruments.kick && pattern.instruments.kick[step]) reelPulse = 1;
+  reelActiveInstruments.clear();
+  for (const inst of REEL_DOT_INSTRUMENTS) {
+    const track = pattern.instruments[inst];
+    if (track && track[step]) reelActiveInstruments.add(inst);
+  }
+}
+
+function reelSectionLabel(step) {
+  if (!currentPattern || !currentPattern.structure) return "";
+  const barIndex = Math.floor(step / STEPS_PER_BAR);
+  const label = currentPattern.structure[barIndex];
+  if (!label) return "";
+  if (arrangementMode !== "song") return "";
+  return label;
+}
+
+function drawReelFrame(ctx, elapsedSec, durationSec, step) {
   const w = reelCanvas.width;
   const h = reelCanvas.height;
   const accent = STYLE_ACCENTS[selectedStyleId] || "#a55eea";
+  const cx = w / 2;
+  const cy = h * 0.46;
 
-  ctx.fillStyle = "#0b0b12";
+  reelPulse *= 0.9;
+
+  ctx.fillStyle = "#08080d";
   ctx.fillRect(0, 0, w, h);
 
-  const glow = ctx.createRadialGradient(w / 2, h * 0.4, 30, w / 2, h * 0.4, h * 0.75);
-  glow.addColorStop(0, accent + "50");
-  glow.addColorStop(1, "#0b0b1200");
+  const pulseR = h * (0.5 + 0.06 * reelPulse);
+  const glow = ctx.createRadialGradient(cx, cy, 20, cx, cy, pulseR);
+  glow.addColorStop(0, accent + (reelPulse > 0.3 ? "70" : "45"));
+  glow.addColorStop(1, "#08080d00");
   ctx.fillStyle = glow;
   ctx.fillRect(0, 0, w, h);
 
+  // A circular radial visualizer - bars radiating outward from a center
+  // ring, driven by the same real frequency data as the on-page
+  // visualizer, plus a solid inner ring that scales with the kick pulse.
   if (engine.analyser) {
     const data = new Uint8Array(engine.analyser.frequencyBinCount);
     engine.analyser.getByteFrequencyData(data);
-    const barCount = 36;
-    const barGap = 7;
-    const barWidth = (w - 100) / barCount - barGap;
-    const baseY = h * 0.6;
-    ctx.fillStyle = accent;
-    for (let i = 0; i < barCount; i++) {
-      const dataIndex = Math.floor((i / barCount) * data.length * 0.7);
+    const bars = 72;
+    const innerR = h * 0.13 * (1 + 0.12 * reelPulse);
+    for (let i = 0; i < bars; i++) {
+      const angle = (i / bars) * Math.PI * 2 - Math.PI / 2;
+      const dataIndex = Math.floor((i / bars) * data.length * 0.75);
       const value = data[dataIndex] / 255;
-      const barHeight = Math.max(5, value * h * 0.24);
-      const x = 50 + i * (barWidth + barGap);
-      ctx.fillRect(x, baseY - barHeight, barWidth, barHeight * 2);
+      const len = h * 0.02 + value * h * 0.12;
+      const x1 = cx + Math.cos(angle) * innerR;
+      const y1 = cy + Math.sin(angle) * innerR;
+      const x2 = cx + Math.cos(angle) * (innerR + len);
+      const y2 = cy + Math.sin(angle) * (innerR + len);
+      ctx.strokeStyle = accent;
+      ctx.globalAlpha = 0.55 + value * 0.45;
+      ctx.lineWidth = w * 0.007;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
     }
+    ctx.globalAlpha = 1;
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
+    ctx.fillStyle = "#ffffff12";
+    ctx.fill();
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = w * 0.004;
+    ctx.stroke();
   }
 
   const style = STYLES[selectedStyleId];
   ctx.textAlign = "center";
   ctx.fillStyle = "#ffffff";
-  ctx.font = "700 58px sans-serif";
-  ctx.fillText(style ? style.name : "Beat Studio", w / 2, h * 0.2);
+  ctx.font = `700 ${Math.round(h * 0.044)}px sans-serif`;
+  ctx.fillText(style ? style.name : "Beat Studio", cx, h * 0.2);
 
-  ctx.font = "400 26px sans-serif";
+  ctx.font = `400 ${Math.round(h * 0.02)}px sans-serif`;
   ctx.fillStyle = "#c9c9d8";
   const tempo = Math.round(Number(tempoSlider.value));
   const keyLabel = keySelect.value + (keySelect.dataset.octave || "");
-  ctx.fillText(`${tempo} BPM  ·  ${keyLabel}`, w / 2, h * 0.26);
+  ctx.fillText(`${tempo} BPM  ·  ${keyLabel}`, cx, h * 0.235);
 
-  ctx.font = "700 30px sans-serif";
+  // Section badge (Full Song mode only) - a small pill showing Intro /
+  // Verse / Chorus / Bridge / Outro so the video actually narrates where
+  // in the arrangement it currently is.
+  const section = step !== undefined ? reelSectionLabel(step) : "";
+  if (section) {
+    ctx.font = `700 ${Math.round(h * 0.016)}px sans-serif`;
+    const padX = w * 0.035;
+    const textW = ctx.measureText(section.toUpperCase()).width;
+    const pillW = textW + padX * 2;
+    const pillH = h * 0.032;
+    const pillY = h * 0.265;
+    ctx.fillStyle = accent + "30";
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
+    const r = pillH / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - pillW / 2 + r, pillY);
+    ctx.arcTo(cx + pillW / 2, pillY, cx + pillW / 2, pillY + pillH, r);
+    ctx.arcTo(cx + pillW / 2, pillY + pillH, cx - pillW / 2, pillY + pillH, r);
+    ctx.arcTo(cx - pillW / 2, pillY + pillH, cx - pillW / 2, pillY, r);
+    ctx.arcTo(cx - pillW / 2, pillY, cx + pillW / 2, pillY, r);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(section.toUpperCase(), cx, pillY + pillH * 0.72);
+  }
+
+  // Instrument-activity dots - a row of colored dots that light up on
+  // whichever instruments are actually sounding this exact step, so the
+  // video visibly reflects the real arrangement, not just generic bars.
+  const dotY = h * 0.7;
+  const activeList = REEL_DOT_INSTRUMENTS.filter((inst) => activeStyle && (activeStyle.drums.instruments.includes(inst) || activeStyle.melodic.monoInstruments.includes(inst) || activeStyle.melodic.chordInstruments.includes(inst)));
+  const dotGap = w * 0.09;
+  const dotStartX = cx - ((activeList.length - 1) * dotGap) / 2;
+  activeList.forEach((inst, i) => {
+    const x = dotStartX + i * dotGap;
+    const on = reelActiveInstruments.has(inst);
+    const r = on ? h * 0.011 : h * 0.007;
+    ctx.beginPath();
+    ctx.arc(x, dotY, r, 0, Math.PI * 2);
+    ctx.fillStyle = on ? (TRACK_COLOR[inst] || accent) : "#ffffff25";
+    ctx.fill();
+    if (on) {
+      ctx.strokeStyle = TRACK_COLOR[inst] || accent;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  });
+
+  ctx.font = `700 ${Math.round(h * 0.023)}px sans-serif`;
   ctx.fillStyle = accent;
-  ctx.fillText("BEAT STUDIO", w / 2, h * 0.92);
+  ctx.fillText("BEAT STUDIO", cx, h * 0.92);
 
   const barY = h * 0.965;
   const barW = w * 0.7;
-  const barX = (w - barW) / 2;
+  const barX = cx - barW / 2;
+  const barH = h * 0.005;
+  const drawBar = (x, y, width, height) => {
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(x, y, width, height, height / 2);
+      ctx.fill();
+    } else {
+      ctx.fillRect(x, y, width, height);
+    }
+  };
   ctx.fillStyle = "#2a2a3a";
-  ctx.fillRect(barX, barY, barW, 6);
-  ctx.fillStyle = accent;
-  ctx.fillRect(barX, barY, barW * Math.min(1, elapsedSec / durationSec), 6);
+  drawBar(barX, barY, barW, barH);
+  const progressW = barW * Math.min(1, elapsedSec / durationSec);
+  if (progressW > 0) {
+    ctx.fillStyle = accent;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 12;
+    drawBar(barX, barY, progressW, barH);
+    ctx.shadowBlur = 0;
+  }
 }
 
 let reelAnimFrame = null;
@@ -898,7 +1026,14 @@ async function exportReel() {
   reelStatus.textContent = "Starting recording…";
 
   if (engine.isPlaying) engine.stop();
-  engine.onStep = highlightStep;
+  reelPulse = 0;
+  reelActiveInstruments.clear();
+  let reelCurrentStep = 0;
+  engine.onStep = (step) => {
+    highlightStep(step);
+    reelStepHook(step);
+    reelCurrentStep = step;
+  };
   engine.start(currentPattern, activeStyle, currentFlavors, Number(tempoSlider.value));
   playBtn.textContent = "■ Stop";
   playBtn.classList.add("playing");
@@ -927,7 +1062,7 @@ async function exportReel() {
   const startTime = performance.now();
   function frame() {
     const elapsed = (performance.now() - startTime) / 1000;
-    drawReelFrame(ctx, elapsed, duration);
+    drawReelFrame(ctx, elapsed, duration, reelCurrentStep);
     reelStatus.textContent = `Recording… ${Math.min(duration, elapsed).toFixed(0)}s / ${duration}s`;
     if (elapsed < duration && !cancelled) {
       reelAnimFrame = requestAnimationFrame(frame);

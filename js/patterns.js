@@ -1,6 +1,6 @@
 const STEPS_PER_BAR = 16;
 
-const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14 };
+const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14 };
 
 const FLAVOR_POOLS = {
   kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy"],
@@ -18,7 +18,36 @@ const FLAVOR_POOLS = {
   organ: ["drawbar", "gospel", "church", "combo"],
   vocal: ["ooh", "ahh", "ay", "oh", "choir"],
   kalimba: ["kalimba", "musicbox", "steeldrum"],
+  marimba: ["marimba", "vibraphone"],
 };
+
+// Tags each flavor by sonic character (warm/bright/dark) so a shuffle can
+// pick one character and apply it across every instrument at once, instead
+// of rolling each instrument's flavor fully independently. Real producers
+// build a kit from one coherent sample pack or one console's character
+// rather than grabbing random one-off samples - this is the same idea
+// applied to a shuffle, so "Generate Beat" lands on a beat that sounds like
+// one production instead of several unrelated instruments stacked together.
+const FLAVOR_TAGS = {
+  kick: { boombap: "warm", "808": "dark", fourfloor: "bright", acoustic: "warm", lofi: "warm", deep: "dark", snappy: "bright", click: "bright", punch: "bright", subkick: "dark", gritty: "dark", roomy: "warm" },
+  snare: { crisp: "bright", clap: "bright", fat: "warm", rimshot: "bright", trapsnap: "bright", brush: "warm", gated: "dark", acoustic: "warm", ghost: "dark", layered: "dark" },
+  hihat: { bright: "bright", dark: "dark", vinyl: "warm", metallic: "bright", analog: "warm", tape: "warm", sizzle: "bright", lofi808: "dark" },
+  perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright" },
+  bass: { warm: "warm", synth: "bright", "808": "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm" },
+  piano: { electric: "bright", pluck: "bright", grand: "warm", rhodes: "warm", wurlitzer: "warm", upright: "warm", celesta: "bright", toy: "bright", harpsichord: "bright" },
+  lead: { square: "bright", saw: "bright", bell: "bright", flute: "warm", supersaw: "bright", pluck: "bright", sine: "warm", chip: "bright", brasslead: "warm", fm: "bright" },
+  pad: { warm: "warm", ensemble: "warm", airy: "bright", glass: "bright", choir: "warm", dark: "dark" },
+  stab: { "pluck-chord": "bright", "square-chord": "bright", "bell-chord": "bright", "brass-chord": "warm", "organ-chord": "warm", "string-chord": "warm" },
+  guitar: { clean: "bright", power: "dark", muted: "dark", nylon: "warm", acoustic: "warm", jazz: "warm", funk: "bright", twelvestring: "bright" },
+  strings: { soul: "warm", orchestral: "warm", staccato: "bright", synth: "bright", pizzicato: "bright", tremolo: "dark" },
+  horn: { brass: "bright", soft: "warm", muted: "dark", sax: "warm", trumpetstab: "bright", section: "bright" },
+  organ: { drawbar: "warm", gospel: "dark", church: "dark", combo: "bright" },
+  vocal: { ooh: "warm", ahh: "warm", ay: "bright", oh: "warm", choir: "warm" },
+  kalimba: { kalimba: "warm", musicbox: "bright", steeldrum: "bright" },
+  marimba: { marimba: "warm", vibraphone: "bright" },
+};
+
+const FLAVOR_PALETTES = ["warm", "bright", "dark"];
 
 function M(degreeOffset, len) {
   return { type: "mono", degreeOffset, len };
@@ -416,7 +445,7 @@ const STYLES = {
     scale: "dorian",
     progression: [0, 3, 4, 0],
     ambience: "vinyl",
-    defaultFlavors: { kick: "lofi", snare: "fat", hihat: "vinyl", perc: "shaker", bass: "warm", piano: "electric", pad: "airy", lead: "flute", strings: "soul", stab: "pluck-chord" },
+    defaultFlavors: { kick: "lofi", snare: "fat", hihat: "vinyl", perc: "shaker", bass: "warm", piano: "electric", pad: "airy", lead: "flute", strings: "soul", stab: "pluck-chord", marimba: "marimba" },
     drums: {
       instruments: ["kick", "snare", "hihat", "perc"],
       main: {
@@ -435,10 +464,11 @@ const STYLES = {
         optionalProbability: 0.25,
       },
     },
-    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "pad", "strings", "stab"] },
+    melodic: { monoInstruments: ["bass", "lead", "marimba"], chordInstruments: ["piano", "pad", "strings", "stab"] },
     melody: {
       bass: { motifBars: 2, noteLengths: [[4,3],[6,2],[8,1]], restProbability: 0.35, chordToneProbability: 0.8, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.35 },
       lead: { motifBars: 2, noteLengths: [[4,2],[6,2],[8,2],[3,1]], restProbability: 0.5, chordToneProbability: 0.7, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-2,1]], variationProbability: 0.45 },
+      marimba: { motifBars: 2, noteLengths: [[4,2],[6,2],[8,1]], restProbability: 0.62, chordToneProbability: 0.75, chordTonePool: [[0,3],[4,2],[7,1]], passingTonePool: [[2,1],[-2,1]], variationProbability: 0.3 },
     },
     chords: {
       piano: {
@@ -519,7 +549,7 @@ const STYLES = {
     key: "C2",
     scale: "major",
     progression: [0, 3, 4, 0],
-    defaultFlavors: { kick: "acoustic", snare: "clap", hihat: "bright", perc: "shaker", bass: "logdrum", guitar: "nylon", pad: "warm", stab: "pluck-chord", organ: "drawbar" },
+    defaultFlavors: { kick: "acoustic", snare: "clap", hihat: "bright", perc: "shaker", bass: "logdrum", guitar: "nylon", pad: "warm", stab: "pluck-chord", organ: "drawbar", marimba: "marimba" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc"],
       main: {
@@ -537,10 +567,11 @@ const STYLES = {
         optionalProbability: 0.3,
       },
     },
-    melodic: { monoInstruments: ["bass", "guitar"], chordInstruments: ["pad", "organ", "stab"] },
+    melodic: { monoInstruments: ["bass", "guitar", "marimba"], chordInstruments: ["pad", "organ", "stab"] },
     melody: {
       bass: { motifBars: 1, noteLengths: [[4,3],[3,2],[6,1]], restProbability: 0.25, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.25 },
       guitar: { motifBars: 2, noteLengths: [[2,4],[1,3],[4,1]], restProbability: 0.3, chordToneProbability: 0.7, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[6,1]], variationProbability: 0.4 },
+      marimba: { motifBars: 1, noteLengths: [[1,3],[2,3],[3,1]], restProbability: 0.4, chordToneProbability: 0.8, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.3 },
     },
     chords: {
       pad: {
@@ -1047,7 +1078,7 @@ const SONG_SECTIONS = [
 ];
 
 const INSTRUMENT_PRIORITY = [
-  "kick", "hihat", "snare", "bass", "piano", "organ", "pad", "lead", "kalimba",
+  "kick", "hihat", "snare", "bass", "piano", "organ", "pad", "lead", "kalimba", "marimba",
   "guitar", "openhat", "perc", "stab", "strings", "horn", "vocal", "crash", "tom", "fx",
 ];
 
@@ -1055,7 +1086,7 @@ const INSTRUMENT_PRIORITY = [
 // whole song, atmospheric/feature instruments swell into choruses, dip
 // for the bridge breakdown, and fade in/out over the intro and outro -
 // the same "automate a level over the arrangement" move a real mix uses.
-const AUTOMATION_INSTRUMENTS = ["pad", "strings", "organ", "lead", "vocal", "kalimba"];
+const AUTOMATION_INSTRUMENTS = ["pad", "strings", "organ", "lead", "vocal", "kalimba", "marimba"];
 
 function generateAutomationCurve(barMetas) {
   const points = [];

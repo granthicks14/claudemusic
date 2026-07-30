@@ -29,17 +29,16 @@ const promptGenerateBtn = document.getElementById("prompt-generate");
 const promptStatus = document.getElementById("prompt-status");
 
 const DRUM_ORDER = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "fx"];
-const MELODIC_ORDER = ["bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba"];
-const MONO_INSTRUMENTS = ["bass", "lead", "guitar", "kalimba"];
-const AUTOMATABLE_INSTRUMENTS = new Set(["pad", "strings", "organ", "lead", "vocal", "kalimba"]);
+const MELODIC_ORDER = ["bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "marimba"];
+const MONO_INSTRUMENTS = ["bass", "lead", "guitar", "kalimba", "marimba"];
 
 const TRACK_LABELS = {
   kick: "Kick", snare: "Snare", hihat: "Hi-Hat", openhat: "Open Hat", tom: "Tom", perc: "Perc", crash: "Crash", fx: "FX Riser",
   bass: "Bass", piano: "Piano", lead: "Melody", pad: "Pad", stab: "Stab", guitar: "Guitar", strings: "Strings", horn: "Horn",
-  organ: "Organ", vocal: "Vocal", kalimba: "Kalimba",
+  organ: "Organ", vocal: "Vocal", kalimba: "Kalimba", marimba: "Marimba",
 };
 
-const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, strings: 4, horn: 1, organ: 4, vocal: 1, kalimba: 1 };
+const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, strings: 4, horn: 1, organ: 4, vocal: 1, kalimba: 1, marimba: 1 };
 
 const STYLE_ACCENTS = {
   hiphop: "#ff6b6b", trap: "#a55eea", house: "#26de81", rock: "#fd9644", reggaeton: "#fed330", lofi: "#45aaf2",
@@ -53,6 +52,7 @@ const TRACK_COLOR = {
   kick: "#ff6b6b", snare: "#feca57", hihat: "#48dbfb", openhat: "#0abde3", tom: "#ff9f43",
   perc: "#1dd1a1", crash: "#c8d6e5", fx: "#c8d6e5", bass: "#a55eea", piano: "#00d2d3", lead: "#ff9ff3", pad: "#54a0ff",
   stab: "#f368e0", guitar: "#ff6348", strings: "#7bed9f", horn: "#eccc68", organ: "#e58e26", vocal: "#ff7f9f", kalimba: "#fdcb6e",
+  marimba: "#55efc4",
 };
 
 let selectedStyleId = null;
@@ -650,11 +650,18 @@ function getActiveNoteAt(track, step) {
 function updatePlayhead(step, steps) {
   const playhead = document.getElementById("playhead");
   if (!playhead) return;
-  const labelWidth = 225;
-  const totalWidth = stepGrid.clientWidth;
-  const trackWidth = Math.max(totalWidth - labelWidth, 1);
-  const stepPx = trackWidth / steps;
-  playhead.style.left = labelWidth + step * stepPx + "px";
+  // Measure the real rendered lane geometry instead of reimplementing the
+  // grid's label-width/gap math in JS - that duplication is what let this
+  // drift out of sync with the actual note positions in the first place.
+  const lane = stepGrid.querySelector(".rack-lane");
+  if (!lane) {
+    playhead.hidden = true;
+    return;
+  }
+  const gridRect = stepGrid.getBoundingClientRect();
+  const laneRect = lane.getBoundingClientRect();
+  const laneLeft = laneRect.left - gridRect.left;
+  playhead.style.left = laneLeft + (step / steps) * laneRect.width + "px";
   playhead.hidden = false;
 }
 
@@ -756,27 +763,48 @@ function stopVisualizer() {
 // Every explicit "give me a beat" action (Generate Beat, or the prompt
 // box) re-rolls each instrument's sound alongside the new pattern, so a
 // fresh beat always comes with a fresh timbre instead of needing a
-// separate manual shuffle step.
+// separate manual shuffle step. Rather than rolling every instrument's
+// flavor fully independently - which can land a bright digital hi-hat next
+// to a dark distorted 808 next to a plain vintage snare, sounding like
+// unrelated one-shots instead of a real production - the shuffle first
+// picks a single sonic "palette" (warm/bright/dark) and then, for every
+// instrument, prefers a flavor tagged with that same palette. That's the
+// same principle as picking one coherent sample pack or one console's
+// character for a whole mix, rather than grabbing random individual
+// samples from anywhere.
+let lastPalette = null;
+const PALETTE_LABELS = { warm: "a warmer, vintage-leaning", bright: "a brighter, modern-leaning", dark: "a darker, moodier" };
+
 function shuffleFlavors() {
+  const choices = FLAVOR_PALETTES.filter((p) => p !== lastPalette);
+  const palette = choices[Math.floor(Math.random() * choices.length)];
+  lastPalette = palette;
+
   const changed = [];
   for (const inst of activeRows()) {
     const pool = FLAVOR_POOLS[inst];
     if (!pool || pool.length < 1) continue;
+    const tags = FLAVOR_TAGS[inst] || {};
     const current = currentFlavors[inst];
-    const choices = pool.length > 1 ? pool.filter((f) => f !== current) : pool;
-    const next = choices[Math.floor(Math.random() * choices.length)];
+
+    let matching = pool.filter((f) => tags[f] === palette && f !== current);
+    if (!matching.length) matching = pool.filter((f) => tags[f] === palette);
+    if (!matching.length) matching = pool.filter((f) => f !== current);
+    if (!matching.length) matching = pool;
+
+    const next = matching[Math.floor(Math.random() * matching.length)];
     if (next !== current) changed.push(`${TRACK_LABELS[inst]} → ${next}`);
     currentFlavors[inst] = next;
   }
-  return changed;
+  return { changed, palette };
 }
 
-function showShuffleStatus(changed) {
-  shuffleStatus.textContent = changed.length ? `New sounds: ${changed.join(", ")}` : "";
+function showShuffleStatus({ changed, palette }) {
+  shuffleStatus.textContent = changed.length ? `Shuffled to ${PALETTE_LABELS[palette]} kit: ${changed.join(", ")}` : "";
   clearTimeout(showShuffleStatus._timer);
   showShuffleStatus._timer = setTimeout(() => {
     shuffleStatus.textContent = "";
-  }, 5000);
+  }, 6000);
 }
 
 generateBtn.addEventListener("click", () => {

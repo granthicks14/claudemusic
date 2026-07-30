@@ -1,15 +1,15 @@
-const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "fx"];
+const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "marimba", "fx"];
 
 const DEFAULT_TRACK_VOLUME = {
   kick: 1, snare: 0.9, hihat: 0.6, openhat: 0.6, tom: 0.85, perc: 0.55, crash: 0.8,
   bass: 0.9, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.55, horn: 0.7,
-  organ: 0.6, vocal: 0.65, kalimba: 0.7, fx: 0.6,
+  organ: 0.6, vocal: 0.65, kalimba: 0.7, marimba: 0.65, fx: 0.6,
 };
 
 const BASE_VELOCITY = {
   kick: 1, snare: 0.9, hihat: 0.7, openhat: 0.7, tom: 0.85, perc: 0.6, crash: 0.9,
   bass: 0.8, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.6, horn: 0.75,
-  organ: 0.65, vocal: 0.7, kalimba: 0.75, fx: 0.8,
+  organ: 0.65, vocal: 0.7, kalimba: 0.75, marimba: 0.7, fx: 0.8,
 };
 
 const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "fx"];
@@ -17,7 +17,7 @@ const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash"
 const DEFAULT_REVERB_SEND = {
   kick: 0, bass: 0, snare: 0.22, hihat: 0.08, openhat: 0.15, tom: 0.2, perc: 0.15, crash: 0.35,
   piano: 0.22, lead: 0.28, pad: 0.4, stab: 0.22, guitar: 0.18, strings: 0.35, horn: 0.22,
-  organ: 0.28, vocal: 0.32, kalimba: 0.25, fx: 0.45,
+  organ: 0.28, vocal: 0.32, kalimba: 0.25, marimba: 0.28, fx: 0.45,
 };
 
 class BeatEngine {
@@ -669,15 +669,11 @@ class BeatEngine {
       gain.gain.linearRampToValueAtTime(0.0001, time + durationSeconds + 0.05);
       osc.connect(gain).connect(this.dest("bass"));
     } else if (flavor === "pluck") {
-      osc.type = "triangle";
-      osc.frequency.setValueAtTime(freq, time);
-      const filter = ctx.createBiquadFilter();
-      filter.type = "lowpass";
-      filter.frequency.setValueAtTime(2000, time);
-      filter.frequency.exponentialRampToValueAtTime(300, time + 0.2);
-      gain.gain.setValueAtTime(vel, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + Math.min(durationSeconds, 0.3));
-      osc.connect(filter).connect(gain).connect(this.dest("bass"));
+      // A physically-modeled plucked string down in bass register - the
+      // same Karplus-Strong technique the guitar voices use, tuned dark
+      // and fast-damped for a picked/upright-adjacent bass pluck.
+      this.pluckString(time, freq, durationSeconds, vel, this.dest("bass"), { damp: 0.35, feedback: 0.97, pluckNoise: 0.01, brightness: 0.8, sustain: 0.4 });
+      return;
     } else if (flavor === "drillslide") {
       osc.type = "sine";
       osc.frequency.setValueAtTime(freq * 2.4, time);
@@ -780,18 +776,26 @@ class BeatEngine {
       lfo.start(time);
       lfo.stop(time + durationSeconds + 0.05);
     } else if (flavor === "upright") {
-      // Plucked triangle body with a fast pitch-drop thump, warmer and
-      // shorter than "pluck" - approximates an upright/double bass pluck.
-      osc.type = "triangle";
-      osc.frequency.setValueAtTime(freq * 1.3, time);
-      osc.frequency.exponentialRampToValueAtTime(freq, time + 0.05);
-      const filter = ctx.createBiquadFilter();
-      filter.type = "lowpass";
-      filter.frequency.setValueAtTime(1400, time);
-      filter.frequency.exponentialRampToValueAtTime(350, time + 0.35);
-      gain.gain.setValueAtTime(vel * 0.9, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + Math.min(durationSeconds, 0.5));
-      osc.connect(filter).connect(gain).connect(this.dest("bass"));
+      // Warmer and shorter than "pluck" - a fast pitch-drop thump layered
+      // under a heavily damped string for the woody body-thump of a real
+      // upright/double bass pluck.
+      const thump = ctx.createOscillator();
+      thump.type = "triangle";
+      thump.frequency.setValueAtTime(freq * 1.3, time);
+      thump.frequency.exponentialRampToValueAtTime(freq, time + 0.05);
+      const thumpFilter = ctx.createBiquadFilter();
+      thumpFilter.type = "lowpass";
+      thumpFilter.frequency.setValueAtTime(900, time);
+      thumpFilter.frequency.exponentialRampToValueAtTime(250, time + 0.3);
+      const thumpGain = ctx.createGain();
+      thumpGain.gain.setValueAtTime(vel * 0.5, time);
+      thumpGain.gain.exponentialRampToValueAtTime(0.001, time + Math.min(durationSeconds, 0.35));
+      thump.connect(thumpFilter).connect(thumpGain).connect(this.dest("bass"));
+      thump.start(time);
+      thump.stop(time + 0.4);
+
+      this.pluckString(time, freq, durationSeconds, vel * 0.85, this.dest("bass"), { damp: 0.42, feedback: 0.965, pluckNoise: 0.015, brightness: 0.7, sustain: 0.45 });
+      return;
     } else {
       osc.type = "sine";
       osc.frequency.setValueAtTime(freq, time);
@@ -816,72 +820,135 @@ class BeatEngine {
     return curve;
   }
 
+  // Karplus-Strong plucked-string synthesis: a short filtered noise burst
+  // excites a delay-line loop (delay -> damping filter -> feedback gain ->
+  // back into the delay), and the loop rings out on its own like a real
+  // vibrating string. This is the standard physical-modeling technique for
+  // plucked strings (Karplus & Strong, 1983 - the same core idea behind
+  // hardware physical-modeling synths), which is what actually gives a
+  // string its pluck transient and natural inharmonic decay - a bare
+  // oscillator can only ever approximate the sustained portion of that.
+  //
+  // The damping stage is the original algorithm's simple two-tap average,
+  // y[n] = (1-damp)*x[n] + damp*x[n-1], not a general biquad lowpass: its
+  // magnitude response is exactly |( 1-damp) + damp*e^-jw| <= 1 for every
+  // frequency and every damp in [0,1], so the loop is mathematically
+  // guaranteed stable for any feedback < 1. A BiquadFilterNode was tried
+  // first and measured (via OfflineAudioContext RMS analysis) to blow up
+  // into runaway noise at these very short in-loop delay times even at low
+  // Q, so this simpler, provably-bounded filter is used instead.
+  pluckString(time, freq, durationSeconds, vel, dest, opts = {}) {
+    const ctx = this.ctx;
+    const {
+      damp = 0.25,
+      feedback = 0.988,
+      pluckNoise = 0.008,
+      brightness = 1,
+      sustain = 1.3,
+      outputLowpass = null,
+    } = opts;
+
+    const delay = ctx.createDelay(1);
+    delay.delayTime.value = 1 / freq;
+    const oneSample = ctx.createDelay(1);
+    oneSample.delayTime.value = 1 / ctx.sampleRate;
+    const gDirect = ctx.createGain();
+    gDirect.gain.value = 1 - damp;
+    const gDelayed = ctx.createGain();
+    gDelayed.gain.value = damp;
+    const fb = ctx.createGain();
+    fb.gain.value = feedback;
+    delay.connect(gDirect).connect(fb);
+    delay.connect(oneSample).connect(gDelayed).connect(fb);
+    fb.connect(delay);
+
+    let outNode = delay;
+    let body = null;
+    if (outputLowpass) {
+      body = ctx.createBiquadFilter();
+      body.type = "lowpass";
+      body.frequency.value = outputLowpass;
+      outNode.connect(body);
+      outNode = body;
+    }
+    const outGain = ctx.createGain();
+    const ringTime = Math.max(durationSeconds, sustain);
+    outGain.gain.setValueAtTime(vel, time);
+    outGain.gain.exponentialRampToValueAtTime(0.0006, time + ringTime);
+    outNode.connect(outGain).connect(dest);
+
+    const exciter = ctx.createBufferSource();
+    exciter.buffer = this.makeNoiseBuffer(pluckNoise);
+    const exciterFilter = ctx.createBiquadFilter();
+    exciterFilter.type = "lowpass";
+    exciterFilter.frequency.value = Math.min(9000, freq * 6 * brightness);
+    const exciterGain = ctx.createGain();
+    exciterGain.gain.setValueAtTime(1, time);
+    exciterGain.gain.linearRampToValueAtTime(0, time + pluckNoise);
+    exciter.connect(exciterFilter).connect(exciterGain).connect(delay);
+    exciter.start(time);
+    exciter.stop(time + pluckNoise + 0.01);
+
+    const cleanupMs = (ringTime + 0.3) * 1000;
+    setTimeout(() => {
+      delay.disconnect();
+      oneSample.disconnect();
+      gDirect.disconnect();
+      gDelayed.disconnect();
+      fb.disconnect();
+      outGain.disconnect();
+      if (body) body.disconnect();
+    }, cleanupMs);
+  }
+
   playGuitarVoice(time, freq, durationSeconds, vel, flavor) {
     const ctx = this.ctx;
     const dest = this.dest("guitar");
     const dur = Math.min(durationSeconds, flavor === "muted" ? 0.18 : 1.2);
 
     if (flavor === "power") {
+      // A real power chord is a plucked root+fifth pair run into an
+      // overdriven amp, not a bare distorted oscillator - plucking two
+      // physically-modeled strings into a shared distortion stage gets
+      // the percussive pick attack that a power chord actually has.
       const shaper = ctx.createWaveShaper();
-      shaper.curve = this.makeDistortionCurve(35);
+      shaper.curve = this.makeDistortionCurve(30);
       const filter = ctx.createBiquadFilter();
       filter.type = "lowpass";
-      filter.frequency.value = 3200;
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(vel, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
-      shaper.connect(filter).connect(gain).connect(dest);
-      for (const ratio of [1, 1.5]) {
-        const osc = ctx.createOscillator();
-        osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(freq * ratio, time);
-        osc.connect(shaper);
-        osc.start(time);
-        osc.stop(time + dur + 0.05);
-      }
+      filter.frequency.value = 3400;
+      const post = ctx.createGain();
+      post.gain.value = 0.8;
+      shaper.connect(filter).connect(post).connect(dest);
+      this.pluckString(time, freq, dur, vel, shaper, { damp: 0.28, feedback: 0.985, pluckNoise: 0.01, brightness: 1.1, sustain: 0.9 });
+      this.pluckString(time, freq * 1.5, dur, vel * 0.75, shaper, { damp: 0.28, feedback: 0.985, pluckNoise: 0.01, brightness: 1.1, sustain: 0.9 });
       return;
     }
 
     if (flavor === "jazz") {
-      const osc = ctx.createOscillator();
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(freq, time);
-      const osc2 = ctx.createOscillator();
-      osc2.type = "triangle";
-      osc2.frequency.setValueAtTime(freq * 1.002, time);
-      const filter = ctx.createBiquadFilter();
-      filter.type = "lowpass";
-      filter.frequency.value = 1500;
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.0001, time);
-      gain.gain.linearRampToValueAtTime(vel * 0.85, time + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
-      osc.connect(filter).connect(gain).connect(dest);
-      osc2.connect(filter);
-      osc.start(time);
-      osc2.start(time);
-      osc.stop(time + dur + 0.1);
-      osc2.stop(time + dur + 0.1);
+      // Dark, round, heavily-damped string - the hollow-body archtop tone.
+      this.pluckString(time, freq, dur, vel * 0.9, dest, { damp: 0.45, feedback: 0.99, pluckNoise: 0.012, brightness: 0.5, sustain: 1.2, outputLowpass: 2200 });
       return;
     }
 
     if (flavor === "acoustic") {
-      const filter = ctx.createBiquadFilter();
-      filter.type = "lowpass";
-      filter.frequency.setValueAtTime(4500, time);
-      filter.frequency.exponentialRampToValueAtTime(700, time + dur);
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(vel, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
-      gain.connect(dest);
-      for (const detune of [0, 0.006]) {
-        const osc = ctx.createOscillator();
-        osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(freq * (1 + detune), time);
-        osc.connect(filter).connect(gain);
-        osc.start(time);
-        osc.stop(time + dur + 0.05);
-      }
+      // Brighter, more percussive pick attack than nylon - a steel-string
+      // strum, with a light second string for a natural doubled-string body.
+      this.pluckString(time, freq, dur, vel, dest, { damp: 0.18, feedback: 0.99, pluckNoise: 0.012, brightness: 1.1, sustain: 1.3 });
+      this.pluckString(time, freq * 1.004, dur, vel * 0.4, dest, { damp: 0.18, feedback: 0.99, pluckNoise: 0.012, brightness: 1.1, sustain: 1.3 });
+      return;
+    }
+
+    if (flavor === "muted") {
+      // Palm-muted: heavily damped, very short decay - a percussive thud
+      // more than a ringing note.
+      this.pluckString(time, freq, Math.min(dur, 0.16), vel, dest, { damp: 0.4, feedback: 0.93, pluckNoise: 0.014, brightness: 0.8, sustain: 0.16 });
+      return;
+    }
+
+    if (flavor === "nylon") {
+      // Warm, mellow, long-ringing classical-guitar pluck - a soft
+      // fingerstyle attack instead of a bright pick.
+      this.pluckString(time, freq, dur, vel, dest, { damp: 0.32, feedback: 0.992, pluckNoise: 0.02, brightness: 0.65, sustain: 1.4 });
       return;
     }
 
@@ -909,40 +976,18 @@ class BeatEngine {
     if (flavor === "twelvestring") {
       // Doubled, slightly detuned+octave-up string pair for the shimmering
       // chorus-like ring of a 12-string.
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(vel, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
-      const filter = ctx.createBiquadFilter();
-      filter.type = "lowpass";
-      filter.frequency.setValueAtTime(4500, time);
-      filter.frequency.exponentialRampToValueAtTime(700, time + dur);
-      filter.connect(gain).connect(dest);
-      for (const ratio of [1, 1.003, 2, 2.006]) {
-        const osc = ctx.createOscillator();
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(freq * ratio, time);
-        const g = ctx.createGain();
-        g.gain.value = ratio > 1.5 ? 0.35 : 1;
-        osc.connect(g).connect(filter);
-        osc.start(time);
-        osc.stop(time + dur + 0.05);
+      // Doubled unison plus an octave-up pair, each its own physically
+      // modeled string - the shimmering chorus-like ring of a real
+      // 12-string comes from actual doubled strings beating together,
+      // not a single oscillator with a chorus effect bolted on.
+      for (const [ratio, level] of [[1, 1], [1.003, 1], [2, 0.35], [2.006, 0.35]]) {
+        this.pluckString(time, freq * ratio, dur, vel * level, dest, { damp: 0.12, feedback: 0.988, pluckNoise: 0.008, brightness: 1.2, sustain: 1.2 });
       }
       return;
     }
 
-    const osc = ctx.createOscillator();
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(freq, time);
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.setValueAtTime(flavor === "nylon" ? 2200 : 3000, time);
-    filter.frequency.exponentialRampToValueAtTime(500, time + dur);
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(vel, time);
-    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
-    osc.connect(filter).connect(gain).connect(dest);
-    osc.start(time);
-    osc.stop(time + dur + 0.05);
+    // Clean electric: bright, crisp pick attack, long ring.
+    this.pluckString(time, freq, dur, vel, dest, { damp: 0.08, feedback: 0.99, pluckNoise: 0.006, brightness: 1.3, sustain: 1.0 });
   }
 
   playStringsVoice(time, freq, durationSeconds, vel, flavor) {
@@ -1073,6 +1118,21 @@ class BeatEngine {
     }
 
     const dur = Math.min(durationSeconds, flavor === "muted" ? 0.3 : 0.5);
+
+    // A brief breath "chiff" of noise right at the attack - the airy
+    // consonant-like transient a real brass/reed embouchure produces
+    // before the tone settles, missing from a bare oscillator attack.
+    const chiff = ctx.createBufferSource();
+    chiff.buffer = this.makeNoiseBuffer(0.02);
+    const chiffFilter = ctx.createBiquadFilter();
+    chiffFilter.type = "bandpass";
+    chiffFilter.frequency.value = flavor === "sax" ? 1600 : 2200;
+    const chiffGain = ctx.createGain();
+    chiffGain.gain.setValueAtTime(vel * 0.2, time);
+    chiffGain.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
+    chiff.connect(chiffFilter).connect(chiffGain).connect(dest);
+    chiff.start(time);
+    chiff.stop(time + 0.025);
 
     const osc = ctx.createOscillator();
     osc.type = "sawtooth";
@@ -1257,6 +1317,60 @@ class BeatEngine {
     }
   }
 
+  playMarimbaVoice(time, freq, durationSeconds, vel, flavor) {
+    const ctx = this.ctx;
+    const dest = this.dest("marimba");
+    const dur = Math.min(durationSeconds, flavor === "vibraphone" ? 1.4 : 0.8);
+
+    // A soft mallet-strike noise transient - lower and rounder than the
+    // kalimba's thumb-pluck click, since a felt/rubber mallet compresses
+    // against a wooden bar rather than snapping a metal tine.
+    const strike = ctx.createBufferSource();
+    strike.buffer = this.makeNoiseBuffer(0.025);
+    const strikeFilter = ctx.createBiquadFilter();
+    strikeFilter.type = "lowpass";
+    strikeFilter.frequency.value = 2200;
+    const strikeGain = ctx.createGain();
+    strikeGain.gain.setValueAtTime(vel * 0.25, time);
+    strikeGain.gain.exponentialRampToValueAtTime(0.001, time + 0.025);
+    strike.connect(strikeFilter).connect(strikeGain).connect(dest);
+    strike.start(time);
+    strike.stop(time + 0.03);
+
+    // Real marimba bars are tuned/undercut to emphasize roughly the fourth
+    // harmonic alongside the fundamental - a fixed pair of sine partials at
+    // that ratio approximates the bar's characteristic woody timbre.
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(vel, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+    gain.connect(dest);
+
+    if (flavor === "vibraphone") {
+      // A rotating fan inside a vibraphone's resonator tubes creates a
+      // slow pulsating tremolo - the clearest audible difference from a
+      // marimba's dry, un-modulated wooden tone.
+      const trem = ctx.createOscillator();
+      trem.frequency.value = 5;
+      const tremGain = ctx.createGain();
+      tremGain.gain.value = vel * 0.35;
+      trem.connect(tremGain).connect(gain.gain);
+      trem.start(time);
+      trem.stop(time + dur + 0.1);
+    }
+
+    const partials = [{ ratio: 1, level: 1 }, { ratio: 3.99, level: 0.22 }];
+    for (const p of partials) {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq * p.ratio, time);
+      const pGain = ctx.createGain();
+      pGain.gain.value = p.level;
+      osc.connect(pGain).connect(gain);
+      osc.start(time);
+      osc.stop(time + dur + 0.1);
+    }
+  }
+
   playPianoVoice(time, freq, durationSeconds, vel, flavor) {
     const ctx = this.ctx;
     const dest = this.dest("piano");
@@ -1395,6 +1509,21 @@ class BeatEngine {
       return;
     }
 
+    // A short high-passed noise click on every attack approximates the
+    // hammer striking the string/tine - without it a synthesized piano
+    // reads as a smooth pad instead of a struck instrument.
+    const hammer = ctx.createBufferSource();
+    hammer.buffer = this.makeNoiseBuffer(0.01);
+    const hammerFilter = ctx.createBiquadFilter();
+    hammerFilter.type = "highpass";
+    hammerFilter.frequency.value = 4000;
+    const hammerGain = ctx.createGain();
+    hammerGain.gain.setValueAtTime(vel * 0.15, time);
+    hammerGain.gain.exponentialRampToValueAtTime(0.001, time + 0.01);
+    hammer.connect(hammerFilter).connect(hammerGain).connect(dest);
+    hammer.start(time);
+    hammer.stop(time + 0.015);
+
     const osc1 = ctx.createOscillator();
     osc1.type = "sine";
     osc1.frequency.setValueAtTime(freq, time);
@@ -1406,7 +1535,6 @@ class BeatEngine {
     gain.gain.exponentialRampToValueAtTime(vel, time + 0.008);
     gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
 
-    let node2 = osc2;
     if (flavor === "grand") {
       const osc3 = ctx.createOscillator();
       osc3.type = "sine";
@@ -1431,6 +1559,49 @@ class BeatEngine {
     const ctx = this.ctx;
     const dest = this.dest("lead");
     const dur = Math.min(durationSeconds, 1);
+
+    if (flavor === "flute") {
+      // A flute's tone is almost a pure fundamental with very few upper
+      // harmonics, colored throughout by breath noise (not just an attack
+      // transient) - continuous filtered noise mixed under a sine, a slow
+      // attack, and vibrato that only kicks in once the note has settled,
+      // the way real breath support and embouchure actually behave.
+      const noteDur = Math.max(dur, 0.35);
+      const envelope = ctx.createGain();
+      envelope.gain.setValueAtTime(0.0001, time);
+      envelope.gain.linearRampToValueAtTime(vel * 0.8, time + 0.09);
+      envelope.gain.exponentialRampToValueAtTime(0.001, time + noteDur);
+      envelope.connect(dest);
+
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, time);
+      const vibrato = ctx.createOscillator();
+      vibrato.frequency.value = 5;
+      const vibratoGain = ctx.createGain();
+      vibratoGain.gain.setValueAtTime(0, time);
+      vibratoGain.gain.linearRampToValueAtTime(freq * 0.006, time + 0.25);
+      vibrato.connect(vibratoGain).connect(osc.frequency);
+      osc.connect(envelope);
+
+      const breath = ctx.createBufferSource();
+      breath.buffer = this.makeNoiseBuffer(noteDur + 0.1);
+      const breathFilter = ctx.createBiquadFilter();
+      breathFilter.type = "bandpass";
+      breathFilter.frequency.value = freq * 2;
+      breathFilter.Q.value = 0.7;
+      const breathGain = ctx.createGain();
+      breathGain.gain.value = vel * 0.12;
+      breath.connect(breathFilter).connect(breathGain).connect(envelope);
+
+      osc.start(time);
+      vibrato.start(time);
+      breath.start(time);
+      osc.stop(time + noteDur + 0.1);
+      vibrato.stop(time + noteDur + 0.1);
+      breath.stop(time + noteDur + 0.1);
+      return;
+    }
 
     if (flavor === "bell") {
       const osc1 = ctx.createOscillator();
@@ -1833,6 +2004,7 @@ class BeatEngine {
         else if (inst === "lead") this.playLeadVoice(t, freq, noteDur, vel, flavors.lead);
         else if (inst === "guitar") this.playGuitarVoice(t, freq, noteDur, vel, flavors.guitar);
         else if (inst === "kalimba") this.playKalimbaVoice(t, freq, noteDur, vel, flavors.kalimba);
+        else if (inst === "marimba") this.playMarimbaVoice(t, freq, noteDur, vel, flavors.marimba);
       }
     }
   }

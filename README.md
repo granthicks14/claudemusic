@@ -1,6 +1,6 @@
 # Beat Studio
 
-Describe the beat you want in plain English, or pick from 15 genres, and get either a quick loop or a full ~2-minute song with a real intro/verse/chorus/bridge/outro arrangement — drums, bass, piano, organ, lead, guitar, kalimba, strings, horns, vocal chops, pads, synth stabs, and an FX riser — then edit and mix it like a mini DAW, right in the browser. Everything is synthesized live with the Web Audio API; no audio files or dependencies required.
+Describe the beat you want in plain English, or pick from 15 genres, and get either a quick loop or a full ~2-minute song with a real intro/verse/chorus/bridge/outro arrangement — drums, bass, piano, organ, lead, guitar, kalimba, marimba, strings, horns, vocal chops, pads, synth stabs, and an FX riser — then edit and mix it like a mini DAW, right in the browser. Everything is synthesized live with the Web Audio API; no audio files or dependencies required.
 
 ## Run it
 
@@ -16,7 +16,7 @@ Then visit `http://localhost:8000`.
 
 - `js/theory.js` — scales (including phrygian for drill's dark mode), keys, chord building, note-name/frequency conversion.
 - `js/patterns.js` — per-genre templates for drums and chordal instruments, each style's key/scale/chord progression, the per-instrument sound-flavor pools that get auto-shuffled on every generation, two arrangement builders (a short intro/main/fill loop, and a full verse/chorus **song structure**), and the **motif-based melody generator** that drives bass, lead, and guitar.
-- `js/audio-engine.js` — synthesizes every instrument live (including a distorted guitar voice, a vibrato string voice, an Amapiano-style log-drum bass, and an LFO wobble bass), runs the mixer (volume/mute/solo/reverb send per track), and the mix bus: sidechain ducking, a glue compressor, and a reverb send effect.
+- `js/audio-engine.js` — synthesizes every instrument live, including a **Karplus-Strong physically-modeled plucked string** for every guitar and pluck-style bass voice, a vibrato string voice, an Amapiano-style log-drum bass, and an LFO wobble bass. Also runs the mixer (volume/mute/solo/reverb send per track) and the mix bus: sidechain ducking, a glue compressor, and a reverb send effect.
 - `js/app.js` — the channel rack UI, the free-form piano roll editor (drag to draw/resize/move notes), and the "describe your beat" prompt parser.
 
 ## Describe the beat you want
@@ -95,11 +95,25 @@ Researched how large sample-library instruments (the GarageBand approach: dozens
 
 That's over 110 total instrument/flavor combinations, every one of them a real, distinct signal path rather than a palette swap.
 
-## New instruments: pianos, guitars, organ, kalimba, an FX riser, and a synthesized vocal chop
+## Instruments that actually sound played: physically-modeled strings
+
+The clearest complaint driving this round: the guitars didn't sound like guitars. The root cause was the synthesis technique — every guitar voice was a plain oscillator through a lowpass filter, which can only ever approximate the *sustained* part of a note and can never produce a real pluck's attack transient or its natural, slightly inharmonic decay. The fix is **Karplus-Strong synthesis**, the actual physical-modeling algorithm (Karplus & Strong, 1983 — the same core idea inside hardware physical-modeling synths) used for real plucked-string sound design:
+
+- A short burst of filtered noise "plucks" a **delay-line loop** tuned to the note's exact frequency (delay time = 1/frequency).
+- The loop feeds back through a damping filter and a feedback gain, so it rings out on its own, decaying naturally and independently — a real string, not a note that just fades on a fixed envelope.
+- Every guitar flavor (Clean, Power, Muted, Nylon, Acoustic, Jazz, Twelve-String) is now built on this technique, each with its own damping/feedback/pick-attack character — a palm-muted "Muted" note is heavily damped and decays almost instantly, while an open "Nylon" pluck rings warm and long. **Power** chords pluck a root+fifth string pair together into a shared overdrive stage, the way a real power chord is actually played and amplified. **Twelve-String** plucks four physically-modeled strings (unison pair + octave-up pair) instead of faking the shimmer with a chorus effect.
+- The same technique now also drives the bass **Pluck** and **Upright** flavors, for the same reason — a plucked bass string has the same physically-modeled character need as a plucked guitar string.
+
+Also added a soft mallet-strike transient to the piano voice (the "hammer hitting the string" click that was previously missing), continuous breath noise under the flute lead (it was silently falling back to a plain sawtooth before — now it has a real airy, slow-attack flute tone with vibrato that only kicks in once the note settles), and a breath "chiff" transient on every horn note.
+
+**A stability bug caught during testing, worth calling out:** the first Karplus-Strong implementation used a standard biquad lowpass as the loop's damping filter. It measured fine by ear in casual listening, but running it through an `OfflineAudioContext` and analyzing the rendered signal's RMS energy over time — rather than just listening for console errors — revealed the loop was actually **exponentially unstable** at these very short in-loop delay times (every guitar note would have degraded into runaway distorted noise within about a second of ringing). The fix was switching to the original 1983 algorithm's actual damping filter — a simple two-tap average, `y[n] = (1−d)·x[n] + d·x[n−1]` — whose magnitude response is mathematically bounded to 1 at every frequency, making the loop provably stable for any feedback below 1, regardless of engine-level filter implementation quirks. Re-verified stable across the full guitar/bass frequency range before shipping.
+
+## New instruments: pianos, guitars, organ, kalimba, marimba, an FX riser, and a synthesized vocal chop
 
 - **Organ** — a Hammond-style drawbar stack (sine partials at the classic fundamental/octave/octave+fifth ratios), with a driven "gospel" voice that adds overdrive and Leslie-style tremolo. Added where it's genuinely idiomatic: gospel-sample hip-hop, Fela Kuti-style Afrobeat, and classic Rhodes+organ R&B/soul.
 - **Vocal** — since real vocal samples aren't available in a dependency-free browser app, this is built with **formant synthesis**: a sawtooth source through three parallel bandpass filters tuned to vowel formant frequencies (three vowel presets now: "ooh," "ahh," "ay"), the same technique speech synthesizers use to fake a sung vowel. Present by default on the genres where vocal chops are a genuine signature sound (house, trap, reggaeton, dubstep, phonk, Jersey Club, Rap), and addable to any other genre via the prompt box.
 - **Kalimba** *(new)* — a plucked-tine tuned-percussion voice (a noise "thumb pluck" transient plus inharmonic sine partials, with a "Music Box" variant), driven by a *different* melody generator than the other lead instruments: low variation, tight rhythm, so it repeats as a genuine ostinato loop rather than an evolving motif — matching how kalimba/melodic-loop hooks actually function in modern rap and Afrobeats records, where they're a hypnotic repeating figure, not a developing melody.
+- **Marimba** *(new)* — a mallet-percussion voice: a soft, low-passed strike transient (rounder than the kalimba's metal-tine click, since a mallet compresses against a wooden bar rather than snapping a tine) plus a fundamental/fourth-harmonic sine pair, matching how a real marimba bar is tuned. The **Vibraphone** flavor adds the slow pulsating tremolo a rotating resonator fan gives a real vibraphone — the one clear audible difference from the marimba's dry wooden tone. Layered in as a sparse, low-density ostinato alongside the existing melody on Lo-Fi Chill and Afrobeats, the two genres where a mallet instrument is genuinely idiomatic (Nujabes-style lo-fi glockenspiel touches; African mallet/log-drum textures).
 - **FX Riser** *(new)* — a rising bandpass-filtered noise sweep, the classic pre-drop/pre-chorus transition effect. In Full Song mode it's placed automatically one bar before every chorus, regardless of that bar's instrument density, because a section-change riser is a deliberate arrangement choice, not something that should get masked out by the general layering system.
 
 ## Mixing: how producers actually make a beat sound good
@@ -132,7 +146,7 @@ Bass, lead, guitar, piano, organ, pad, stab, strings, horn, and vocal are stored
 ## A real piano roll, FL Studio-style
 
 - **A real keyboard, not a plain list.** Piano-roll rows for single-note instruments (bass, lead, guitar) are shaded like an actual keyboard — black keys darker, the root note highlighted — so you can see where you are the way you would on a real piano roll. Chordal instruments (piano, pad, stab, strings, horn, organ, vocal) show the seven diatonic chords with the tonic highlighted.
-- **See what's playing, live.** During playback, whichever note or chord is currently sounding lights up — the note bar itself glows, and in an open piano roll the matching keyboard row highlights too, exactly like watching FL Studio's piano roll light up as a pattern plays. A moving playhead line sweeps across the whole arrangement.
+- **See what's playing, live.** During playback, whichever note or chord is currently sounding lights up — the note bar itself glows, and in an open piano roll the matching keyboard row highlights too, exactly like watching FL Studio's piano roll light up as a pattern plays. A moving playhead line sweeps across the whole arrangement, precisely tracking the audio position — it previously drifted out of sync (a leftover hardcoded pixel width that didn't match the actual rendered grid, worse the further into a song you got); it's now measured directly from the real rendered layout instead of reimplementing that math separately, so it can't drift out of sync again.
 - **Hover for the note name.** Every note bar shows its length and, when there's room, its actual note name (e.g. "E4") printed right on the bar; hovering shows the full name and duration.
 - **Drag to draw, resize, move, or delete.** Click-drag on empty space to draw a note of any length, drag its right edge to resize, drag its body to move it, or click it to delete — the same interaction whether you're in the piano roll or looking at the compact channel-rack overview.
 
@@ -146,7 +160,11 @@ In **Full Song** mode, atmospheric and feature instruments (pad, strings, organ,
 
 - **Channel rack** — every instrument is a row with a color swatch, mute (M), solo (S), a volume fader, and a reverb-send fader. Click empty space on any row's lane to add a hit/note, click an existing one to remove it.
 - **Piano roll** — click a track's name to open its dedicated editor, scale-snapped so nothing plays a wrong note.
-- **Generate Beat** (and the prompt-box Generate) — builds a fresh loop or full song from scratch, and re-rolls the timbre ("flavor") of every instrument at the same time, guaranteed to pick something different from what's currently playing. There's no separate shuffle button to press — every beat you generate automatically comes with a fresh set of sounds, with a status line confirming exactly what changed (e.g. "Kick → 808, Snare → clap...").
+- **Generate Beat** (and the prompt-box Generate) — builds a fresh loop or full song from scratch, and re-rolls the timbre ("flavor") of every instrument at the same time. There's no separate shuffle button to press — every beat you generate automatically comes with a fresh set of sounds, with a status line confirming exactly what changed (e.g. "Shuffled to a darker, moodier kit: Kick → gritty, Snare → gated...").
+
+## A coherent shuffle, not a pile of random instruments
+
+Rolling every instrument's flavor fully independently could land a bright digital hi-hat next to a dark distorted 808 next to a plain vintage snare — technically "shuffled," but sounding like unrelated one-shots stacked together rather than one real production. Every flavor across every instrument is now tagged by sonic character — **warm** (vintage/analog/organic), **bright** (crisp/modern/digital), or **dark** (moody/heavy/distorted) — and a shuffle first picks a single palette, then prefers flavors matching that palette for every instrument in the kit. That's the same principle a producer uses picking one coherent sample pack or one console's character for a whole session, rather than grabbing random individual samples from anywhere. The palette also never repeats twice in a row, so two shuffles in a row still land somewhere different.
 
 Every hit also gets small randomized pitch/decay/timing/velocity variation at playback, so nothing ever sounds mechanically identical twice.
 

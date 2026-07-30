@@ -20,34 +20,40 @@ const pianoRollPanel = document.getElementById("piano-roll");
 const pianoRollTitle = document.getElementById("piano-roll-title");
 const pianoRollGrid = document.getElementById("piano-roll-grid");
 const pianoRollClose = document.getElementById("piano-roll-close");
+const automationPanel = document.getElementById("automation-panel");
+const automationTitle = document.getElementById("automation-title");
+const automationLane = document.getElementById("automation-lane");
+const automationClose = document.getElementById("automation-close");
+const automationClearBtn = document.getElementById("automation-clear");
 const promptInput = document.getElementById("prompt-input");
 const promptGenerateBtn = document.getElementById("prompt-generate");
 const promptStatus = document.getElementById("prompt-status");
 
-const DRUM_ORDER = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash"];
-const MELODIC_ORDER = ["bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal"];
-const MONO_INSTRUMENTS = ["bass", "lead", "guitar"];
+const DRUM_ORDER = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "fx"];
+const MELODIC_ORDER = ["bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba"];
+const MONO_INSTRUMENTS = ["bass", "lead", "guitar", "kalimba"];
+const AUTOMATABLE_INSTRUMENTS = new Set(["pad", "strings", "organ", "lead", "vocal", "kalimba"]);
 
 const TRACK_LABELS = {
-  kick: "Kick", snare: "Snare", hihat: "Hi-Hat", openhat: "Open Hat", tom: "Tom", perc: "Perc", crash: "Crash",
+  kick: "Kick", snare: "Snare", hihat: "Hi-Hat", openhat: "Open Hat", tom: "Tom", perc: "Perc", crash: "Crash", fx: "FX Riser",
   bass: "Bass", piano: "Piano", lead: "Melody", pad: "Pad", stab: "Stab", guitar: "Guitar", strings: "Strings", horn: "Horn",
-  organ: "Organ", vocal: "Vocal",
+  organ: "Organ", vocal: "Vocal", kalimba: "Kalimba",
 };
 
-const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, strings: 4, horn: 1, organ: 4, vocal: 1 };
+const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, strings: 4, horn: 1, organ: 4, vocal: 1, kalimba: 1 };
 
 const STYLE_ACCENTS = {
   hiphop: "#ff6b6b", trap: "#a55eea", house: "#26de81", rock: "#fd9644", reggaeton: "#fed330", lofi: "#45aaf2",
   drill: "#c0392b", afrobeats: "#ffa502", dubstep: "#3742fa", rnb: "#ff6b9d",
-  phonk: "#8e44ad", jerseyclub: "#00cec9", dnb: "#e17055", synthwave: "#fd79a8",
+  phonk: "#8e44ad", jerseyclub: "#00cec9", dnb: "#e17055", synthwave: "#fd79a8", rap: "#ffa801",
 };
 
-const SIDECHAIN_DEFAULT_ON = new Set(["trap", "house", "dubstep", "afrobeats", "drill", "phonk", "jerseyclub", "dnb", "synthwave"]);
+const SIDECHAIN_DEFAULT_ON = new Set(["trap", "house", "dubstep", "afrobeats", "drill", "phonk", "jerseyclub", "dnb", "synthwave", "rap"]);
 
 const TRACK_COLOR = {
   kick: "#ff6b6b", snare: "#feca57", hihat: "#48dbfb", openhat: "#0abde3", tom: "#ff9f43",
-  perc: "#1dd1a1", crash: "#c8d6e5", bass: "#a55eea", piano: "#00d2d3", lead: "#ff9ff3", pad: "#54a0ff",
-  stab: "#f368e0", guitar: "#ff6348", strings: "#7bed9f", horn: "#eccc68", organ: "#e58e26", vocal: "#ff7f9f",
+  perc: "#1dd1a1", crash: "#c8d6e5", fx: "#c8d6e5", bass: "#a55eea", piano: "#00d2d3", lead: "#ff9ff3", pad: "#54a0ff",
+  stab: "#f368e0", guitar: "#ff6348", strings: "#7bed9f", horn: "#eccc68", organ: "#e58e26", vocal: "#ff7f9f", kalimba: "#fdcb6e",
 };
 
 let selectedStyleId = null;
@@ -58,6 +64,7 @@ let currentPattern = null;
 let selectedBars = 4;
 let arrangementMode = "loop";
 let openPianoRollInst = null;
+let openAutomationInst = null;
 
 function activeRows() {
   return [
@@ -139,7 +146,16 @@ function generatePattern() {
   renderSectionRow();
   renderStepGrid();
   if (openPianoRollInst) renderPianoRoll();
+  if (openAutomationInst) renderAutomation();
+  pushAutomationToEngine();
   if (engine.isPlaying) engine.updatePattern(currentPattern);
+}
+
+function pushAutomationToEngine() {
+  const automation = currentPattern.automation || {};
+  for (const track of ALL_TRACKS) {
+    engine.setAutomation(track, automation[track] || null);
+  }
 }
 
 function sectionTypeClass(label) {
@@ -177,11 +193,17 @@ function trackHeaderHTML(track) {
   const reverbPct = engine.reverbSends[track]
     ? Math.round(engine.reverbSends[track].gain.value * 100)
     : Math.round((DEFAULT_REVERB_SEND[track] || 0) * 100);
+  const isMelodic = MELODIC_ORDER.includes(track);
+  const hasAutomation = currentPattern && currentPattern.automation && currentPattern.automation[track] && currentPattern.automation[track].length;
+  const automationBtn = isMelodic
+    ? `<button class="track-btn auto-btn ${hasAutomation ? "has-automation" : ""} ${openAutomationInst === track ? "on" : ""}" data-action="automation" data-track="${track}" title="Edit volume over the song">A</button>`
+    : "";
   return `
     <span class="track-color" style="background:${TRACK_COLOR[track]}"></span>
     <button class="track-name" data-track="${track}" title="Open piano roll">${TRACK_LABELS[track]}</button>
     <button class="track-btn mute-btn ${state.muted ? "on" : ""}" data-action="mute" data-track="${track}">M</button>
     <button class="track-btn solo-btn ${state.solo ? "on" : ""}" data-action="solo" data-track="${track}">S</button>
+    ${automationBtn}
     <input type="range" class="track-vol" data-track="${track}" min="0" max="100" value="${Math.round(state.volume * 100)}" title="Volume">
     <input type="range" class="track-rev" data-track="${track}" min="0" max="100" value="${reverbPct}" title="Reverb send">
   `;
@@ -241,8 +263,8 @@ function renderHitMarks(lane, track, steps) {
 function renderStepGrid() {
   stepGrid.innerHTML = "";
   const steps = selectedBars * STEPS_PER_BAR;
-  stepGrid.style.gridTemplateColumns = `225px repeat(${steps}, 1fr)`;
-  sectionRow.style.gridTemplateColumns = `225px repeat(${steps}, 1fr)`;
+  stepGrid.style.gridTemplateColumns = `248px repeat(${steps}, 1fr)`;
+  sectionRow.style.gridTemplateColumns = `248px repeat(${steps}, 1fr)`;
 
   for (const track of activeRows()) {
     const header = document.createElement("div");
@@ -303,6 +325,12 @@ stepGrid.addEventListener("click", (e) => {
     return;
   }
 
+  const autoBtn = e.target.closest(".auto-btn");
+  if (autoBtn) {
+    toggleAutomation(autoBtn.dataset.track);
+    return;
+  }
+
   const noteBar = e.target.closest(".note-bar");
   if (noteBar) {
     currentPattern.instruments[noteBar.dataset.track][Number(noteBar.dataset.step)] = null;
@@ -349,6 +377,7 @@ function togglePianoRoll(track) {
     closePianoRoll();
     return;
   }
+  closeAutomation();
   openPianoRollInst = track;
   pianoRollPanel.hidden = false;
   pianoRollTitle.textContent = `${TRACK_LABELS[track]} — drag to draw a note, drag its right edge to resize, drag its body to move, click to delete`;
@@ -360,6 +389,114 @@ function closePianoRoll() {
   openPianoRollInst = null;
   pianoRollPanel.hidden = true;
 }
+
+function toggleAutomation(track) {
+  if (openAutomationInst === track) {
+    closeAutomation();
+    return;
+  }
+  closePianoRoll();
+  openAutomationInst = track;
+  automationPanel.hidden = false;
+  automationTitle.textContent = `${TRACK_LABELS[track]} — volume over the arrangement`;
+  renderAutomation();
+  renderStepGrid();
+}
+
+function closeAutomation() {
+  if (!openAutomationInst) return;
+  openAutomationInst = null;
+  automationPanel.hidden = true;
+  renderStepGrid();
+}
+
+function renderAutomation() {
+  const track = openAutomationInst;
+  const steps = selectedBars * STEPS_PER_BAR;
+  const points = ((currentPattern.automation && currentPattern.automation[track]) || []).slice().sort((a, b) => a.step - b.step);
+
+  automationLane.innerHTML = "";
+  automationLane.dataset.track = track;
+  automationLane.style.backgroundImage = barDividerBackground(selectedBars);
+
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", "0 0 100 100");
+  svg.setAttribute("preserveAspectRatio", "none");
+  svg.classList.add("automation-svg");
+
+  if (points.length) {
+    const polyline = document.createElementNS(svgNS, "polyline");
+    polyline.setAttribute("points", points.map((p) => `${(p.step / steps) * 100},${(1 - p.value) * 100}`).join(" "));
+    polyline.setAttribute("class", "automation-line");
+    svg.appendChild(polyline);
+    for (const p of points) {
+      const circle = document.createElementNS(svgNS, "circle");
+      circle.setAttribute("cx", (p.step / steps) * 100);
+      circle.setAttribute("cy", (1 - p.value) * 100);
+      circle.setAttribute("r", 1.7);
+      circle.setAttribute("class", "automation-point");
+      circle.dataset.step = p.step;
+      svg.appendChild(circle);
+    }
+  }
+  automationLane.appendChild(svg);
+}
+
+automationLane.addEventListener("mousedown", (e) => {
+  const track = openAutomationInst;
+  if (!track) return;
+  e.preventDefault();
+
+  const steps = selectedBars * STEPS_PER_BAR;
+  const rect = automationLane.getBoundingClientRect();
+  const isPoint = e.target.classList.contains("automation-point");
+  const downX = e.clientX;
+  const downY = e.clientY;
+
+  const stepAt = (clientX) => Math.max(0, Math.min(steps - 1, Math.round(((clientX - rect.left) / rect.width) * steps)));
+  const valueAt = (clientY) => Math.max(0, Math.min(1, 1 - (clientY - rect.top) / rect.height));
+
+  const points = ((currentPattern.automation && currentPattern.automation[track]) || []).map((p) => ({ ...p }));
+  let draggedIndex = null;
+  if (isPoint) {
+    const clickedStep = Number(e.target.dataset.step);
+    draggedIndex = points.findIndex((p) => p.step === clickedStep);
+  }
+
+  const onUp = (upEvent) => {
+    document.removeEventListener("mouseup", onUp);
+    const moved = Math.abs(upEvent.clientX - downX) > 4 || Math.abs(upEvent.clientY - downY) > 4;
+
+    if (draggedIndex !== null && !moved) {
+      points.splice(draggedIndex, 1);
+    } else if (draggedIndex !== null) {
+      points[draggedIndex] = { step: stepAt(upEvent.clientX), value: valueAt(upEvent.clientY) };
+    } else {
+      points.push({ step: stepAt(upEvent.clientX), value: valueAt(upEvent.clientY) });
+    }
+    points.sort((a, b) => a.step - b.step);
+
+    if (!currentPattern.automation) currentPattern.automation = {};
+    currentPattern.automation[track] = points;
+    engine.setAutomation(track, points);
+    renderAutomation();
+    renderStepGrid();
+  };
+
+  document.addEventListener("mouseup", onUp);
+});
+
+automationClose.addEventListener("click", closeAutomation);
+automationClearBtn.addEventListener("click", () => {
+  const track = openAutomationInst;
+  if (!track) return;
+  if (!currentPattern.automation) currentPattern.automation = {};
+  currentPattern.automation[track] = [];
+  engine.setAutomation(track, null);
+  renderAutomation();
+  renderStepGrid();
+});
 
 const BLACK_KEY_SEMITONES = new Set([1, 3, 6, 8, 10]);
 

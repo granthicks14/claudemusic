@@ -1,23 +1,23 @@
-const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal"];
+const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "fx"];
 
 const DEFAULT_TRACK_VOLUME = {
   kick: 1, snare: 0.9, hihat: 0.6, openhat: 0.6, tom: 0.85, perc: 0.55, crash: 0.8,
   bass: 0.9, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.55, horn: 0.7,
-  organ: 0.6, vocal: 0.65,
+  organ: 0.6, vocal: 0.65, kalimba: 0.7, fx: 0.6,
 };
 
 const BASE_VELOCITY = {
   kick: 1, snare: 0.9, hihat: 0.7, openhat: 0.7, tom: 0.85, perc: 0.6, crash: 0.9,
   bass: 0.8, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.6, horn: 0.75,
-  organ: 0.65, vocal: 0.7,
+  organ: 0.65, vocal: 0.7, kalimba: 0.75, fx: 0.8,
 };
 
-const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash"];
+const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "fx"];
 
 const DEFAULT_REVERB_SEND = {
   kick: 0, bass: 0, snare: 0.22, hihat: 0.08, openhat: 0.15, tom: 0.2, perc: 0.15, crash: 0.35,
   piano: 0.22, lead: 0.28, pad: 0.4, stab: 0.22, guitar: 0.18, strings: 0.35, horn: 0.22,
-  organ: 0.28, vocal: 0.32,
+  organ: 0.28, vocal: 0.32, kalimba: 0.25, fx: 0.45,
 };
 
 class BeatEngine {
@@ -46,6 +46,7 @@ class BeatEngine {
     this.reverbSends = {};
     this.trackGains = {};
     this.trackState = {};
+    this.automation = {};
     for (const t of ALL_TRACKS) {
       this.trackState[t] = { volume: DEFAULT_TRACK_VOLUME[t], muted: false, solo: false };
     }
@@ -150,6 +151,26 @@ class BeatEngine {
 
   setSwing(value) {
     this.swing = value;
+  }
+
+  setAutomation(inst, points) {
+    this.automation[inst] = points && points.length ? [...points].sort((a, b) => a.step - b.step) : null;
+  }
+
+  getAutomationMultiplier(inst, step) {
+    const points = this.automation[inst];
+    if (!points || !points.length) return 1;
+    if (step <= points[0].step) return points[0].value;
+    if (step >= points[points.length - 1].step) return points[points.length - 1].value;
+    for (let i = 0; i < points.length - 1; i++) {
+      const a = points[i];
+      const b = points[i + 1];
+      if (step >= a.step && step <= b.step) {
+        const t = b.step === a.step ? 0 : (step - a.step) / (b.step - a.step);
+        return a.value + (b.value - a.value) * t;
+      }
+    }
+    return 1;
   }
 
   recomputeGains() {
@@ -452,6 +473,27 @@ class BeatEngine {
     noise.connect(hp).connect(gain).connect(this.dest("crash"));
     noise.start(time);
     noise.stop(time + 1.4);
+  }
+
+  // A rising filtered-noise sweep - the classic "riser" transition FX
+  // producers drop in right before a chorus/drop to build anticipation.
+  playFxRiser(time, vel) {
+    const ctx = this.ctx;
+    const dur = 1.8;
+    const noise = ctx.createBufferSource();
+    noise.buffer = this.makeNoiseBuffer(dur + 0.2);
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.Q.value = 1.2;
+    bp.frequency.setValueAtTime(250, time);
+    bp.frequency.exponentialRampToValueAtTime(9000, time + dur);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(vel * 0.5, time + dur * 0.85);
+    gain.gain.linearRampToValueAtTime(0.0001, time + dur);
+    noise.connect(bp).connect(gain).connect(this.dest("fx"));
+    noise.start(time);
+    noise.stop(time + dur + 0.1);
   }
 
   playBass(time, freq, durationSeconds, vel, flavor) {
@@ -831,6 +873,42 @@ class BeatEngine {
 
   // ---- Melodic voices ----
 
+  playKalimbaVoice(time, freq, durationSeconds, vel, flavor) {
+    const ctx = this.ctx;
+    const dest = this.dest("kalimba");
+    const dur = Math.min(durationSeconds, flavor === "musicbox" ? 0.9 : 0.6);
+
+    // A short noise "pluck" transient for the thumb-against-tine attack.
+    const click = ctx.createBufferSource();
+    click.buffer = this.makeNoiseBuffer(0.015);
+    const clickFilter = ctx.createBiquadFilter();
+    clickFilter.type = "highpass";
+    clickFilter.frequency.value = 3000;
+    const clickGain = ctx.createGain();
+    clickGain.gain.setValueAtTime(vel * 0.3, time);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, time + 0.015);
+    click.connect(clickFilter).connect(clickGain).connect(dest);
+    click.start(time);
+    click.stop(time + 0.02);
+
+    const partials =
+      flavor === "musicbox"
+        ? [{ ratio: 1, level: 1 }, { ratio: 2.76, level: 0.35 }, { ratio: 5.4, level: 0.15 }]
+        : [{ ratio: 1, level: 1 }, { ratio: 3.4, level: 0.4 }];
+
+    for (const p of partials) {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq * p.ratio, time);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * p.level, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur * (p.ratio === 1 ? 1 : 0.5));
+      osc.connect(gain).connect(dest);
+      osc.start(time);
+      osc.stop(time + dur + 0.1);
+    }
+  }
+
   playPianoVoice(time, freq, durationSeconds, vel, flavor) {
     const ctx = this.ctx;
     const dest = this.dest("piano");
@@ -1205,22 +1283,24 @@ class BeatEngine {
     for (const inst of Object.keys(p.instruments)) {
       const val = p.instruments[inst][step];
       if (!val) continue;
+      const autoMul = this.getAutomationMultiplier(inst, step);
 
-      if (inst === "kick" || inst === "snare" || inst === "tom" || inst === "crash" || inst === "perc") {
+      if (inst === "kick" || inst === "snare" || inst === "tom" || inst === "crash" || inst === "perc" || inst === "fx") {
         const t = this.jitterTime(time);
-        const vel = this.jitterVel(BASE_VELOCITY[inst]);
+        const vel = this.jitterVel(BASE_VELOCITY[inst]) * autoMul;
         if (inst === "kick") this.playKick(t, vel, flavors.kick);
         else if (inst === "snare") this.playSnare(t, vel, flavors.snare);
         else if (inst === "tom") this.playTom(t, vel);
         else if (inst === "crash") this.playCrash(t, vel);
         else if (inst === "perc") this.playPerc(t, vel, flavors.perc);
+        else if (inst === "fx") this.playFxRiser(t, vel);
         continue;
       }
 
       if (inst === "hihat" || inst === "openhat") {
         const open = inst === "openhat";
         if (val === "roll") this.playHihatRoll(time, dur, open, flavors.hihat, inst);
-        else this.playHihat(this.jitterTime(time), this.jitterVel(BASE_VELOCITY[inst]), open, flavors.hihat, inst);
+        else this.playHihat(this.jitterTime(time), this.jitterVel(BASE_VELOCITY[inst]) * autoMul, open, flavors.hihat, inst);
         continue;
       }
 
@@ -1230,7 +1310,7 @@ class BeatEngine {
       if (val.degrees) {
         for (const deg of val.degrees) {
           const freq = degreeToFreq(this.rootMidi, this.style.scale, deg);
-          const vel = this.jitterVel(BASE_VELOCITY[inst] * 0.85);
+          const vel = this.jitterVel(BASE_VELOCITY[inst] * 0.85) * autoMul;
           if (inst === "piano") this.playPianoVoice(t, freq, noteDur, vel, flavors.piano);
           else if (inst === "pad") this.playPadVoice(t, freq, noteDur, vel, flavors.pad);
           else if (inst === "stab") this.playStabVoice(t, freq, noteDur, vel, flavors.stab);
@@ -1241,10 +1321,11 @@ class BeatEngine {
         }
       } else if (val.degree !== undefined) {
         const freq = degreeToFreq(this.rootMidi, this.style.scale, val.degree);
-        const vel = this.jitterVel(BASE_VELOCITY[inst]);
+        const vel = this.jitterVel(BASE_VELOCITY[inst]) * autoMul;
         if (inst === "bass") this.playBass(t, freq, noteDur, vel, flavors.bass);
         else if (inst === "lead") this.playLeadVoice(t, freq, noteDur, vel, flavors.lead);
         else if (inst === "guitar") this.playGuitarVoice(t, freq, noteDur, vel, flavors.guitar);
+        else if (inst === "kalimba") this.playKalimbaVoice(t, freq, noteDur, vel, flavors.kalimba);
       }
     }
   }

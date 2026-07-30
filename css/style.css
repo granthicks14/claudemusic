@@ -493,6 +493,55 @@ body {
   cursor: pointer;
 }
 
+.automation-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.automation-lane {
+  position: relative;
+  height: 140px;
+  min-width: 560px;
+  background: #1a1a25;
+  border-radius: 8px;
+  cursor: crosshair;
+}
+
+.automation-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.automation-line {
+  fill: none;
+  stroke: var(--accent-2);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.automation-point {
+  fill: var(--accent-2);
+  stroke: #0b0b12;
+  stroke-width: 0.6;
+  cursor: grab;
+}
+
+.automation-point:hover {
+  fill: #fff;
+}
+
+.track-btn.auto-btn.has-automation {
+  background: var(--accent-2);
+  color: #0b0b12;
+  border-color: var(--accent-2);
+}
+
+.track-btn.auto-btn.on {
+  box-shadow: 0 0 0 2px #fff;
+}
+
 .piano-roll-grid {
   display: grid;
   gap: 2px;

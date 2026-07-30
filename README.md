@@ -1,6 +1,6 @@
 # Beat Studio
 
-Describe the beat you want in plain English, or pick from 14 genres, and get either a quick loop or a full ~2-minute song with a real intro/verse/chorus/bridge/outro arrangement — drums, bass, piano, organ, lead, guitar, strings, horns, vocal chops, pads, and synth stabs — then edit and mix it like a mini DAW, right in the browser. Everything is synthesized live with the Web Audio API; no audio files or dependencies required.
+Describe the beat you want in plain English, or pick from 15 genres, and get either a quick loop or a full ~2-minute song with a real intro/verse/chorus/bridge/outro arrangement — drums, bass, piano, organ, lead, guitar, kalimba, strings, horns, vocal chops, pads, synth stabs, and an FX riser — then edit and mix it like a mini DAW, right in the browser. Everything is synthesized live with the Web Audio API; no audio files or dependencies required.
 
 ## Run it
 
@@ -45,7 +45,7 @@ This is genuinely conditional, not decoration: a genre like Drill or Lo-Fi that'
 
 ## Genres
 
-Fourteen styles, each modeled on real production conventions researched for this build, with instrumentation chosen to actually fit the genre (no synth stabs on a rock track, no four-on-the-floor kick pretending to be a dembow):
+Fifteen styles, each modeled on real production conventions researched for this build, with instrumentation chosen to actually fit the genre (no synth stabs on a rock track, no four-on-the-floor kick pretending to be a dembow):
 
 - **Hip-Hop** — boom bap kick/snare, ~58%-swing hi-hats, a soulful sustained melody and pitched string stabs (Kanye-style soul-sample chord loops).
 - **Trap** — sparse kick, sliding 808, rolling hi-hats, a spacious bell hook (Metro Boomin-style restraint).
@@ -61,6 +61,7 @@ Fourteen styles, each modeled on real production conventions researched for this
 - **Jersey Club** *(new)* — a bouncy triplet-feel "kick-back" pattern (approximated on the 16-step grid the way most club edits actually chop it), heavily chopped vocal hooks as the lead element, dry and punchy.
 - **Drum & Bass** *(new)* — fast syncopated breakbeat-style drums at ~172 BPM and a growling Reese bass (a stack of four detuned sawtooths beating against each other — the real technique behind the classic DnB bass sound).
 - **Synthwave** *(new)* — 80s gated drums, an analog synth bass and soaring lead, a lush arpeggiated pad/stab bed.
+- **Rap** *(new)* — researched specifically from Kanye West and Lil Baby's production. Deep 808 bass (the *808s & Heartbreak* legacy: TR-808-driven, minor-key, minimalist), sparse drums that deliberately leave room for the hook rather than competing with it (Lil Baby-style "less is more"), a bouncy triplet-feel kick/hi-hat pattern approximating the 1/12-note ("triplet") quantization Lil Baby's records are known for, an Auto-Tune-style sung vocal hook, and a repeating kalimba melody — the kalimba/melodic-loop sound that's become a signature of modern melodic trap.
 
 ## Real melodies, not random notes — and no more stuck-on-one-pitch lead
 
@@ -80,10 +81,12 @@ Researched real synth sound-design technique (unison/detune stacking - "supersaw
 - **Piano** gained **Celesta** (a bright, bell-like tuned-percussion voice). **Guitar** gained **Jazz** (a mellow hollow-body tone). **Pad** gained **Glass** (a bright bell-partial pad). **Strings** gained **Synth Strings** (a wide 5-voice unison "string machine" sound). **Stab** gained **Brass Chord**. **Horn** gained **Sax** (a more reedy, resonant filter). **Organ** gained **Church** (a slower, longer-sustaining voice). **Vocal** gained a third vowel, **Ay**.
 - **Drums** gained new kit pieces too: kick **Click** (a sharp minimal-techno transient), snare **Brush** (soft and long), hi-hat **Analog** (a warmer vintage drum-machine tone), and percussion **Clave**.
 
-## New instruments: pianos, guitars, organ, and a synthesized vocal chop
+## New instruments: pianos, guitars, organ, kalimba, an FX riser, and a synthesized vocal chop
 
 - **Organ** — a Hammond-style drawbar stack (sine partials at the classic fundamental/octave/octave+fifth ratios), with a driven "gospel" voice that adds overdrive and Leslie-style tremolo. Added where it's genuinely idiomatic: gospel-sample hip-hop, Fela Kuti-style Afrobeat, and classic Rhodes+organ R&B/soul.
-- **Vocal** — since real vocal samples aren't available in a dependency-free browser app, this is built with **formant synthesis**: a sawtooth source through three parallel bandpass filters tuned to vowel formant frequencies (three vowel presets now: "ooh," "ahh," "ay"), the same technique speech synthesizers use to fake a sung vowel. Present by default on the genres where vocal chops are a genuine signature sound (house, trap, reggaeton, dubstep, phonk, Jersey Club), and addable to any other genre via the prompt box.
+- **Vocal** — since real vocal samples aren't available in a dependency-free browser app, this is built with **formant synthesis**: a sawtooth source through three parallel bandpass filters tuned to vowel formant frequencies (three vowel presets now: "ooh," "ahh," "ay"), the same technique speech synthesizers use to fake a sung vowel. Present by default on the genres where vocal chops are a genuine signature sound (house, trap, reggaeton, dubstep, phonk, Jersey Club, Rap), and addable to any other genre via the prompt box.
+- **Kalimba** *(new)* — a plucked-tine tuned-percussion voice (a noise "thumb pluck" transient plus inharmonic sine partials, with a "Music Box" variant), driven by a *different* melody generator than the other lead instruments: low variation, tight rhythm, so it repeats as a genuine ostinato loop rather than an evolving motif — matching how kalimba/melodic-loop hooks actually function in modern rap and Afrobeats records, where they're a hypnotic repeating figure, not a developing melody.
+- **FX Riser** *(new)* — a rising bandpass-filtered noise sweep, the classic pre-drop/pre-chorus transition effect. In Full Song mode it's placed automatically one bar before every chorus, regardless of that bar's instrument density, because a section-change riser is a deliberate arrangement choice, not something that should get masked out by the general layering system.
 
 ## Mixing: how producers actually make a beat sound good
 
@@ -105,6 +108,12 @@ Bass, lead, guitar, piano, organ, pad, stab, strings, horn, and vocal are stored
 - **See what's playing, live.** During playback, whichever note or chord is currently sounding lights up — the note bar itself glows, and in an open piano roll the matching keyboard row highlights too, exactly like watching FL Studio's piano roll light up as a pattern plays. A moving playhead line sweeps across the whole arrangement.
 - **Hover for the note name.** Every note bar shows its length and, when there's room, its actual note name (e.g. "E4") printed right on the bar; hovering shows the full name and duration.
 - **Drag to draw, resize, move, or delete.** Click-drag on empty space to draw a note of any length, drag its right edge to resize, drag its body to move it, or click it to delete — the same interaction whether you're in the piano roll or looking at the compact channel-rack overview.
+
+## Editing an instrument's volume over the whole song
+
+Every melodic/chordal track gets a new **A** button (next to Mute/Solo) that opens a volume-automation editor — a draggable curve across the entire arrangement, exactly like an automation clip in a real DAW: click empty space to add a point, drag a point to move it, click a point to delete it, and "Reset to Flat" clears it back to a constant level. This is genuinely applied at playback, not just visual — the engine reads the curve every step and scales that instrument's volume accordingly, live, even while a beat is already playing.
+
+In **Full Song** mode, atmospheric and feature instruments (pad, strings, organ, lead, vocal, kalimba) get a sensible automation curve generated automatically — quiet in the intro, swelling into each chorus, dipping for the bridge breakdown, fading out over the outro — because that's the kind of thing a mix actually needs over a multi-minute arrangement; short loops are left flat since a 4-bar loop has nowhere to "build" to. You can always override the generated curve by hand.
 
 ## Editing it like a DAW
 

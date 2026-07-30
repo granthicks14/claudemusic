@@ -1,6 +1,6 @@
 const STEPS_PER_BAR = 16;
 
-const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14 };
+const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14 };
 
 const FLAVOR_POOLS = {
   kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click"],
@@ -17,6 +17,7 @@ const FLAVOR_POOLS = {
   horn: ["brass", "soft", "muted", "sax"],
   organ: ["drawbar", "gospel", "church"],
   vocal: ["ooh", "ahh", "ay"],
+  kalimba: ["kalimba", "musicbox"],
 };
 
 function M(degreeOffset, len) {
@@ -226,7 +227,7 @@ const STYLES = {
     progression: [0, 5],
     defaultFlavors: { kick: "808", snare: "clap", hihat: "bright", bass: "808", lead: "bell", stab: "bell-chord", vocal: "ooh" },
     drums: {
-      instruments: ["kick", "snare", "hihat", "openhat", "crash"],
+      instruments: ["kick", "snare", "hihat", "openhat", "crash", "fx"],
       main: {
         core: {
           kick:    [1,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
@@ -274,7 +275,7 @@ const STYLES = {
     progression: [0, 3, 4, 0],
     defaultFlavors: { kick: "fourfloor", snare: "clap", hihat: "bright", perc: "conga", bass: "synth", piano: "pluck", pad: "ensemble", lead: "saw", stab: "square-chord", vocal: "ahh" },
     drums: {
-      instruments: ["kick", "snare", "hihat", "openhat", "perc", "crash"],
+      instruments: ["kick", "snare", "hihat", "openhat", "perc", "crash", "fx"],
       main: {
         core: {
           kick:    [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
@@ -571,7 +572,7 @@ const STYLES = {
     progression: [0, 4],
     defaultFlavors: { kick: "deep", snare: "fat", hihat: "metallic", bass: "wobble", stab: "square-chord", vocal: "ahh" },
     drums: {
-      instruments: ["kick", "snare", "hihat", "openhat", "crash"],
+      instruments: ["kick", "snare", "hihat", "openhat", "crash", "fx"],
       main: {
         core: {
           kick:    [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
@@ -845,6 +846,58 @@ const STYLES = {
       },
     },
   },
+
+  rap: {
+    name: "Rap",
+    description: "Deep 808, a bouncy triplet-feel kick, sparse drums, an Auto-Tune-style hook and kalimba melody.",
+    tempo: { min: 130, max: 145, default: 138 },
+    swing: 0.15,
+    humanize: { timingMs: 3, velocityJitter: 0.13 },
+    key: "C2",
+    scale: "minor",
+    progression: [0, 5, 3, 4],
+    defaultFlavors: { kick: "808", snare: "trapsnap", hihat: "dark", bass: "808", kalimba: "kalimba", vocal: "ahh", stab: "bell-chord" },
+    drums: {
+      // Modeled on the Kanye West "808s & Heartbreak" legacy (TR-808,
+      // minor-key minimalism, Auto-Tuned melodic hooks) and Lil Baby-style
+      // modern melodic trap, where "less is more" on the drums so the
+      // melody and vocal hook carry the record.
+      instruments: ["kick", "snare", "hihat", "openhat", "fx"],
+      main: {
+        core: {
+          kick:    [1,0,0,1, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+          snare:   [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          hihat:   [1,0,0,1, 0,0,1,0, 0,1,0,0, 1,0,0,1],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,0,0,0, 0,1,0,0, 0,0,0,0, 0,0,1,0],
+          snare:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1],
+          openhat: [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,0],
+        },
+        optionalProbability: 0.25,
+        hihatRollSteps: [11],
+        hihatRollProbability: 0.35,
+      },
+    },
+    melodic: { monoInstruments: ["bass", "kalimba"], chordInstruments: ["vocal", "stab"] },
+    melody: {
+      bass: { motifBars: 1, noteLengths: [[3,3],[4,2],[6,1]], restProbability: 0.3, chordToneProbability: 0.9, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1],[3,1]], variationProbability: 0.2 },
+      kalimba: { motifBars: 1, noteLengths: [[1,3],[2,3],[3,1]], restProbability: 0.2, chordToneProbability: 0.8, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.12 },
+    },
+    chords: {
+      vocal: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, C(0,1,2),0,0,0],
+        optionalProbability: 0.3,
+      },
+      stab: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,C(2,3,1),0, 0,0,0,0, 0,0,0,0],
+        optionalProbability: 0.15,
+      },
+    },
+  },
 };
 
 function rollTrack(core, optional, probability) {
@@ -970,7 +1023,7 @@ function generateVariation(style, bars) {
     instruments[inst] = generateMonoMelody(REGISTER[inst], structure, barRootDegrees, style.melody[inst], totalSteps);
   }
 
-  return { instruments, structure, barRootDegrees };
+  return { instruments, structure, barRootDegrees, automation: {} };
 }
 
 // ---- Full-song arrangement ----
@@ -994,9 +1047,48 @@ const SONG_SECTIONS = [
 ];
 
 const INSTRUMENT_PRIORITY = [
-  "kick", "hihat", "snare", "bass", "piano", "organ", "pad", "lead",
-  "guitar", "openhat", "perc", "stab", "strings", "horn", "vocal", "crash", "tom",
+  "kick", "hihat", "snare", "bass", "piano", "organ", "pad", "lead", "kalimba",
+  "guitar", "openhat", "perc", "stab", "strings", "horn", "vocal", "crash", "tom", "fx",
 ];
+
+// Volume automation: rather than leaving a track's fader flat for the
+// whole song, atmospheric/feature instruments swell into choruses, dip
+// for the bridge breakdown, and fade in/out over the intro and outro -
+// the same "automate a level over the arrangement" move a real mix uses.
+const AUTOMATION_INSTRUMENTS = ["pad", "strings", "organ", "lead", "vocal", "kalimba"];
+
+function generateAutomationCurve(barMetas) {
+  const points = [];
+  let lastValue = null;
+  for (let i = 0; i < barMetas.length; i++) {
+    const b = barMetas[i];
+    const step = i * STEPS_PER_BAR;
+    const span = Math.max(b.len - 1, 1);
+    let value;
+    if (b.type === "intro") value = 0.3 + 0.5 * (b.pos / span);
+    else if (b.type === "verse") value = 0.65;
+    else if (b.type === "chorus") value = 1;
+    else if (b.type === "bridge") value = b.pos < b.len / 2 ? 0.35 : 0.6;
+    else if (b.type === "outro") value = 0.7 - 0.55 * (b.pos / span);
+    else value = 0.7;
+
+    if (points.length === 0 || Math.abs(value - lastValue) > 0.05 || i === barMetas.length - 1) {
+      points.push({ step, value: Math.max(0, Math.min(1, value)) });
+      lastValue = value;
+    }
+  }
+  return points;
+}
+
+function generateAutomation(style, barMetas) {
+  const automation = {};
+  for (const inst of AUTOMATION_INSTRUMENTS) {
+    if (style.melodic.chordInstruments.includes(inst) || style.melodic.monoInstruments.includes(inst)) {
+      automation[inst] = generateAutomationCurve(barMetas);
+    }
+  }
+  return automation;
+}
 
 function priorityInstrumentList(style) {
   const have = new Set([...style.drums.instruments, ...style.melodic.monoInstruments, ...style.melodic.chordInstruments]);
@@ -1078,6 +1170,18 @@ function generateSongVariation(style) {
     instruments[inst] = melody;
   }
 
+  // Drop a riser into the bar right before every chorus - the classic
+  // pre-drop build that announces a section change is coming, regardless
+  // of whether "fx" happened to be in that bar's active instrument layer.
+  if (instruments.fx) {
+    for (let i = 1; i < bars; i++) {
+      if (barMetas[i].type === "chorus" && barMetas[i].pos === 0) {
+        instruments.fx[(i - 1) * STEPS_PER_BAR] = true;
+      }
+    }
+  }
+
   const structure = barMetas.map((b) => b.label);
-  return { instruments, structure, barRootDegrees };
+  const automation = generateAutomation(style, barMetas);
+  return { instruments, structure, barRootDegrees, automation };
 }

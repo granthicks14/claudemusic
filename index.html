@@ -79,6 +79,20 @@
           <div id="piano-roll-grid" class="piano-roll-grid"></div>
         </div>
       </div>
+
+      <div id="automation-panel" class="piano-roll" hidden>
+        <div class="piano-roll-header">
+          <span id="automation-title"></span>
+          <div class="automation-actions">
+            <button id="automation-clear">Reset to Flat</button>
+            <button id="automation-close">Close ✕</button>
+          </div>
+        </div>
+        <p class="hint">Click to add a volume point, drag a point to move it, click a point to delete it. This shapes the track's level over the whole arrangement.</p>
+        <div class="grid-wrap">
+          <div id="automation-lane" class="automation-lane"></div>
+        </div>
+      </div>
     </section>
   </div>
 

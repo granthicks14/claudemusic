@@ -64,6 +64,7 @@ const FLAVOR_LABELS = {
   "909": "TR-909", "909snare": "TR-909", linn: "LinnDrum", "707": "TR-707", "606": "TR-606", dmx: "DMX",
   timpani: "Timpani", clarinet: "Clarinet", frenchhorn: "French Horn", oboe: "Oboe", cr78: "CR-78",
   simmons: "Simmons SDS-V", "808": "808", sp1200: "SP-1200", talkingdrum: "Talking Drum", moog: "Moog",
+  dx7ep: "DX7 E.Piano", juno: "Juno-106", vocoder: "Vocoder",
 };
 function flavorLabel(key) {
   if (FLAVOR_LABELS[key]) return FLAVOR_LABELS[key];

@@ -9,15 +9,15 @@ const FLAVOR_POOLS = {
   perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78", "talkingdrum"],
   tom: ["acoustic", "simmons"],
   bass: ["warm", "synth", "808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog"],
-  piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord"],
+  piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord", "dx7ep"],
   lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm"],
-  pad: ["warm", "ensemble", "airy", "glass", "choir", "dark"],
+  pad: ["warm", "ensemble", "airy", "glass", "choir", "dark", "juno"],
   stab: ["pluck-chord", "square-chord", "bell-chord", "brass-chord", "organ-chord", "string-chord"],
   guitar: ["clean", "power", "muted", "nylon", "acoustic", "jazz", "funk", "twelvestring"],
   strings: ["soul", "orchestral", "staccato", "synth", "pizzicato", "tremolo"],
   horn: ["brass", "soft", "muted", "sax", "trumpetstab", "section", "clarinet", "frenchhorn", "oboe"],
   organ: ["drawbar", "gospel", "church", "combo"],
-  vocal: ["ooh", "ahh", "ay", "oh", "choir"],
+  vocal: ["ooh", "ahh", "ay", "oh", "choir", "vocoder"],
   kalimba: ["kalimba", "musicbox", "steeldrum"],
   marimba: ["marimba", "vibraphone"],
   arp: ["arp", "pulse"],
@@ -47,15 +47,15 @@ const FLAVOR_TAGS = {
   perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright", timpani: "dark", cr78: "warm", talkingdrum: "warm" },
   tom: { acoustic: "warm", simmons: "bright" },
   bass: { warm: "warm", synth: "bright", "808": "dark", hard808: "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm", moog: "warm" },
-  piano: { electric: "bright", pluck: "bright", grand: "warm", rhodes: "warm", wurlitzer: "warm", upright: "warm", celesta: "bright", toy: "bright", harpsichord: "bright" },
+  piano: { electric: "bright", pluck: "bright", grand: "warm", rhodes: "warm", wurlitzer: "warm", upright: "warm", celesta: "bright", toy: "bright", harpsichord: "bright", dx7ep: "bright" },
   lead: { square: "bright", saw: "bright", bell: "bright", flute: "warm", supersaw: "bright", pluck: "bright", sine: "warm", chip: "bright", brasslead: "warm", fm: "bright" },
-  pad: { warm: "warm", ensemble: "warm", airy: "bright", glass: "bright", choir: "warm", dark: "dark" },
+  pad: { warm: "warm", ensemble: "warm", airy: "bright", glass: "bright", choir: "warm", dark: "dark", juno: "warm" },
   stab: { "pluck-chord": "bright", "square-chord": "bright", "bell-chord": "bright", "brass-chord": "warm", "organ-chord": "warm", "string-chord": "warm" },
   guitar: { clean: "bright", power: "dark", muted: "dark", nylon: "warm", acoustic: "warm", jazz: "warm", funk: "bright", twelvestring: "bright" },
   strings: { soul: "warm", orchestral: "warm", staccato: "bright", synth: "bright", pizzicato: "bright", tremolo: "dark" },
   horn: { brass: "bright", soft: "warm", muted: "dark", sax: "warm", trumpetstab: "bright", section: "bright", clarinet: "warm", frenchhorn: "warm", oboe: "bright" },
   organ: { drawbar: "warm", gospel: "dark", church: "dark", combo: "bright" },
-  vocal: { ooh: "warm", ahh: "warm", ay: "bright", oh: "warm", choir: "warm" },
+  vocal: { ooh: "warm", ahh: "warm", ay: "bright", oh: "warm", choir: "warm", vocoder: "bright" },
   kalimba: { kalimba: "warm", musicbox: "bright", steeldrum: "bright" },
   marimba: { marimba: "warm", vibraphone: "bright" },
   arp: { arp: "bright", pulse: "warm" },
@@ -90,36 +90,86 @@ function pickWeighted(pool) {
   return pool[0][0];
 }
 
-// Real hooks lean on a small, reused set of pitches (most pop hooks use only
-// 3-4 distinct notes) shaped into a "leap up, then step back down" arc rather
-// than a fresh random pitch on every note - that's what makes a phrase read
-// as a tune instead of noodling.
-function buildPitchPool(params) {
-  const pool = [0];
-  for (let i = 0; i < 2; i++) {
-    const useChordTone = Math.random() < params.chordToneProbability;
-    const val = pickWeighted(useChordTone ? params.chordTonePool : params.passingTonePool);
-    if (!pool.includes(val)) pool.push(val);
+// ---- Note-to-note melodic composition ----
+// The previous approach picked 2-3 pitches up front and mechanically
+// arc-indexed into them - fine for "the same few notes recur," but it
+// never actually reasoned about how one note leads to the next, which is
+// most of what separates a considered melodic line from a shuffled bag of
+// acceptable pitches. Two of the most robust, well-replicated findings in
+// melodic corpus research now drive that note-to-note choice directly:
+//
+// - Pitch proximity: melodies overwhelmingly move by step: real-melody
+//   corpus studies consistently find small intervals dominate note-to-note
+//   motion (Huron, "Sweet Anticipation", 2006, ch. 4 - the "pitch proximity"
+//   principle, one of the oldest and best-replicated findings in melodic
+//   analysis, tracing back to Carl Stumpf and von Hornbostel a century ago).
+// - Post-skip reversal: on the rarer occasion a melody does leap, that leap
+//   is disproportionately likely to be followed by motion back the other
+//   way (Von Hippel & Huron, "Why Do Skips Precede Reversals?", Music
+//   Perception, 2000) - exactly what Narmour's implication-realization
+//   model predicts a leap "implies" (his gap-fill principle, 1990).
+//
+// A gentle pull toward an overall rise-then-fall arc shape across the whole
+// phrase is layered on top (Meyer, "Emotion and Meaning in Music", 1956) so
+// the result has both local coherence (each note relates sensibly to the
+// last) and a global shape (the phrase reads as one arc, not a random walk).
+function pickNextDegree(prevOffset, lastLeapDirection, candidates, arcTarget) {
+  let best = candidates[0].value;
+  let bestScore = -Infinity;
+  for (const { value: c, weight } of candidates) {
+    const delta = c - prevOffset;
+    const dist = Math.abs(delta);
+    // Pitch proximity biases toward small steps *statistically* rather
+    // than forbidding leaps outright - real melodies are dominated by
+    // steps but still leap regularly (roughly a quarter to a third of
+    // note-to-note motion in corpus studies); coefficients tuned so
+    // random tie-breaking can still let a leap win a meaningful share of
+    // the time instead of steps mechanically sweeping every choice.
+    let score = -dist * 0.55;
+    if (dist === 0) score -= 0.4; // some motion is more interesting than none
+    if (lastLeapDirection !== 0 && dist > 0) {
+      // post-skip reversal: after a leap, favor snapping back the other way
+      const dir = delta > 0 ? 1 : -1;
+      score += dir === -lastLeapDirection ? 1.5 : -1.5;
+    }
+    score -= Math.abs(c - arcTarget) * 0.18; // gentle pull toward the phrase's overall arc
+    score += (weight || 1) * 0.25; // still honors each genre's authored chord-tone preferences
+    score += Math.random() * 1.6; // keeps it from being fully deterministic
+    if (score > bestScore) {
+      bestScore = score;
+      best = c;
+    }
   }
-  return pool.sort((a, b) => a - b);
+  return best;
 }
 
 function generateMotif(lengthSteps, params) {
-  const pitchPool = buildPitchPool(params);
   const events = [];
   let pos = 0;
+  let prevOffset = 0;
+  let lastLeapDirection = 0;
   while (pos < lengthSteps) {
     const dur = Math.min(pickWeighted(params.noteLengths), lengthSteps - pos);
     if (Math.random() < params.restProbability) {
       events.push({ offset: pos, duration: dur, degreeOffset: null });
     } else {
-      const progress = pos / lengthSteps;
-      const arc = Math.sin(progress * Math.PI); // 0 at the edges, 1 in the middle
-      let idx = Math.round(arc * (pitchPool.length - 1));
-      if (Math.random() < 0.25) {
-        idx = Math.max(0, Math.min(pitchPool.length - 1, idx + (Math.random() < 0.5 ? -1 : 1)));
-      }
-      events.push({ offset: pos, duration: dur, degreeOffset: pitchPool[idx] });
+      // Chord tones are more likely right on a quarter-note beat (metric
+      // accent correlating with consonance is standard tonal-harmony
+      // practice - strong beats get the "safe" landing notes, weak beats
+      // can carry more passing-tone color).
+      const isStrongBeat = pos % 4 === 0;
+      const chordToneChance = isStrongBeat ? Math.min(0.95, params.chordToneProbability + 0.15) : params.chordToneProbability;
+      const useChordTone = Math.random() < chordToneChance;
+      const rawPool = (useChordTone ? params.chordTonePool : params.passingTonePool) || [];
+      const candidates = rawPool.map(([value, weight]) => ({ value, weight }));
+      if (!candidates.some((c) => c.value === 0)) candidates.push({ value: 0, weight: 0.5 });
+
+      const arcTarget = Math.sin((pos / lengthSteps) * Math.PI) * 3;
+      const next = pickNextDegree(prevOffset, lastLeapDirection, candidates, arcTarget);
+      const delta = next - prevOffset;
+      lastLeapDirection = Math.abs(delta) >= 2 ? Math.sign(delta) : 0;
+      prevOffset = next;
+      events.push({ offset: pos, duration: dur, degreeOffset: next });
     }
     pos += dur;
   }
@@ -162,6 +212,7 @@ function generateMonoMelody(register, structure, barRootDegrees, params, totalSt
   const arr = new Array(totalSteps).fill(null);
   const motifLen = params.motifBars * STEPS_PER_BAR;
   const motif = generateMotif(motifLen, params);
+  const totalChunks = Math.ceil(totalSteps / motifLen);
   let chunkStart = 0;
   let chunkIndex = 0;
 
@@ -170,6 +221,20 @@ function generateMonoMelody(register, structure, barRootDegrees, params, totalSt
     if (chunkIndex > 0 && Math.random() < params.variationProbability) {
       const modes = ["transposeUp", "transposeDown", "invert", "truncate"];
       motifToUse = transformMotif(motif, modes[Math.floor(Math.random() * modes.length)]);
+    }
+    // Antecedent-consequent phrasing (standard "period" form in tonal
+    // harmony - see e.g. Kostka & Payne, "Tonal Harmony"): a "question"
+    // phrase conventionally lands on an open, unresolved half-cadence (the
+    // 5th scale degree) while its "answer" resolves all the way home to
+    // the tonic - the harmonic version of the call-and-response pairing
+    // below, not just a pitch-contour echo.
+    if (chunkIndex % 2 === 0 && chunkIndex + 1 < totalChunks) {
+      for (let i = motifToUse.length - 1; i >= 0; i--) {
+        if (motifToUse[i].degreeOffset !== null) {
+          motifToUse = motifToUse.map((e, idx) => (idx === i ? { ...e, degreeOffset: 4 } : e));
+          break;
+        }
+      }
     }
     // Question-and-answer phrasing: every other repeat is the "answer,"
     // sometimes dropped an octave for contrast, and always resolves its
@@ -201,6 +266,70 @@ function generateMonoMelody(register, structure, barRootDegrees, params, totalSt
 
   if (structure[0] === "intro") thinRange(arr, 0, STEPS_PER_BAR, 0.3);
   return arr;
+}
+
+// A chorus needs one strong, instantly-recognizable hook rather than the
+// verse's more loosely-evolving motif - real songwriting almost always
+// repeats the *exact same* short idea every time the chorus comes back
+// (that repetition is most of what makes a hook a hook), so this generates
+// one fixed motif per instrument and stamps it into every chorus bar
+// verbatim - transposed to each bar's chord, never varied or transformed -
+// instead of letting the verse's own motif-with-variation logic keep
+// evolving straight through the chorus sections too. Only runs in full-song
+// mode, since a short loop has no chorus/verse distinction to make.
+function applyChorusHook(melody, inst, style, barMetas, barRootDegrees) {
+  const params = style.melody[inst];
+  if (!params || !barMetas.some((b) => b.type === "chorus")) return;
+
+  const register = REGISTER[inst];
+  const registerJitter = pickWeighted([[-7, 1], [0, 3], [7, 1]]);
+  const effectiveRegister = register + registerJitter;
+  const hookParams = {
+    ...params,
+    motifBars: 1,
+    restProbability: Math.max(0.1, params.restProbability * 0.75),
+    chordToneProbability: Math.min(0.95, params.chordToneProbability + 0.15),
+  };
+  const hookLen = hookParams.motifBars * STEPS_PER_BAR;
+  const hook = generateMotif(hookLen, hookParams);
+  const hookByOffset = new Map(hook.filter((e) => e.degreeOffset !== null).map((e) => [e.offset, e]));
+
+  for (let i = 0; i < barMetas.length; i++) {
+    if (barMetas[i].type !== "chorus") continue;
+    const barStart = i * STEPS_PER_BAR;
+    const sectionBarPos = barMetas[i].pos;
+    const barRoot = barRootDegrees[i];
+    for (let s = 0; s < STEPS_PER_BAR; s++) {
+      const globalStep = barStart + s;
+      const hookStep = (sectionBarPos * STEPS_PER_BAR + s) % hookLen;
+      const ev = hookByOffset.get(hookStep);
+      if (!ev) {
+        melody[globalStep] = null;
+        continue;
+      }
+      const dur = Math.min(ev.duration, hookLen - hookStep, melody.length - globalStep);
+      melody[globalStep] = { degree: barRoot + effectiveRegister + ev.degreeOffset, len: dur };
+    }
+  }
+}
+
+// Two independently-generated mono melodies can land dense onsets on the
+// exact same step purely by chance, which reads as cluttered rather than
+// arranged - real call-and-response arrangement leaves room for each
+// voice rather than having both talk at once. This only ever *removes* a
+// colliding note (never adds one or changes a pitch), and only when the
+// instrument being thinned has another note within a couple of steps
+// either side, so a genuinely sparse part never gets silenced outright.
+function declutterMonoCollisions(instruments, monoInstruments) {
+  if (!monoInstruments || monoInstruments.length < 2) return;
+  const primary = instruments[monoInstruments[0]];
+  const secondary = instruments[monoInstruments[1]];
+  if (!primary || !secondary) return;
+  for (let i = 0; i < secondary.length; i++) {
+    if (!secondary[i] || !primary[i]) continue;
+    const hasNearby = [-2, -1, 1, 2].some((d) => secondary[i + d]);
+    if (hasNearby && Math.random() < 0.6) secondary[i] = null;
+  }
 }
 
 const STYLES = {
@@ -1106,7 +1235,10 @@ const STYLES = {
     key: "A1",
     scale: "minor",
     progressions: [[0, 5, 3, 4], [0, 3, 4, 0], [0, 6, 3, 4], [0, 3]],
-    defaultFlavors: { kick: "linn", snare: "linn", hihat: "bright", bass: "synth", lead: "brasslead", pad: "warm", stab: "square-chord", arp: "arp" },
+    // A Juno-106 chorus pad instead of a plain "warm" patch - that lush,
+    // BBD-chorused analog pad is about as quintessentially 80s-synthwave
+    // a texture as exists.
+    defaultFlavors: { kick: "linn", snare: "linn", hihat: "bright", bass: "synth", lead: "brasslead", pad: "juno", stab: "square-chord", arp: "arp" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash"],
       main: {
@@ -1458,6 +1590,7 @@ function generateVariation(rawStyle, bars) {
   for (const inst of style.melodic.monoInstruments) {
     instruments[inst] = generateMonoMelody(REGISTER[inst], structure, barRootDegrees, style.melody[inst], totalSteps);
   }
+  declutterMonoCollisions(instruments, style.melodic.monoInstruments);
 
   return { instruments, structure, barRootDegrees, barChordContexts, automation: {} };
 }
@@ -1623,6 +1756,7 @@ function generateSongVariation(rawStyle) {
   }
   for (const inst of style.melodic.monoInstruments) {
     const melody = generateMonoMelody(REGISTER[inst], [], barRootDegrees, style.melody[inst], totalSteps);
+    applyChorusHook(melody, inst, style, barMetas, barRootDegrees);
     for (let i = 0; i < bars; i++) {
       if (activeSets[i].has(inst)) continue;
       const start = i * STEPS_PER_BAR;
@@ -1630,6 +1764,7 @@ function generateSongVariation(rawStyle) {
     }
     instruments[inst] = melody;
   }
+  declutterMonoCollisions(instruments, style.melodic.monoInstruments);
 
   // Drop a riser into the bar right before every chorus - the classic
   // pre-drop build that announces a section change is coming, regardless

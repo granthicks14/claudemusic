@@ -1776,6 +1776,39 @@ class BeatEngine {
     const dest = this.dest("vocal");
     const dur = Math.min(durationSeconds, 0.6);
 
+    if (flavor === "vocoder") {
+      // A real vocoder imposes a filter bank derived from a spoken
+      // "modulator" signal onto a synthesized "carrier" tone - without an
+      // actual speech input to analyze, the classic synthesized vocoder
+      // hit (Herbie Hancock, Zapp, Daft Punk-adjacent) is approximated by
+      // running a buzzy square-wave carrier (harmonically richer and more
+      // mechanical than the vocal instrument's sawtooth) through a coarser
+      // bank of more, narrower fixed-frequency bandpass bands than the
+      // formant synthesis below uses - and, like Auto Lead, deliberately
+      // no vibrato at all, which is exactly what reads as "talking
+      // machine" rather than "sung."
+      const osc = ctx.createOscillator();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(freq, time);
+      const envelope = ctx.createGain();
+      envelope.gain.setValueAtTime(0.0001, time);
+      envelope.gain.linearRampToValueAtTime(vel * 0.8, time + 0.012);
+      envelope.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      envelope.connect(dest);
+      for (const freqCenter of [280, 600, 1100, 1900, 2900, 4200]) {
+        const bp = ctx.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = freqCenter;
+        bp.Q.value = 18;
+        const g = ctx.createGain();
+        g.gain.value = 1 / 6;
+        osc.connect(bp).connect(g).connect(envelope);
+      }
+      osc.start(time);
+      osc.stop(time + dur + 0.05);
+      return;
+    }
+
     // Formant synthesis: a harmonically-rich source through a few parallel
     // bandpass filters tuned to vowel formant frequencies approximates a
     // sung vowel far better than a single filtered oscillator.
@@ -2126,6 +2159,37 @@ class BeatEngine {
       return;
     }
 
+    if (flavor === "dx7ep") {
+      // True FM synthesis - a carrier sine whose frequency is modulated by
+      // a second sine - rather than the additive detuned-oscillator trick
+      // every other piano flavor here uses. The Yamaha DX7's "E.PIANO 1"
+      // patch (probably the single most-used FM sound in 80s pop) gets its
+      // bright, bell-like attack settling into a near-pure sustain from a
+      // modulator ratio around 14:1 whose OWN amplitude (the "modulation
+      // index") decays much faster than the carrier's - deep modulation
+      // for an instant, then almost none as the modulator dies away.
+      const carrier = ctx.createOscillator();
+      carrier.type = "sine";
+      carrier.frequency.setValueAtTime(freq, time);
+      const modulator = ctx.createOscillator();
+      modulator.type = "sine";
+      modulator.frequency.setValueAtTime(freq * 14, time);
+      const modGain = ctx.createGain();
+      modGain.gain.setValueAtTime(freq * 2.2, time);
+      modGain.gain.exponentialRampToValueAtTime(Math.max(1, freq * 0.02), time + 0.35);
+      modulator.connect(modGain).connect(carrier.frequency);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.exponentialRampToValueAtTime(vel, time + 0.006);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      carrier.connect(gain).connect(dest);
+      carrier.start(time);
+      modulator.start(time);
+      carrier.stop(time + dur + 0.1);
+      modulator.stop(time + dur + 0.1);
+      return;
+    }
+
     if (flavor === "toy") {
       // Bright, thin, slightly detuned square+sine pair with a fast decay -
       // a cheap toy/kids-piano upright character.
@@ -2456,6 +2520,43 @@ class BeatEngine {
         osc.start(time);
         osc.stop(time + dur + 0.1);
       }
+      return;
+    }
+
+    if (flavor === "juno") {
+      // The Roland Juno-106's signature isn't really its oscillator (a
+      // plain analog saw) - it's the built-in BBD (bucket-brigade device)
+      // chorus circuit almost every classic Juno pad patch runs through,
+      // which is what actually gives it that lush, wide, shimmering
+      // character. Modeled as the real DSP a chorus circuit uses: a short
+      // delay line whose delay time is itself slowly modulated by an LFO,
+      // mixed back in with the dry signal - not just a second detuned
+      // oscillator the way every other pad flavor here fakes "width."
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freq, time);
+      const envelope = ctx.createGain();
+      envelope.gain.setValueAtTime(0.0001, time);
+      envelope.gain.linearRampToValueAtTime(vel * 0.6, time + attack);
+      envelope.gain.setValueAtTime(vel * 0.6, time + Math.max(attack, dur - 0.2));
+      envelope.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      osc.connect(envelope).connect(dest);
+
+      const delay = ctx.createDelay(0.05);
+      delay.delayTime.value = 0.018;
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 0.6;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = 0.006;
+      lfo.connect(lfoGain).connect(delay.delayTime);
+      const chorusGain = ctx.createGain();
+      chorusGain.gain.value = 0.8;
+      envelope.connect(delay).connect(chorusGain).connect(dest);
+
+      osc.start(time);
+      lfo.start(time);
+      osc.stop(time + dur + 0.1);
+      lfo.stop(time + dur + 0.1);
       return;
     }
 

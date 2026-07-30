@@ -13,6 +13,15 @@
       <p class="subtitle">Pick a style, build a full arrangement, then produce it your way.</p>
     </header>
 
+    <section class="prompt-box">
+      <label for="prompt-input">Describe the beat you want</label>
+      <div class="prompt-row">
+        <input type="text" id="prompt-input" placeholder="e.g. &quot;dark energetic trap with vocal chops&quot; or &quot;chill lofi piano beat&quot;" maxlength="140">
+        <button id="prompt-generate" class="transport-btn play">Generate</button>
+      </div>
+      <p id="prompt-status" class="shuffle-status"></p>
+    </section>
+
     <section id="style-select" class="style-grid"></section>
 
     <section id="workspace" class="workspace" hidden>

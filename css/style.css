@@ -44,6 +44,45 @@ body {
   color: var(--muted);
 }
 
+.prompt-box {
+  background: linear-gradient(160deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.1rem 1.3rem;
+  margin-bottom: 1.5rem;
+}
+
+.prompt-box label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+
+.prompt-row {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.prompt-row input {
+  flex: 1;
+  background: #1d1d2b;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 9px;
+  padding: 0.65rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+.prompt-row input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.prompt-box .shuffle-status {
+  margin: 0.6rem 0 0;
+}
+
 .style-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));

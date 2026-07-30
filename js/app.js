@@ -20,17 +20,21 @@ const pianoRollPanel = document.getElementById("piano-roll");
 const pianoRollTitle = document.getElementById("piano-roll-title");
 const pianoRollGrid = document.getElementById("piano-roll-grid");
 const pianoRollClose = document.getElementById("piano-roll-close");
+const promptInput = document.getElementById("prompt-input");
+const promptGenerateBtn = document.getElementById("prompt-generate");
+const promptStatus = document.getElementById("prompt-status");
 
 const DRUM_ORDER = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash"];
-const MELODIC_ORDER = ["bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn"];
+const MELODIC_ORDER = ["bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal"];
 const MONO_INSTRUMENTS = ["bass", "lead", "guitar"];
 
 const TRACK_LABELS = {
   kick: "Kick", snare: "Snare", hihat: "Hi-Hat", openhat: "Open Hat", tom: "Tom", perc: "Perc", crash: "Crash",
   bass: "Bass", piano: "Piano", lead: "Melody", pad: "Pad", stab: "Stab", guitar: "Guitar", strings: "Strings", horn: "Horn",
+  organ: "Organ", vocal: "Vocal",
 };
 
-const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, strings: 4, horn: 1 };
+const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, strings: 4, horn: 1, organ: 4, vocal: 1 };
 
 const STYLE_ACCENTS = {
   hiphop: "#ff6b6b", trap: "#a55eea", house: "#26de81", rock: "#fd9644", reggaeton: "#fed330", lofi: "#45aaf2",
@@ -42,7 +46,7 @@ const SIDECHAIN_DEFAULT_ON = new Set(["trap", "house", "dubstep", "afrobeats", "
 const TRACK_COLOR = {
   kick: "#ff6b6b", snare: "#feca57", hihat: "#48dbfb", openhat: "#0abde3", tom: "#ff9f43",
   perc: "#1dd1a1", crash: "#c8d6e5", bass: "#a55eea", piano: "#00d2d3", lead: "#ff9ff3", pad: "#54a0ff",
-  stab: "#f368e0", guitar: "#ff6348", strings: "#7bed9f", horn: "#eccc68",
+  stab: "#f368e0", guitar: "#ff6348", strings: "#7bed9f", horn: "#eccc68", organ: "#e58e26", vocal: "#ff7f9f",
 };
 
 let selectedStyleId = null;
@@ -510,5 +514,115 @@ for (const btn of barsButtons) {
     if (selectedStyleId) generatePattern();
   });
 }
+
+// ---- Describe-a-beat: lightweight keyword/mood parsing, no ML involved ----
+
+const GENRE_KEYWORDS = {
+  drill: ["uk drill", "ny drill", "drill"],
+  trap: ["trap"],
+  dubstep: ["dubstep", "riddim", "wobble bass", "wobble"],
+  afrobeats: ["amapiano", "afrobeats", "afrobeat", "log drum"],
+  reggaeton: ["reggaeton", "dembow"],
+  house: ["four on the floor", "house", "edm", "dance beat"],
+  rock: ["rock", "punk", "guitar band"],
+  rnb: ["neo-soul", "neo soul", "r&b", "r and b", "rnb", "soul"],
+  lofi: ["chillhop", "chill hop", "study beat", "lo-fi", "lo fi", "lofi"],
+  hiphop: ["boom bap", "boombap", "hip-hop", "hip hop", "hiphop", "rap beat"],
+};
+
+const GENERIC_VOCAL_CHORDS = {
+  core: new Array(STEPS_PER_BAR).fill(0),
+  optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,C(0,1,1),0],
+  optionalProbability: 0.2,
+};
+
+function parsePrompt(text) {
+  const lower = text.toLowerCase();
+  let styleId = null;
+  let matchedKeyword = "";
+  for (const [id, keywords] of Object.entries(GENRE_KEYWORDS)) {
+    for (const kw of keywords) {
+      if (lower.includes(kw) && kw.length > matchedKeyword.length) {
+        styleId = id;
+        matchedKeyword = kw;
+      }
+    }
+  }
+
+  const has = (words) => words.some((w) => lower.includes(w));
+  const mood = {
+    dark: has(["dark", "moody", "sad", "eerie", "evil", "scary", "sinister", "menacing"]),
+    bright: has(["happy", "bright", "uplifting", "joyful", "sunny", "cheerful"]),
+    chill: has(["chill", "relax", "mellow", "slow", "calm", "laid back", "laid-back"]),
+    hype: has(["hype", "energetic", "energy", "fast", "hard", "aggressive", "intense", "banger"]),
+    long: has(["long", "extended", "full song", "epic"]),
+    wantsVocal: has(["vocal chops", "vocal chop", "vocals", "vocal", "choir", "singing", "sing", "voice"]),
+  };
+
+  let fallback = false;
+  if (!styleId) {
+    fallback = true;
+    if (mood.dark) styleId = "drill";
+    else if (mood.chill) styleId = "lofi";
+    else if (mood.hype) styleId = "house";
+    else styleId = "hiphop";
+  }
+
+  return { styleId, fallback, mood };
+}
+
+function generateFromPrompt() {
+  const text = promptInput.value.trim();
+  if (!text) {
+    promptStatus.textContent = 'Type a description first, e.g. "dark energetic trap with vocal chops".';
+    return;
+  }
+
+  const { styleId, fallback, mood } = parsePrompt(text);
+  selectStyle(styleId);
+
+  const notes = [];
+  if (fallback) notes.push(`no exact genre match, so here's ${STYLES[styleId].name} as the closest fit`);
+
+  if (mood.dark && activeStyle.scale === "major") {
+    activeStyle.scale = "minor";
+    notes.push("shifted to a darker minor key");
+  } else if (mood.bright && activeStyle.scale !== "major") {
+    activeStyle.scale = "major";
+    notes.push("shifted to a brighter major key");
+  }
+
+  if (mood.hype) {
+    tempoSlider.value = tempoSlider.max;
+    notes.push("pushed the tempo up");
+  } else if (mood.chill) {
+    tempoSlider.value = tempoSlider.min;
+    notes.push("eased the tempo down");
+  }
+  tempoValue.textContent = tempoSlider.value;
+  engine.updateTempo(Number(tempoSlider.value));
+
+  if (mood.long) {
+    selectedBars = 8;
+    for (const b of barsButtons) b.classList.toggle("selected", b.dataset.bars === "8");
+    notes.push("built out an 8-bar arrangement");
+  }
+
+  if (mood.wantsVocal && !activeStyle.melodic.chordInstruments.includes("vocal")) {
+    activeStyle.melodic = { ...activeStyle.melodic, chordInstruments: [...activeStyle.melodic.chordInstruments, "vocal"] };
+    activeStyle.chords = { ...activeStyle.chords, vocal: GENERIC_VOCAL_CHORDS };
+    currentFlavors.vocal = mood.dark ? "ahh" : "ooh";
+    notes.push("added vocal chops");
+  }
+
+  generatePattern();
+  const article = /^[aeiou]/i.test(STYLES[styleId].name) ? "an" : "a";
+  promptStatus.textContent = `Generated ${article} ${STYLES[styleId].name} beat${notes.length ? " — " + notes.join(", ") : ""}.`;
+}
+
+promptGenerateBtn.addEventListener("click", generateFromPrompt);
+promptInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") generateFromPrompt();
+});
 
 renderStyleCards();

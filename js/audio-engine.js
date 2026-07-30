@@ -1,13 +1,15 @@
-const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn"];
+const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal"];
 
 const DEFAULT_TRACK_VOLUME = {
   kick: 1, snare: 0.9, hihat: 0.6, openhat: 0.6, tom: 0.85, perc: 0.55, crash: 0.8,
   bass: 0.9, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.55, horn: 0.7,
+  organ: 0.6, vocal: 0.65,
 };
 
 const BASE_VELOCITY = {
   kick: 1, snare: 0.9, hihat: 0.7, openhat: 0.7, tom: 0.85, perc: 0.6, crash: 0.9,
   bass: 0.8, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.6, horn: 0.75,
+  organ: 0.65, vocal: 0.7,
 };
 
 const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash"];
@@ -15,6 +17,7 @@ const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash"
 const DEFAULT_REVERB_SEND = {
   kick: 0, bass: 0, snare: 0.22, hihat: 0.08, openhat: 0.15, tom: 0.2, perc: 0.15, crash: 0.35,
   piano: 0.22, lead: 0.28, pad: 0.4, stab: 0.22, guitar: 0.18, strings: 0.35, horn: 0.22,
+  organ: 0.28, vocal: 0.32,
 };
 
 class BeatEngine {
@@ -520,6 +523,26 @@ class BeatEngine {
       return;
     }
 
+    if (flavor === "acoustic") {
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(4500, time);
+      filter.frequency.exponentialRampToValueAtTime(700, time + dur);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      gain.connect(dest);
+      for (const detune of [0, 0.006]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(freq * (1 + detune), time);
+        osc.connect(filter).connect(gain);
+        osc.start(time);
+        osc.stop(time + dur + 0.05);
+      }
+      return;
+    }
+
     const osc = ctx.createOscillator();
     osc.type = "triangle";
     osc.frequency.setValueAtTime(freq, time);
@@ -588,6 +611,100 @@ class BeatEngine {
     osc.stop(time + dur + 0.05);
   }
 
+  playOrganVoice(time, freq, durationSeconds, vel, flavor) {
+    const ctx = this.ctx;
+    const dest = this.dest("organ");
+    const dur = Math.max(durationSeconds, 0.3);
+    const attack = 0.015;
+
+    // Drawbar-organ approximation: stack sine partials at the classic
+    // fundamental / octave / octave+fifth ratios and sum them.
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(vel, time + attack);
+    gain.gain.setValueAtTime(vel, time + Math.max(attack, dur - 0.08));
+    gain.gain.linearRampToValueAtTime(0.0001, time + dur);
+
+    let node = gain;
+    if (flavor === "gospel") {
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = this.makeDistortionCurve(8);
+      gain.connect(shaper);
+      node = shaper;
+    }
+    node.connect(dest);
+
+    const partials = [
+      { ratio: 1, level: 1 },
+      { ratio: 2, level: 0.6 },
+      { ratio: 3, level: 0.35 },
+      { ratio: 4, level: 0.2 },
+    ];
+    for (const p of partials) {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq * p.ratio, time);
+      const pGain = ctx.createGain();
+      pGain.gain.value = p.level;
+      osc.connect(pGain).connect(gain);
+      osc.start(time);
+      osc.stop(time + dur + 0.1);
+    }
+
+    if (flavor === "gospel") {
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 6;
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = vel * 0.15;
+      lfo.connect(lfoGain).connect(gain.gain);
+      lfo.start(time);
+      lfo.stop(time + dur + 0.1);
+    }
+  }
+
+  playVocalVoice(time, freq, durationSeconds, vel, flavor) {
+    const ctx = this.ctx;
+    const dest = this.dest("vocal");
+    const dur = Math.min(durationSeconds, 0.6);
+
+    // Formant synthesis: a harmonically-rich source through a few parallel
+    // bandpass filters tuned to vowel formant frequencies approximates a
+    // sung vowel far better than a single filtered oscillator.
+    const formants = flavor === "ahh" ? [700, 1220, 2600] : [300, 870, 2240];
+
+    const osc = ctx.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(freq, time);
+
+    const vibrato = ctx.createOscillator();
+    vibrato.frequency.value = 5.5;
+    const vibratoGain = ctx.createGain();
+    vibratoGain.gain.value = freq * 0.01;
+    vibrato.connect(vibratoGain).connect(osc.frequency);
+
+    const envelope = ctx.createGain();
+    envelope.gain.setValueAtTime(0.0001, time);
+    envelope.gain.linearRampToValueAtTime(vel, time + 0.02);
+    envelope.gain.exponentialRampToValueAtTime(0.001, time + dur);
+    envelope.connect(dest);
+
+    const levels = [1, 0.55, 0.3];
+    formants.forEach((freqCenter, i) => {
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = freqCenter;
+      bp.Q.value = 12;
+      const g = ctx.createGain();
+      g.gain.value = levels[i];
+      osc.connect(bp).connect(g).connect(envelope);
+    });
+
+    osc.start(time);
+    osc.stop(time + dur + 0.05);
+    vibrato.start(time);
+    vibrato.stop(time + dur + 0.05);
+  }
+
   // ---- Melodic voices ----
 
   playPianoVoice(time, freq, durationSeconds, vel, flavor) {
@@ -609,6 +726,52 @@ class BeatEngine {
       osc.connect(filter).connect(gain).connect(dest);
       osc.start(time);
       osc.stop(time + Math.max(dur, 0.4) + 0.05);
+      return;
+    }
+
+    if (flavor === "wurlitzer") {
+      const osc1 = ctx.createOscillator();
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(freq, time);
+      const osc2 = ctx.createOscillator();
+      osc2.type = "square";
+      osc2.frequency.setValueAtTime(freq * 2, time);
+      const gain1 = ctx.createGain();
+      gain1.gain.setValueAtTime(0.0001, time);
+      gain1.gain.exponentialRampToValueAtTime(vel, time + 0.004);
+      gain1.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      const gain2 = ctx.createGain();
+      gain2.gain.setValueAtTime(vel * 0.25, time);
+      gain2.gain.exponentialRampToValueAtTime(0.001, time + Math.min(dur, 0.3));
+      osc1.connect(gain1).connect(dest);
+      osc2.connect(gain2).connect(dest);
+      osc1.start(time);
+      osc2.start(time);
+      osc1.stop(time + dur + 0.1);
+      osc2.stop(time + dur + 0.15);
+      return;
+    }
+
+    if (flavor === "upright") {
+      const osc1 = ctx.createOscillator();
+      osc1.type = "triangle";
+      osc1.frequency.setValueAtTime(freq, time);
+      const osc2 = ctx.createOscillator();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(freq * 0.997, time);
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 2600;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.exponentialRampToValueAtTime(vel * 0.9, time + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      osc1.connect(filter).connect(gain).connect(dest);
+      osc2.connect(filter);
+      osc1.start(time);
+      osc2.start(time);
+      osc1.stop(time + dur + 0.1);
+      osc2.stop(time + dur + 0.1);
       return;
     }
 
@@ -828,6 +991,8 @@ class BeatEngine {
           else if (inst === "stab") this.playStabVoice(t, freq, noteDur, vel, flavors.stab);
           else if (inst === "strings") this.playStringsVoice(t, freq, noteDur, vel, flavors.strings);
           else if (inst === "horn") this.playHornVoice(t, freq, noteDur, vel, flavors.horn);
+          else if (inst === "organ") this.playOrganVoice(t, freq, noteDur, vel, flavors.organ);
+          else if (inst === "vocal") this.playVocalVoice(t, freq, noteDur, vel, flavors.vocal);
         }
       } else if (val.degree !== undefined) {
         const freq = degreeToFreq(this.rootMidi, this.style.scale, val.degree);

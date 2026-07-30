@@ -1,6 +1,6 @@
 const STEPS_PER_BAR = 16;
 
-const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14 };
+const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14 };
 
 const FLAVOR_POOLS = {
   kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy"],
@@ -8,13 +8,15 @@ const FLAVOR_POOLS = {
   hihat: ["bright", "dark", "vinyl", "metallic"],
   perc: ["shaker", "conga"],
   bass: ["warm", "synth", "808", "sub", "pluck", "logdrum", "wobble", "drillslide"],
-  piano: ["electric", "pluck", "grand", "rhodes"],
+  piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright"],
   lead: ["square", "saw", "bell", "flute"],
   pad: ["warm", "ensemble", "airy"],
   stab: ["pluck-chord", "square-chord", "bell-chord"],
-  guitar: ["clean", "power", "muted", "nylon"],
+  guitar: ["clean", "power", "muted", "nylon", "acoustic"],
   strings: ["soul", "orchestral", "staccato"],
   horn: ["brass", "soft", "muted"],
+  organ: ["drawbar", "gospel"],
+  vocal: ["ooh", "ahh"],
 };
 
 function M(degreeOffset, len) {
@@ -41,7 +43,22 @@ function pickWeighted(pool) {
   return pool[0][0];
 }
 
+// Real hooks lean on a small, reused set of pitches (most pop hooks use only
+// 3-4 distinct notes) shaped into a "leap up, then step back down" arc rather
+// than a fresh random pitch on every note - that's what makes a phrase read
+// as a tune instead of noodling.
+function buildPitchPool(params) {
+  const pool = [0];
+  for (let i = 0; i < 2; i++) {
+    const useChordTone = Math.random() < params.chordToneProbability;
+    const val = pickWeighted(useChordTone ? params.chordTonePool : params.passingTonePool);
+    if (!pool.includes(val)) pool.push(val);
+  }
+  return pool.sort((a, b) => a - b);
+}
+
 function generateMotif(lengthSteps, params) {
+  const pitchPool = buildPitchPool(params);
   const events = [];
   let pos = 0;
   while (pos < lengthSteps) {
@@ -49,9 +66,13 @@ function generateMotif(lengthSteps, params) {
     if (Math.random() < params.restProbability) {
       events.push({ offset: pos, duration: dur, degreeOffset: null });
     } else {
-      const useChordTone = Math.random() < params.chordToneProbability;
-      const degreeOffset = pickWeighted(useChordTone ? params.chordTonePool : params.passingTonePool);
-      events.push({ offset: pos, duration: dur, degreeOffset });
+      const progress = pos / lengthSteps;
+      const arc = Math.sin(progress * Math.PI); // 0 at the edges, 1 in the middle
+      let idx = Math.round(arc * (pitchPool.length - 1));
+      if (Math.random() < 0.25) {
+        idx = Math.max(0, Math.min(pitchPool.length - 1, idx + (Math.random() < 0.5 ? -1 : 1)));
+      }
+      events.push({ offset: pos, duration: dur, degreeOffset: pitchPool[idx] });
     }
     pos += dur;
   }
@@ -93,6 +114,17 @@ function generateMonoMelody(register, structure, barRootDegrees, params, totalSt
       const modes = ["transposeUp", "transposeDown", "invert", "truncate"];
       motifToUse = transformMotif(motif, modes[Math.floor(Math.random() * modes.length)]);
     }
+    // Question-and-answer phrasing: every other repeat is the "answer" and
+    // resolves its final note back to the tonic, the classic call-response
+    // pairing that makes a phrase feel finished rather than just looping.
+    if (chunkIndex % 2 === 1) {
+      for (let i = motifToUse.length - 1; i >= 0; i--) {
+        if (motifToUse[i].degreeOffset !== null) {
+          motifToUse = motifToUse.map((e, idx) => (idx === i ? { ...e, degreeOffset: 0 } : e));
+          break;
+        }
+      }
+    }
     for (const ev of motifToUse) {
       if (ev.degreeOffset === null) continue;
       const stepPos = chunkStart + ev.offset;
@@ -120,7 +152,7 @@ const STYLES = {
     key: "C2",
     scale: "minor",
     progression: [0, 3, 4, 3],
-    defaultFlavors: { kick: "boombap", snare: "crisp", hihat: "dark", perc: "shaker", bass: "warm", piano: "electric", lead: "flute", strings: "soul", stab: "pluck-chord" },
+    defaultFlavors: { kick: "boombap", snare: "crisp", hihat: "dark", perc: "shaker", bass: "warm", piano: "electric", lead: "flute", strings: "soul", stab: "pluck-chord", organ: "gospel" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc"],
       main: {
@@ -140,7 +172,7 @@ const STYLES = {
         optionalProbability: 0.35,
       },
     },
-    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "strings", "stab"] },
+    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "strings", "organ", "stab"] },
     melody: {
       bass: { motifBars: 2, noteLengths: [[4,3],[6,2],[8,1]], restProbability: 0.25, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[-1,1],[1,1],[3,1]], variationProbability: 0.3 },
       lead: { motifBars: 2, noteLengths: [[4,2],[6,2],[8,1],[3,1]], restProbability: 0.4, chordToneProbability: 0.65, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1],[6,1]], variationProbability: 0.5 },
@@ -155,6 +187,11 @@ const STYLES = {
         core:     [C(0,3,8),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, C(2,3,4),0,0,0],
         optionalProbability: 0.25,
+      },
+      organ: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, C(0,3,4),0,0,0, 0,0,0,0],
+        optionalProbability: 0.2,
       },
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
@@ -173,7 +210,7 @@ const STYLES = {
     key: "C2",
     scale: "minor",
     progression: [0, 5],
-    defaultFlavors: { kick: "808", snare: "clap", hihat: "bright", bass: "808", lead: "bell", stab: "bell-chord" },
+    defaultFlavors: { kick: "808", snare: "clap", hihat: "bright", bass: "808", lead: "bell", stab: "bell-chord", vocal: "ooh" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash"],
       main: {
@@ -193,7 +230,7 @@ const STYLES = {
         hihatRollProbability: 0.45,
       },
     },
-    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["stab"] },
+    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["stab", "vocal"] },
     melody: {
       bass: { motifBars: 1, noteLengths: [[3,2],[4,3],[2,1]], restProbability: 0.3, chordToneProbability: 0.9, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1],[3,1]], variationProbability: 0.3 },
       lead: { motifBars: 1, noteLengths: [[2,3],[3,2],[4,1]], restProbability: 0.55, chordToneProbability: 0.6, chordTonePool: [[0,2],[2,2],[4,2]], passingTonePool: [[-1,1],[1,1],[6,1]], variationProbability: 0.4 },
@@ -202,6 +239,11 @@ const STYLES = {
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,C(0,3,1),0, 0,0,0,0, 0,0,0,0],
+        optionalProbability: 0.2,
+      },
+      vocal: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,C(0,1,1),0],
         optionalProbability: 0.2,
       },
     },
@@ -216,7 +258,7 @@ const STYLES = {
     key: "C2",
     scale: "dorian",
     progression: [0, 3, 4, 0],
-    defaultFlavors: { kick: "fourfloor", snare: "clap", hihat: "bright", perc: "conga", bass: "synth", piano: "pluck", pad: "ensemble", lead: "saw", stab: "square-chord" },
+    defaultFlavors: { kick: "fourfloor", snare: "clap", hihat: "bright", perc: "conga", bass: "synth", piano: "pluck", pad: "ensemble", lead: "saw", stab: "square-chord", vocal: "ahh" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc", "crash"],
       main: {
@@ -234,7 +276,7 @@ const STYLES = {
         optionalProbability: 0.3,
       },
     },
-    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "pad", "stab"] },
+    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "pad", "stab", "vocal"] },
     melody: {
       bass: { motifBars: 1, noteLengths: [[2,4],[4,2]], restProbability: 0.15, chordToneProbability: 0.85, chordTonePool: [[0,4],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.15 },
       lead: { motifBars: 1, noteLengths: [[2,5],[1,2]], restProbability: 0.1, chordToneProbability: 0.9, chordTonePool: [[0,3],[2,2],[4,2],[7,2]], passingTonePool: [[1,1],[6,1]], variationProbability: 0.2 },
@@ -254,6 +296,11 @@ const STYLES = {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,C(0,3,1)],
         optionalProbability: 0.2,
+      },
+      vocal: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,C(0,1,1), 0,0,0,0, 0,0,0,C(0,1,1), 0,0,0,0],
+        optionalProbability: 0.25,
       },
     },
   },
@@ -302,7 +349,7 @@ const STYLES = {
     key: "A1",
     scale: "minor",
     progression: [0, 3],
-    defaultFlavors: { kick: "snappy", snare: "rimshot", hihat: "bright", perc: "conga", bass: "warm", lead: "saw", horn: "brass", stab: "pluck-chord" },
+    defaultFlavors: { kick: "snappy", snare: "rimshot", hihat: "bright", perc: "conga", bass: "warm", lead: "saw", horn: "brass", stab: "pluck-chord", vocal: "ooh" },
     drums: {
       instruments: ["kick", "snare", "hihat", "tom", "perc", "crash"],
       main: {
@@ -320,7 +367,7 @@ const STYLES = {
         optionalProbability: 0.35,
       },
     },
-    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["horn", "stab"] },
+    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["horn", "stab", "vocal"] },
     melody: {
       bass: { motifBars: 1, noteLengths: [[2,3],[3,2],[4,1]], restProbability: 0.3, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2]], passingTonePool: [[-2,1],[4,1]], variationProbability: 0.25 },
       lead: { motifBars: 1, noteLengths: [[2,3],[3,2]], restProbability: 0.4, chordToneProbability: 0.65, chordTonePool: [[0,2],[2,2],[4,2]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.35 },
@@ -335,6 +382,11 @@ const STYLES = {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optionalProbability: 0.15,
+      },
+      vocal: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,C(0,1,1),0],
+        optionalProbability: 0.2,
       },
     },
   },
@@ -452,7 +504,7 @@ const STYLES = {
     key: "C2",
     scale: "major",
     progression: [0, 3, 4, 0],
-    defaultFlavors: { kick: "acoustic", snare: "clap", hihat: "bright", perc: "shaker", bass: "logdrum", guitar: "nylon", pad: "warm", stab: "pluck-chord" },
+    defaultFlavors: { kick: "acoustic", snare: "clap", hihat: "bright", perc: "shaker", bass: "logdrum", guitar: "nylon", pad: "warm", stab: "pluck-chord", organ: "drawbar" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc"],
       main: {
@@ -470,7 +522,7 @@ const STYLES = {
         optionalProbability: 0.3,
       },
     },
-    melodic: { monoInstruments: ["bass", "guitar"], chordInstruments: ["pad", "stab"] },
+    melodic: { monoInstruments: ["bass", "guitar"], chordInstruments: ["pad", "organ", "stab"] },
     melody: {
       bass: { motifBars: 1, noteLengths: [[4,3],[3,2],[6,1]], restProbability: 0.25, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.25 },
       guitar: { motifBars: 2, noteLengths: [[2,4],[1,3],[4,1]], restProbability: 0.3, chordToneProbability: 0.7, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[6,1]], variationProbability: 0.4 },
@@ -480,6 +532,11 @@ const STYLES = {
         core:     [C(0,4,16),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: new Array(STEPS_PER_BAR).fill(0),
         optionalProbability: 0,
+      },
+      organ: {
+        core:     [C(0,3,8),0,0,0, 0,0,0,0, C(0,3,8),0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optionalProbability: 0.15,
       },
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
@@ -498,7 +555,7 @@ const STYLES = {
     key: "E1",
     scale: "minor",
     progression: [0, 4],
-    defaultFlavors: { kick: "deep", snare: "fat", hihat: "metallic", bass: "wobble", stab: "square-chord" },
+    defaultFlavors: { kick: "deep", snare: "fat", hihat: "metallic", bass: "wobble", stab: "square-chord", vocal: "ahh" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash"],
       main: {
@@ -516,7 +573,7 @@ const STYLES = {
         optionalProbability: 0.3,
       },
     },
-    melodic: { monoInstruments: ["bass"], chordInstruments: ["stab"] },
+    melodic: { monoInstruments: ["bass"], chordInstruments: ["stab", "vocal"] },
     melody: {
       bass: { motifBars: 1, noteLengths: [[4,3],[8,2],[16,1]], restProbability: 0.3, chordToneProbability: 0.9, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1]], variationProbability: 0.2 },
     },
@@ -525,6 +582,11 @@ const STYLES = {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,C(0,3,1)],
         optionalProbability: 0.2,
+      },
+      vocal: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,C(0,1,1)],
+        optionalProbability: 0.15,
       },
     },
   },
@@ -538,7 +600,7 @@ const STYLES = {
     key: "F2",
     scale: "major",
     progression: [0, 5, 1, 4],
-    defaultFlavors: { kick: "acoustic", snare: "fat", hihat: "dark", perc: "shaker", bass: "pluck", piano: "rhodes", pad: "ensemble", lead: "flute", strings: "orchestral" },
+    defaultFlavors: { kick: "acoustic", snare: "fat", hihat: "dark", perc: "shaker", bass: "pluck", piano: "rhodes", pad: "ensemble", lead: "flute", strings: "orchestral", organ: "drawbar" },
     drums: {
       instruments: ["kick", "snare", "hihat", "perc"],
       main: {
@@ -556,7 +618,7 @@ const STYLES = {
         optionalProbability: 0.3,
       },
     },
-    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "pad", "strings"] },
+    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "pad", "strings", "organ"] },
     melody: {
       bass: { motifBars: 2, noteLengths: [[4,3],[3,2],[6,2]], restProbability: 0.3, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.3 },
       lead: { motifBars: 2, noteLengths: [[4,2],[6,3],[8,2],[3,1]], restProbability: 0.45, chordToneProbability: 0.7, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.4 },
@@ -575,6 +637,11 @@ const STYLES = {
       strings: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,C(0,3,4),0, 0,0,0,0, 0,0,0,0],
+        optionalProbability: 0.2,
+      },
+      organ: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, C(0,3,4),0,0,0, 0,0,0,0],
         optionalProbability: 0.2,
       },
     },

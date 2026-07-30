@@ -1,17 +1,20 @@
 const STEPS_PER_BAR = 16;
 
-const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14 };
+const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14 };
 
 const FLAVOR_POOLS = {
-  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi"],
-  snare: ["crisp", "clap", "fat", "rimshot"],
-  hihat: ["bright", "dark", "vinyl"],
+  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy"],
+  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap"],
+  hihat: ["bright", "dark", "vinyl", "metallic"],
   perc: ["shaker", "conga"],
-  bass: ["warm", "synth", "808"],
-  piano: ["electric", "pluck", "grand"],
-  lead: ["square", "saw", "bell"],
-  pad: ["warm", "strings", "airy"],
+  bass: ["warm", "synth", "808", "sub", "pluck"],
+  piano: ["electric", "pluck", "grand", "rhodes"],
+  lead: ["square", "saw", "bell", "flute"],
+  pad: ["warm", "ensemble", "airy"],
   stab: ["pluck-chord", "square-chord", "bell-chord"],
+  guitar: ["clean", "power", "muted", "nylon"],
+  strings: ["soul", "orchestral", "staccato"],
+  horn: ["brass", "soft", "muted"],
 };
 
 function M(degreeOffset, len) {
@@ -21,17 +24,103 @@ function C(degreeOffset, size, len) {
   return { type: "chord", degreeOffset, size, len };
 }
 
+// ---- Motif-based melody generation ----
+// Grounded in real songwriting practice: a short motif is stated, then
+// repeated with small variations (transposition, inversion, truncation) so
+// the ear recognizes it as a hook rather than random notes (motivic
+// sequence / repetition-with-variation). Notes mostly land on chord tones
+// (root/3rd/5th, the "safe" landing notes) with occasional passing tones.
+
+function pickWeighted(pool) {
+  const total = pool.reduce((s, [, w]) => s + w, 0);
+  let r = Math.random() * total;
+  for (const [v, w] of pool) {
+    r -= w;
+    if (r < 0) return v;
+  }
+  return pool[0][0];
+}
+
+function generateMotif(lengthSteps, params) {
+  const events = [];
+  let pos = 0;
+  while (pos < lengthSteps) {
+    const dur = Math.min(pickWeighted(params.noteLengths), lengthSteps - pos);
+    if (Math.random() < params.restProbability) {
+      events.push({ offset: pos, duration: dur, degreeOffset: null });
+    } else {
+      const useChordTone = Math.random() < params.chordToneProbability;
+      const degreeOffset = pickWeighted(useChordTone ? params.chordTonePool : params.passingTonePool);
+      events.push({ offset: pos, duration: dur, degreeOffset });
+    }
+    pos += dur;
+  }
+  return events;
+}
+
+function transformMotif(motif, mode) {
+  if (mode === "transposeUp") return motif.map((e) => (e.degreeOffset === null ? e : { ...e, degreeOffset: e.degreeOffset + 2 }));
+  if (mode === "transposeDown") return motif.map((e) => (e.degreeOffset === null ? e : { ...e, degreeOffset: e.degreeOffset - 2 }));
+  if (mode === "invert") {
+    const reversed = [...motif].reverse();
+    let pos = 0;
+    return reversed.map((e) => {
+      const ev = { ...e, offset: pos };
+      pos += e.duration;
+      return ev;
+    });
+  }
+  if (mode === "truncate") return motif.slice(0, Math.max(1, motif.length - 1));
+  return motif;
+}
+
+function thinRange(arr, start, end, keepProbability) {
+  for (let i = start; i < end; i++) {
+    if (arr[i] && Math.random() > keepProbability) arr[i] = null;
+  }
+}
+
+function generateMonoMelody(register, structure, barRootDegrees, params, totalSteps) {
+  const arr = new Array(totalSteps).fill(null);
+  const motifLen = params.motifBars * STEPS_PER_BAR;
+  const motif = generateMotif(motifLen, params);
+  let chunkStart = 0;
+  let chunkIndex = 0;
+
+  while (chunkStart < totalSteps) {
+    let motifToUse = motif;
+    if (chunkIndex > 0 && Math.random() < params.variationProbability) {
+      const modes = ["transposeUp", "transposeDown", "invert", "truncate"];
+      motifToUse = transformMotif(motif, modes[Math.floor(Math.random() * modes.length)]);
+    }
+    for (const ev of motifToUse) {
+      if (ev.degreeOffset === null) continue;
+      const stepPos = chunkStart + ev.offset;
+      if (stepPos >= totalSteps) continue;
+      const barIdx = Math.floor(stepPos / STEPS_PER_BAR);
+      const barRoot = barRootDegrees[barIdx];
+      const dur = Math.min(ev.duration, totalSteps - stepPos);
+      arr[stepPos] = { degree: barRoot + register + ev.degreeOffset, len: dur };
+    }
+    chunkStart += motifLen;
+    chunkIndex++;
+  }
+
+  if (structure[0] === "intro") thinRange(arr, 0, STEPS_PER_BAR, 0.3);
+  return arr;
+}
+
 const STYLES = {
   hiphop: {
     name: "Hip-Hop",
-    description: "Boom bap: hard kick, snappy snare, dark swung hi-hats, moody minor chords.",
+    description: "Boom bap with a soulful, sample-style melody and moody minor chords.",
     tempo: { min: 82, max: 96, default: 90 },
     swing: 0.15,
     humanize: { timingMs: 6, velocityJitter: 0.18 },
     key: "C2",
     scale: "minor",
     progression: [0, 3, 4, 3],
-    defaultFlavors: { kick: "boombap", snare: "crisp", hihat: "dark", perc: "shaker", bass: "warm", piano: "electric", stab: "pluck-chord" },
+    defaultFlavors: { kick: "boombap", snare: "crisp", hihat: "dark", perc: "shaker", bass: "warm", piano: "electric", lead: "flute", strings: "soul", stab: "pluck-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc"],
       main: {
@@ -51,16 +140,20 @@ const STYLES = {
         optionalProbability: 0.35,
       },
     },
-    melodic: {
-      instruments: ["bass", "piano", "stab"],
-      bass: {
-        core:     [M(0,3), 0,0,0, 0,0,M(0,3),0, 0,0,0,M(-1,1), 0,0,0,0],
-        optional: [0,0,0,M(2,1), 0,0,0,0, 0,0,M(4,1),0, 0,0,0,0],
-        optionalProbability: 0.3,
-      },
+    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "strings", "stab"] },
+    melody: {
+      bass: { motifBars: 2, noteLengths: [[4,3],[6,2],[8,1]], restProbability: 0.25, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[-1,1],[1,1],[3,1]], variationProbability: 0.3 },
+      lead: { motifBars: 2, noteLengths: [[4,2],[6,2],[8,1],[3,1]], restProbability: 0.4, chordToneProbability: 0.65, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1],[6,1]], variationProbability: 0.5 },
+    },
+    chords: {
       piano: {
         core:     [C(0,4,6),0,0,0, 0,0,0,0, C(0,4,6),0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,C(0,3,2),0],
+        optionalProbability: 0.25,
+      },
+      strings: {
+        core:     [C(0,3,8),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, C(2,3,4),0,0,0],
         optionalProbability: 0.25,
       },
       stab: {
@@ -100,18 +193,12 @@ const STYLES = {
         hihatRollProbability: 0.45,
       },
     },
-    melodic: {
-      instruments: ["bass", "lead", "stab"],
-      bass: {
-        core:     [M(0,3),0,0,0, 0,0,0,0, 0,0,M(0,2),0, 0,0,0,0],
-        optional: [0,0,0,M(-2,1), 0,M(3,1),0,0, 0,0,0,M(5,1), 0,0,0,0],
-        optionalProbability: 0.3,
-      },
-      lead: {
-        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-        optional: [M(4,1),0,0,M(2,1), 0,0,M(0,1),0, 0,0,M(4,1),0, 0,M(-1,1),0,M(0,1)],
-        optionalProbability: 0.3,
-      },
+    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["stab"] },
+    melody: {
+      bass: { motifBars: 1, noteLengths: [[3,2],[4,3],[2,1]], restProbability: 0.3, chordToneProbability: 0.9, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1],[3,1]], variationProbability: 0.3 },
+      lead: { motifBars: 1, noteLengths: [[2,3],[3,2],[4,1]], restProbability: 0.55, chordToneProbability: 0.6, chordTonePool: [[0,2],[2,2],[4,2]], passingTonePool: [[-1,1],[1,1],[6,1]], variationProbability: 0.4 },
+    },
+    chords: {
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,C(0,3,1),0, 0,0,0,0, 0,0,0,0],
@@ -122,14 +209,14 @@ const STYLES = {
 
   house: {
     name: "House",
-    description: "Four-on-the-floor kick, offbeat open hats, classic house piano stabs, a pad bed.",
+    description: "Four-on-the-floor kick, offbeat open hats, a looping arp riff and piano stabs.",
     tempo: { min: 122, max: 128, default: 124 },
     swing: 0.03,
     humanize: { timingMs: 2, velocityJitter: 0.08 },
     key: "C2",
     scale: "dorian",
     progression: [0, 3, 4, 0],
-    defaultFlavors: { kick: "fourfloor", snare: "clap", hihat: "bright", perc: "conga", bass: "synth", piano: "pluck", pad: "strings", stab: "square-chord" },
+    defaultFlavors: { kick: "fourfloor", snare: "clap", hihat: "bright", perc: "conga", bass: "synth", piano: "pluck", pad: "ensemble", lead: "saw", stab: "square-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc", "crash"],
       main: {
@@ -147,13 +234,12 @@ const STYLES = {
         optionalProbability: 0.3,
       },
     },
-    melodic: {
-      instruments: ["bass", "piano", "pad", "stab"],
-      bass: {
-        core:     [0,0,M(0,1),0, 0,0,M(0,1),0, 0,0,M(4,1),0, 0,0,M(0,1),0],
-        optional: [M(0,1),0,0,0, M(0,1),0,0,0, M(2,1),0,0,0, M(0,1),0,0,0],
-        optionalProbability: 0.35,
-      },
+    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "pad", "stab"] },
+    melody: {
+      bass: { motifBars: 1, noteLengths: [[2,4],[4,2]], restProbability: 0.15, chordToneProbability: 0.85, chordTonePool: [[0,4],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.15 },
+      lead: { motifBars: 1, noteLengths: [[2,5],[1,2]], restProbability: 0.1, chordToneProbability: 0.9, chordTonePool: [[0,3],[2,2],[4,2],[7,2]], passingTonePool: [[1,1],[6,1]], variationProbability: 0.2 },
+    },
+    chords: {
       piano: {
         core:     [0,0,C(0,4,1),0, 0,0,C(0,4,1),0, 0,0,C(0,4,1),0, 0,0,C(0,4,1),0],
         optional: [0,0,0,0, 0,0,0,C(0,3,1), 0,0,0,0, 0,0,0,C(0,3,1)],
@@ -161,7 +247,7 @@ const STYLES = {
       },
       pad: {
         core:     [C(0,4,16),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
         optionalProbability: 0,
       },
       stab: {
@@ -174,14 +260,14 @@ const STYLES = {
 
   rock: {
     name: "Rock",
-    description: "Backbeat snare, driving eighths, a synth riff hook, crash-out fills.",
+    description: "Backbeat snare, driving eighths, a real guitar riff, crash-out fills.",
     tempo: { min: 100, max: 130, default: 116 },
     swing: 0,
     humanize: { timingMs: 12, velocityJitter: 0.25 },
     key: "E2",
     scale: "major",
     progression: [0, 4, 5, 3],
-    defaultFlavors: { kick: "acoustic", snare: "acoustic", hihat: "bright", bass: "synth", lead: "saw", stab: "square-chord" },
+    defaultFlavors: { kick: "acoustic", snare: "acoustic", hihat: "bright", bass: "synth", guitar: "power", stab: "square-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "tom", "crash"],
       main: {
@@ -199,18 +285,12 @@ const STYLES = {
         optionalProbability: 0.3,
       },
     },
-    melodic: {
-      instruments: ["bass", "lead", "stab"],
-      bass: {
-        core:     [M(0,2),0,0,0, 0,0,M(0,2),0, M(0,2),0,0,0, 0,0,M(4,2),0],
-        optional: [0,0,M(0,1),0, 0,0,0,M(4,1), 0,0,M(0,1),0, 0,0,0,M(2,1)],
-        optionalProbability: 0.3,
-      },
-      lead: {
-        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-        optional: [M(0,1),0,M(2,1),0, 0,0,M(4,1),0, M(0,1),0,M(2,1),0, 0,M(4,1),0,0],
-        optionalProbability: 0.3,
-      },
+    melodic: { monoInstruments: ["bass", "guitar"], chordInstruments: ["stab"] },
+    melody: {
+      bass: { motifBars: 2, noteLengths: [[2,4],[4,2]], restProbability: 0.2, chordToneProbability: 0.9, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.3 },
+      guitar: { motifBars: 2, noteLengths: [[2,4],[4,2],[1,2]], restProbability: 0.25, chordToneProbability: 0.75, chordTonePool: [[0,4],[4,3],[7,2]], passingTonePool: [[1,1],[3,1],[-1,1],[6,1]], variationProbability: 0.4 },
+    },
+    chords: {
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,C(0,3,1),0],
@@ -221,14 +301,14 @@ const STYLES = {
 
   reggaeton: {
     name: "Reggaeton",
-    description: "Dembow tresillo kick pattern with rimshot answers and a synth hook.",
+    description: "Dembow tresillo kick pattern, rimshot answers, a synth hook and horn stabs.",
     tempo: { min: 90, max: 100, default: 95 },
     swing: 0.05,
     humanize: { timingMs: 5, velocityJitter: 0.15 },
     key: "A1",
     scale: "minor",
     progression: [0, 3],
-    defaultFlavors: { kick: "fourfloor", snare: "rimshot", hihat: "bright", perc: "conga", bass: "warm", lead: "saw", stab: "pluck-chord" },
+    defaultFlavors: { kick: "fourfloor", snare: "rimshot", hihat: "bright", perc: "conga", bass: "warm", lead: "saw", horn: "brass", stab: "pluck-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "tom", "perc", "crash"],
       main: {
@@ -246,21 +326,20 @@ const STYLES = {
         optionalProbability: 0.35,
       },
     },
-    melodic: {
-      instruments: ["bass", "lead", "stab"],
-      bass: {
-        core:     [M(0,2),0,0,0, 0,0,M(0,2),0, 0,0,0,0, 0,0,0,0],
-        optional: [0,0,0,M(-2,1), 0,0,0,0, 0,0,M(4,1),0, 0,0,M(0,1),0],
-        optionalProbability: 0.3,
-      },
-      lead: {
+    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["horn", "stab"] },
+    melody: {
+      bass: { motifBars: 1, noteLengths: [[2,3],[3,2],[4,1]], restProbability: 0.3, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2]], passingTonePool: [[-2,1],[4,1]], variationProbability: 0.25 },
+      lead: { motifBars: 1, noteLengths: [[2,3],[3,2]], restProbability: 0.4, chordToneProbability: 0.65, chordTonePool: [[0,2],[2,2],[4,2]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.35 },
+    },
+    chords: {
+      horn: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-        optional: [0,M(2,1),0,0, M(0,1),0,0,M(4,1), 0,M(2,1),0,0, M(0,1),0,0,0],
+        optional: [0,0,C(0,3,1),0, 0,0,0,C(2,3,1), 0,0,0,0, 0,0,0,0],
         optionalProbability: 0.3,
       },
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-        optional: [0,0,C(0,3,1),0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optionalProbability: 0.15,
       },
     },
@@ -268,7 +347,7 @@ const STYLES = {
 
   lofi: {
     name: "Lo-Fi Chill",
-    description: "Softened boom bap, jazzy 7th chords, a warm pad bed, vinyl crackle.",
+    description: "Softened boom bap, jazzy extended chords, a gentle wandering melody, vinyl crackle.",
     tempo: { min: 68, max: 84, default: 76 },
     swing: 0.18,
     humanize: { timingMs: 10, velocityJitter: 0.2 },
@@ -276,7 +355,7 @@ const STYLES = {
     scale: "dorian",
     progression: [0, 3, 4, 0],
     ambience: "vinyl",
-    defaultFlavors: { kick: "lofi", snare: "fat", hihat: "vinyl", perc: "shaker", bass: "warm", piano: "electric", pad: "airy", stab: "pluck-chord" },
+    defaultFlavors: { kick: "lofi", snare: "fat", hihat: "vinyl", perc: "shaker", bass: "warm", piano: "electric", pad: "airy", lead: "flute", strings: "soul", stab: "pluck-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "perc"],
       main: {
@@ -295,13 +374,12 @@ const STYLES = {
         optionalProbability: 0.25,
       },
     },
-    melodic: {
-      instruments: ["bass", "piano", "pad", "stab"],
-      bass: {
-        core:     [M(0,4),0,0,0, 0,0,0,0, M(0,3),0,0,0, 0,0,0,0],
-        optional: [0,0,0,0, 0,0,M(2,1),0, 0,0,0,0, 0,0,M(4,1),0],
-        optionalProbability: 0.25,
-      },
+    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "pad", "strings", "stab"] },
+    melody: {
+      bass: { motifBars: 2, noteLengths: [[4,3],[6,2],[8,1]], restProbability: 0.35, chordToneProbability: 0.8, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.35 },
+      lead: { motifBars: 2, noteLengths: [[4,2],[6,2],[8,2],[3,1]], restProbability: 0.5, chordToneProbability: 0.7, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-2,1]], variationProbability: 0.45 },
+    },
+    chords: {
       piano: {
         core:     [C(0,4,7),0,0,0, 0,0,0,0, 0,0,C(2,3,4),0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,C(0,3,1), 0,0,0,0, 0,0,0,0],
@@ -309,8 +387,13 @@ const STYLES = {
       },
       pad: {
         core:     [C(0,4,16),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
         optionalProbability: 0,
+      },
+      strings: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,C(0,3,4),0, 0,0,0,0, 0,0,0,0],
+        optionalProbability: 0.2,
       },
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
@@ -341,14 +424,13 @@ function rollNoteTrack(core, optional, probability) {
   });
 }
 
-function resolveMelodicBar(instKey, cfg, barRootDegree) {
+function resolveChordBarTrack(instKey, cfg, barRootDegree) {
   const raw = rollNoteTrack(cfg.core, cfg.optional, cfg.optionalProbability);
   const register = REGISTER[instKey];
   return raw.map((spec) => {
     if (!spec) return null;
     const root = barRootDegree + register + spec.degreeOffset;
-    if (spec.type === "chord") return { degrees: chordDegrees(root, spec.size), len: spec.len };
-    return { degree: root, len: spec.len };
+    return { degrees: chordDegrees(root, spec.size), len: spec.len };
   });
 }
 
@@ -405,15 +487,15 @@ function buildDrumBar(style, variant) {
   return bar;
 }
 
-function buildMelodicBar(style, variant, barRootDegree) {
+function buildChordBar(style, variant, barRootDegree) {
   const bar = {};
-  for (const inst of style.melodic.instruments) {
+  const chordInstruments = style.melodic.chordInstruments || [];
+  for (const inst of chordInstruments) {
     if (variant === "intro") {
       bar[inst] = new Array(STEPS_PER_BAR).fill(null);
-      if (inst === "bass") bar[inst][0] = { degree: barRootDegree + REGISTER.bass, len: 8 };
       continue;
     }
-    bar[inst] = resolveMelodicBar(inst, style.melodic[inst], barRootDegree);
+    bar[inst] = resolveChordBarTrack(inst, style.chords[inst], barRootDegree);
     if (variant === "fill" && inst === "stab") {
       bar[inst][0] = { degrees: chordDegrees(barRootDegree + REGISTER.stab, 3), len: 2 };
     }
@@ -423,23 +505,26 @@ function buildMelodicBar(style, variant, barRootDegree) {
 
 function generateVariation(style, bars) {
   const structure = buildStructure(bars);
+  const totalSteps = bars * STEPS_PER_BAR;
   const barRootDegrees = structure.map((_, i) => style.progression[i % style.progression.length]);
 
   const drumBars = structure.map((variant) => buildDrumBar(style, variant));
-  const melodicBars = structure.map((variant, i) => buildMelodicBar(style, variant, barRootDegrees[i]));
-
   for (let i = 1; i < structure.length; i++) {
-    if (structure[i - 1] === "fill" && drumBars[i].crash !== undefined) {
-      drumBars[i].crash[0] = true;
-    }
+    if (structure[i - 1] === "fill" && drumBars[i].crash !== undefined) drumBars[i].crash[0] = true;
   }
 
   const instruments = {};
   for (const inst of style.drums.instruments) {
     instruments[inst] = [].concat(...drumBars.map((b) => b[inst] || new Array(STEPS_PER_BAR).fill(false)));
   }
-  for (const inst of style.melodic.instruments) {
-    instruments[inst] = [].concat(...melodicBars.map((b) => b[inst] || new Array(STEPS_PER_BAR).fill(null)));
+
+  const chordBars = structure.map((variant, i) => buildChordBar(style, variant, barRootDegrees[i]));
+  for (const inst of style.melodic.chordInstruments) {
+    instruments[inst] = [].concat(...chordBars.map((b) => b[inst] || new Array(STEPS_PER_BAR).fill(null)));
+  }
+
+  for (const inst of style.melodic.monoInstruments) {
+    instruments[inst] = generateMonoMelody(REGISTER[inst], structure, barRootDegrees, style.melody[inst], totalSteps);
   }
 
   return { instruments, structure, barRootDegrees };

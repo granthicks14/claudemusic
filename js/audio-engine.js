@@ -1,13 +1,13 @@
-const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "bass", "piano", "lead", "pad", "stab"];
+const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn"];
 
 const DEFAULT_TRACK_VOLUME = {
   kick: 1, snare: 0.9, hihat: 0.6, openhat: 0.6, tom: 0.85, perc: 0.55, crash: 0.8,
-  bass: 0.9, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75,
+  bass: 0.9, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.55, horn: 0.7,
 };
 
 const BASE_VELOCITY = {
   kick: 1, snare: 0.9, hihat: 0.7, openhat: 0.7, tom: 0.85, perc: 0.6, crash: 0.9,
-  bass: 0.8, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75,
+  bass: 0.8, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.6, horn: 0.75,
 };
 
 class BeatEngine {
@@ -118,6 +118,8 @@ class BeatEngine {
       fourfloor: { startFreq: 145, endFreq: 55, decay: 0.28 },
       acoustic: { startFreq: 120, endFreq: 60, decay: 0.22 },
       lofi: { startFreq: 100, endFreq: 45, decay: 0.3 },
+      deep: { startFreq: 80, endFreq: 30, decay: 0.55 },
+      snappy: { startFreq: 160, endFreq: 70, decay: 0.15 },
     };
     const p = presets[flavor] || presets.boombap;
     const jitter = 0.92 + Math.random() * 0.16;
@@ -152,6 +154,7 @@ class BeatEngine {
       clap: { noiseHp: 1000, noiseDecay: 0.22, toneFreq: 0, toneDecay: 0 },
       fat: { noiseHp: 500, noiseDecay: 0.2, toneFreq: 150, toneDecay: 0.15 },
       rimshot: { noiseHp: 2500, noiseDecay: 0.06, toneFreq: 420, toneDecay: 0.05 },
+      trapsnap: { noiseHp: 3500, noiseDecay: 0.09, toneFreq: 300, toneDecay: 0.06 },
     };
     const p = presets[flavor] || presets.crisp;
 
@@ -204,6 +207,7 @@ class BeatEngine {
       bright: { hp: 7500, lp: null },
       dark: { hp: 6000, lp: 11000 },
       vinyl: { hp: 5000, lp: 8500 },
+      metallic: { hp: 8500, lp: null, peak: 9000 },
     };
     const p = presets[flavor] || presets.bright;
     const decay = open ? 0.32 + Math.random() * 0.1 : 0.05 + Math.random() * 0.02;
@@ -223,6 +227,14 @@ class BeatEngine {
       lp.type = "lowpass";
       lp.frequency.value = p.lp;
       node = node.connect(lp);
+    }
+    if (p.peak) {
+      const peak = ctx.createBiquadFilter();
+      peak.type = "peaking";
+      peak.frequency.value = p.peak;
+      peak.Q.value = 6;
+      peak.gain.value = 10;
+      node = node.connect(peak);
     }
     node.connect(gain).connect(this.dest(trackKey));
     noise.start(time);
@@ -316,6 +328,23 @@ class BeatEngine {
       gain.gain.setValueAtTime(vel * 0.8, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + durationSeconds);
       osc.connect(filter).connect(gain).connect(this.dest("bass"));
+    } else if (flavor === "sub") {
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, time);
+      gain.gain.setValueAtTime(vel * 0.9, time);
+      gain.gain.setValueAtTime(vel * 0.9, time + Math.max(0, durationSeconds - 0.05));
+      gain.gain.linearRampToValueAtTime(0.0001, time + durationSeconds + 0.05);
+      osc.connect(gain).connect(this.dest("bass"));
+    } else if (flavor === "pluck") {
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(freq, time);
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(2000, time);
+      filter.frequency.exponentialRampToValueAtTime(300, time + 0.2);
+      gain.gain.setValueAtTime(vel, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + Math.min(durationSeconds, 0.3));
+      osc.connect(filter).connect(gain).connect(this.dest("bass"));
     } else {
       osc.type = "sine";
       osc.frequency.setValueAtTime(freq, time);
@@ -325,6 +354,111 @@ class BeatEngine {
     }
     osc.start(time);
     osc.stop(time + durationSeconds + 0.05);
+  }
+
+  makeDistortionCurve(amount) {
+    const samples = 256;
+    const curve = new Float32Array(samples);
+    const k = amount;
+    for (let i = 0; i < samples; i++) {
+      const x = (i * 2) / samples - 1;
+      curve[i] = ((3 + k) * x * 20 * (Math.PI / 180)) / (Math.PI + k * Math.abs(x));
+    }
+    return curve;
+  }
+
+  playGuitarVoice(time, freq, durationSeconds, vel, flavor) {
+    const ctx = this.ctx;
+    const dest = this.dest("guitar");
+    const dur = Math.min(durationSeconds, flavor === "muted" ? 0.18 : 1.2);
+
+    if (flavor === "power") {
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = this.makeDistortionCurve(35);
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 3200;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      shaper.connect(filter).connect(gain).connect(dest);
+      for (const ratio of [1, 1.5]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(freq * ratio, time);
+        osc.connect(shaper);
+        osc.start(time);
+        osc.stop(time + dur + 0.05);
+      }
+      return;
+    }
+
+    const osc = ctx.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(freq, time);
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(flavor === "nylon" ? 2200 : 3000, time);
+    filter.frequency.exponentialRampToValueAtTime(500, time + dur);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(vel, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+    osc.connect(filter).connect(gain).connect(dest);
+    osc.start(time);
+    osc.stop(time + dur + 0.05);
+  }
+
+  playStringsVoice(time, freq, durationSeconds, vel, flavor) {
+    const ctx = this.ctx;
+    const dest = this.dest("strings");
+    const attack = flavor === "staccato" ? 0.02 : 0.15;
+    const dur = flavor === "staccato" ? Math.min(durationSeconds, 0.35) : Math.max(durationSeconds, 0.5);
+    const detunes = flavor === "orchestral" ? [0, 0.008, -0.008, 0.014] : [0, 0.005, -0.005];
+
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 5.5;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = freq * 0.008;
+
+    for (const d of detunes) {
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freq * (1 + d), time);
+      lfo.connect(lfoGain).connect(osc.frequency);
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 2000;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime((vel * 0.8) / detunes.length, time + attack);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      osc.connect(filter).connect(gain).connect(dest);
+      osc.start(time);
+      osc.stop(time + dur + 0.1);
+    }
+    lfo.start(time);
+    lfo.stop(time + dur + 0.1);
+  }
+
+  playHornVoice(time, freq, durationSeconds, vel, flavor) {
+    const ctx = this.ctx;
+    const dest = this.dest("horn");
+    const dur = Math.min(durationSeconds, flavor === "muted" ? 0.3 : 0.5);
+
+    const osc = ctx.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(freq, time);
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = flavor === "soft" ? 1200 : flavor === "muted" ? 900 : 1800;
+    bp.Q.value = flavor === "muted" ? 3 : 1.2;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(vel, time + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+    osc.connect(bp).connect(gain).connect(dest);
+    osc.start(time);
+    osc.stop(time + dur + 0.05);
   }
 
   // ---- Melodic voices ----
@@ -430,7 +564,7 @@ class BeatEngine {
     const dest = this.dest("pad");
     const attack = 0.25;
     const dur = Math.max(durationSeconds, 0.6);
-    const detunes = flavor === "strings" ? [0, 0.006, -0.006] : flavor === "airy" ? [0] : [0, 0.004];
+    const detunes = flavor === "ensemble" ? [0, 0.006, -0.006] : flavor === "airy" ? [0] : [0, 0.004];
     const type = flavor === "airy" ? "sine" : "sawtooth";
 
     for (const d of detunes) {
@@ -565,12 +699,15 @@ class BeatEngine {
           if (inst === "piano") this.playPianoVoice(t, freq, noteDur, vel, flavors.piano);
           else if (inst === "pad") this.playPadVoice(t, freq, noteDur, vel, flavors.pad);
           else if (inst === "stab") this.playStabVoice(t, freq, noteDur, vel, flavors.stab);
+          else if (inst === "strings") this.playStringsVoice(t, freq, noteDur, vel, flavors.strings);
+          else if (inst === "horn") this.playHornVoice(t, freq, noteDur, vel, flavors.horn);
         }
       } else if (val.degree !== undefined) {
         const freq = degreeToFreq(this.rootMidi, this.style.scale, val.degree);
         const vel = this.jitterVel(BASE_VELOCITY[inst]);
         if (inst === "bass") this.playBass(t, freq, noteDur, vel, flavors.bass);
         else if (inst === "lead") this.playLeadVoice(t, freq, noteDur, vel, flavors.lead);
+        else if (inst === "guitar") this.playGuitarVoice(t, freq, noteDur, vel, flavors.guitar);
       }
     }
   }

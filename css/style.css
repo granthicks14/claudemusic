@@ -302,12 +302,38 @@ body {
 }
 
 .step-cell {
-  aspect-ratio: 1;
+  height: 24px;
   border-radius: 4px;
   background: #22222f;
   min-width: 13px;
   cursor: pointer;
   transition: filter 0.1s ease;
+}
+
+.melodic-lane {
+  position: relative;
+  height: 24px;
+  border-radius: 4px;
+  background: #1c1c28;
+  cursor: pointer;
+}
+
+.melodic-lane.editing {
+  outline: 1px dashed var(--accent-2);
+}
+
+.note-bar {
+  position: absolute;
+  top: 3px;
+  height: 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  transition: filter 0.1s ease;
+}
+
+.note-bar:hover {
+  filter: brightness(1.35);
 }
 
 .step-cell:hover {
@@ -379,25 +405,34 @@ body {
   font-weight: 700;
 }
 
-.roll-cell {
-  aspect-ratio: 2 / 1;
+.roll-lane {
+  position: relative;
+  height: 22px;
   background: #1c1c28;
   border-radius: 3px;
-  min-width: 13px;
-  cursor: pointer;
-  transition: filter 0.1s ease;
+  cursor: crosshair;
 }
 
-.roll-cell:hover {
-  filter: brightness(1.5);
+.roll-note {
+  position: absolute;
+  top: 2px;
+  height: 18px;
+  border-radius: 4px;
+  cursor: grab;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 
-.roll-cell.beat-marker {
-  outline: 1px solid #33334a;
+.roll-note:hover {
+  filter: brightness(1.35);
 }
 
-.roll-cell.bar-start {
-  border-left: 2px solid #4a4a63;
+.roll-note .resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 7px;
+  height: 100%;
+  cursor: ew-resize;
 }
 
 @media (max-width: 720px) {

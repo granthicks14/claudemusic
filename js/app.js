@@ -18,13 +18,15 @@ const pianoRollGrid = document.getElementById("piano-roll-grid");
 const pianoRollClose = document.getElementById("piano-roll-close");
 
 const DRUM_ORDER = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash"];
-const MELODIC_ORDER = ["bass", "piano", "lead", "pad", "stab"];
-const MONO_INSTRUMENTS = ["bass", "lead"];
+const MELODIC_ORDER = ["bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn"];
+const MONO_INSTRUMENTS = ["bass", "lead", "guitar"];
 
 const TRACK_LABELS = {
-  kick: "Kick", snare: "Snare", hihat: "Hi-Hat", openhat: "Open Hat", tom: "Tom",
-  perc: "Perc", crash: "Crash", bass: "Bass", piano: "Piano", lead: "Lead", pad: "Pad", stab: "Stab",
+  kick: "Kick", snare: "Snare", hihat: "Hi-Hat", openhat: "Open Hat", tom: "Tom", perc: "Perc", crash: "Crash",
+  bass: "Bass", piano: "Piano", lead: "Melody", pad: "Pad", stab: "Stab", guitar: "Guitar", strings: "Strings", horn: "Horn",
 };
+
+const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, strings: 4, horn: 1 };
 
 const STYLE_ACCENTS = {
   hiphop: "#ff6b6b", trap: "#a55eea", house: "#26de81", rock: "#fd9644", reggaeton: "#fed330", lofi: "#45aaf2",
@@ -32,7 +34,8 @@ const STYLE_ACCENTS = {
 
 const TRACK_COLOR = {
   kick: "#ff6b6b", snare: "#feca57", hihat: "#48dbfb", openhat: "#0abde3", tom: "#ff9f43",
-  perc: "#1dd1a1", crash: "#c8d6e5", bass: "#a55eea", piano: "#00d2d3", lead: "#ff9ff3", pad: "#54a0ff", stab: "#f368e0",
+  perc: "#1dd1a1", crash: "#c8d6e5", bass: "#a55eea", piano: "#00d2d3", lead: "#ff9ff3", pad: "#54a0ff",
+  stab: "#f368e0", guitar: "#ff6348", strings: "#7bed9f", horn: "#eccc68",
 };
 
 let selectedStyleId = null;
@@ -46,7 +49,7 @@ let openPianoRollInst = null;
 function activeRows() {
   return [
     ...DRUM_ORDER.filter((i) => activeStyle.drums.instruments.includes(i)),
-    ...MELODIC_ORDER.filter((i) => activeStyle.melodic.instruments.includes(i)),
+    ...MELODIC_ORDER.filter((i) => activeStyle.melodic.monoInstruments.includes(i) || activeStyle.melodic.chordInstruments.includes(i)),
   ];
 }
 
@@ -141,9 +144,25 @@ function trackHeaderHTML(track) {
   `;
 }
 
-function isStepActive(track, value) {
-  if (DRUM_ORDER.includes(track)) return Boolean(value);
-  return Boolean(value);
+function barDividerBackground(bars) {
+  const barPct = 100 / bars;
+  return `repeating-linear-gradient(to right, rgba(255,255,255,0.09) 0, rgba(255,255,255,0.09) 1px, transparent 1px, transparent ${barPct}%)`;
+}
+
+function renderNoteBars(lane, track, steps) {
+  const arr = currentPattern.instruments[track];
+  for (let i = 0; i < steps; i++) {
+    const note = arr[i];
+    if (!note) continue;
+    const bar = document.createElement("div");
+    bar.className = "note-bar";
+    bar.dataset.step = i;
+    bar.dataset.track = track;
+    bar.style.left = (i / steps) * 100 + "%";
+    bar.style.width = (note.len / steps) * 100 + "%";
+    bar.style.background = TRACK_COLOR[track];
+    lane.appendChild(bar);
+  }
 }
 
 function renderStepGrid() {
@@ -158,22 +177,31 @@ function renderStepGrid() {
     header.innerHTML = trackHeaderHTML(track);
     stepGrid.appendChild(header);
 
-    for (let i = 0; i < steps; i++) {
-      const cell = document.createElement("div");
-      cell.className = "step-cell";
-      cell.dataset.track = track;
-      cell.dataset.step = i;
-      if (i % STEPS_PER_BAR === 0) cell.classList.add("bar-start");
-      if (i % 4 === 0) cell.classList.add("beat-marker");
-
-      const value = currentPattern.instruments[track][i];
-      if (isStepActive(track, value)) {
-        cell.classList.add("active");
-        cell.style.background = TRACK_COLOR[track];
-        if (value === "roll") cell.classList.add("roll");
+    if (DRUM_ORDER.includes(track)) {
+      for (let i = 0; i < steps; i++) {
+        const cell = document.createElement("div");
+        cell.className = "step-cell";
+        cell.dataset.track = track;
+        cell.dataset.step = i;
+        if (i % STEPS_PER_BAR === 0) cell.classList.add("bar-start");
+        if (i % 4 === 0) cell.classList.add("beat-marker");
+        const value = currentPattern.instruments[track][i];
+        if (value) {
+          cell.classList.add("active");
+          cell.style.background = TRACK_COLOR[track];
+          if (value === "roll") cell.classList.add("roll");
+        }
+        stepGrid.appendChild(cell);
       }
-      if (openPianoRollInst === track) cell.classList.add("editing");
-      stepGrid.appendChild(cell);
+    } else {
+      const lane = document.createElement("div");
+      lane.className = "melodic-lane";
+      lane.dataset.track = track;
+      lane.style.gridColumn = `span ${steps}`;
+      lane.style.backgroundImage = barDividerBackground(selectedBars);
+      if (openPianoRollInst === track) lane.classList.add("editing");
+      renderNoteBars(lane, track, steps);
+      stepGrid.appendChild(lane);
     }
   }
 }
@@ -182,23 +210,11 @@ function defaultNoteFor(track, step) {
   const barIndex = Math.floor(step / STEPS_PER_BAR);
   const barRoot = currentPattern.barRootDegrees[barIndex];
   const register = REGISTER[track];
+  const len = DEFAULT_LEN[track] || 1;
   if (MONO_INSTRUMENTS.includes(track)) {
-    return { degree: barRoot + register, len: track === "bass" ? 2 : 1 };
+    return { degree: barRoot + register, len };
   }
-  const len = track === "pad" ? 8 : track === "piano" ? 2 : 1;
   return { degrees: chordDegrees(barRoot + register, 3), len };
-}
-
-function handleStepClick(track, step) {
-  const arr = currentPattern.instruments[track];
-  if (DRUM_ORDER.includes(track)) {
-    arr[step] = !arr[step];
-  } else {
-    arr[step] = arr[step] ? null : defaultNoteFor(track, step);
-  }
-  renderStepGrid();
-  if (openPianoRollInst) renderPianoRoll();
-  if (engine.isPlaying) engine.updatePattern(currentPattern);
 }
 
 stepGrid.addEventListener("click", (e) => {
@@ -219,8 +235,38 @@ stepGrid.addEventListener("click", (e) => {
     togglePianoRoll(nameBtn.dataset.track);
     return;
   }
+
+  const noteBar = e.target.closest(".note-bar");
+  if (noteBar) {
+    currentPattern.instruments[noteBar.dataset.track][Number(noteBar.dataset.step)] = null;
+    renderStepGrid();
+    if (openPianoRollInst === noteBar.dataset.track) renderPianoRoll();
+    if (engine.isPlaying) engine.updatePattern(currentPattern);
+    return;
+  }
+
+  const lane = e.target.closest(".melodic-lane");
+  if (lane) {
+    const steps = selectedBars * STEPS_PER_BAR;
+    const rect = lane.getBoundingClientRect();
+    const step = Math.max(0, Math.min(steps - 1, Math.floor(((e.clientX - rect.left) / rect.width) * steps)));
+    const track = lane.dataset.track;
+    if (!currentPattern.instruments[track][step]) {
+      currentPattern.instruments[track][step] = defaultNoteFor(track, step);
+      renderStepGrid();
+      if (openPianoRollInst === track) renderPianoRoll();
+      if (engine.isPlaying) engine.updatePattern(currentPattern);
+    }
+    return;
+  }
+
   const cell = e.target.closest(".step-cell");
-  if (cell) handleStepClick(cell.dataset.track, Number(cell.dataset.step));
+  if (cell) {
+    const arr = currentPattern.instruments[cell.dataset.track];
+    arr[Number(cell.dataset.step)] = !arr[Number(cell.dataset.step)];
+    renderStepGrid();
+    if (engine.isPlaying) engine.updatePattern(currentPattern);
+  }
 });
 
 stepGrid.addEventListener("input", (e) => {
@@ -236,7 +282,7 @@ function togglePianoRoll(track) {
   }
   openPianoRollInst = track;
   pianoRollPanel.hidden = false;
-  pianoRollTitle.textContent = `${TRACK_LABELS[track]} — click to place notes`;
+  pianoRollTitle.textContent = `${TRACK_LABELS[track]} — drag to draw a note, drag its right edge to resize, drag its body to move, click to delete`;
   renderPianoRoll();
   renderStepGrid();
 }
@@ -244,6 +290,20 @@ function togglePianoRoll(track) {
 function closePianoRoll() {
   openPianoRollInst = null;
   pianoRollPanel.hidden = true;
+}
+
+function renderRollNoteBar(lane, step, len, steps, track) {
+  const bar = document.createElement("div");
+  bar.className = "roll-note";
+  bar.dataset.step = step;
+  bar.dataset.track = track;
+  bar.style.left = (step / steps) * 100 + "%";
+  bar.style.width = (len / steps) * 100 + "%";
+  bar.style.background = TRACK_COLOR[track];
+  const handle = document.createElement("div");
+  handle.className = "resize-handle";
+  bar.appendChild(handle);
+  lane.appendChild(bar);
 }
 
 function renderPianoRoll() {
@@ -261,65 +321,89 @@ function renderPianoRoll() {
   }
 
   pianoRollGrid.innerHTML = "";
-  pianoRollGrid.style.gridTemplateColumns = `90px repeat(${steps}, 1fr)`;
+  pianoRollGrid.style.gridTemplateColumns = "110px 1fr";
 
   for (const rowDegree of rows) {
     const label = document.createElement("div");
     label.className = "roll-label";
-    if (isMono) {
-      label.textContent = degreeToLabel(rootMidi, activeStyle.scale, rowDegree);
-      if (rowDegree === register) label.classList.add("root-row");
-    } else {
-      label.textContent = `${romanForDegree(rowDegree - register)} · ${degreeToLabel(rootMidi, activeStyle.scale, rowDegree)}`;
-      if (rowDegree === register) label.classList.add("root-row");
-    }
+    label.textContent = isMono
+      ? degreeToLabel(rootMidi, activeStyle.scale, rowDegree)
+      : `${romanForDegree(rowDegree - register)} · ${degreeToLabel(rootMidi, activeStyle.scale, rowDegree)}`;
+    if (rowDegree === register) label.classList.add("root-row");
     pianoRollGrid.appendChild(label);
 
-    for (let i = 0; i < steps; i++) {
-      const cell = document.createElement("div");
-      cell.className = "roll-cell";
-      cell.dataset.track = track;
-      cell.dataset.step = i;
-      cell.dataset.degree = rowDegree;
-      if (i % STEPS_PER_BAR === 0) cell.classList.add("bar-start");
-      if (i % 4 === 0) cell.classList.add("beat-marker");
+    const lane = document.createElement("div");
+    lane.className = "roll-lane";
+    lane.dataset.track = track;
+    lane.dataset.degree = rowDegree;
+    lane.style.backgroundImage = barDividerBackground(selectedBars);
+    pianoRollGrid.appendChild(lane);
+  }
 
-      const value = currentPattern.instruments[track][i];
-      const noteDegree = value ? (isMono ? value.degree : value.degrees[0]) : null;
-      if (noteDegree === rowDegree) {
-        cell.classList.add("active");
-        cell.style.background = TRACK_COLOR[track];
-      }
-
-      pianoRollGrid.appendChild(cell);
-    }
+  const arr = currentPattern.instruments[track];
+  for (let i = 0; i < steps; i++) {
+    const note = arr[i];
+    if (!note) continue;
+    const noteDegree = isMono ? note.degree : note.degrees[0];
+    const rowIndex = rows.indexOf(noteDegree);
+    if (rowIndex === -1) continue;
+    const lane = pianoRollGrid.children[rowIndex * 2 + 1];
+    renderRollNoteBar(lane, i, note.len, steps, track);
   }
 }
 
-pianoRollGrid.addEventListener("click", (e) => {
-  const cell = e.target.closest(".roll-cell");
-  if (!cell) return;
-  const track = cell.dataset.track;
-  const step = Number(cell.dataset.step);
-  const rowDegree = Number(cell.dataset.degree);
-  const arr = currentPattern.instruments[track];
-  const existing = arr[step];
+pianoRollGrid.addEventListener("mousedown", (e) => {
+  const resizeHandle = e.target.closest(".resize-handle");
+  const noteBar = e.target.closest(".roll-note");
+  const lane = e.target.closest(".roll-lane") || (noteBar && noteBar.closest(".roll-lane"));
+  if (!lane) return;
+  e.preventDefault();
+
+  const steps = selectedBars * STEPS_PER_BAR;
+  const rect = lane.getBoundingClientRect();
+  const track = lane.dataset.track;
+  const rowDegree = Number(lane.dataset.degree);
+  const downX = e.clientX;
   const isMono = MONO_INSTRUMENTS.includes(track);
-  const currentDegree = existing ? (isMono ? existing.degree : existing.degrees[0]) : null;
 
-  if (currentDegree === rowDegree) {
-    arr[step] = null;
-  } else if (isMono) {
-    arr[step] = { degree: rowDegree, len: existing ? existing.len : track === "bass" ? 2 : 1 };
-  } else {
-    const size = existing ? existing.degrees.length : 3;
-    const len = existing ? existing.len : track === "pad" ? 8 : track === "piano" ? 2 : 1;
-    arr[step] = { degrees: chordDegrees(rowDegree, size), len };
-  }
+  const stepAt = (clientX) => Math.max(0, Math.min(steps - 1, Math.floor(((clientX - rect.left) / rect.width) * steps)));
 
-  renderPianoRoll();
-  renderStepGrid();
-  if (engine.isPlaying) engine.updatePattern(currentPattern);
+  const onUp = (upEvent) => {
+    document.removeEventListener("mouseup", onUp);
+    const arr = currentPattern.instruments[track];
+
+    if (resizeHandle) {
+      const origStep = Number(noteBar.dataset.step);
+      const newLen = Math.max(1, stepAt(upEvent.clientX) - origStep + 1);
+      if (arr[origStep]) arr[origStep] = { ...arr[origStep], len: newLen };
+    } else if (noteBar) {
+      const origStep = Number(noteBar.dataset.step);
+      const moved = Math.abs(upEvent.clientX - downX) > 6;
+      if (!moved) {
+        arr[origStep] = null;
+      } else {
+        const deltaSteps = stepAt(upEvent.clientX) - stepAt(downX);
+        const newStart = Math.max(0, Math.min(steps - 1, origStep + deltaSteps));
+        if (newStart !== origStep && arr[origStep]) {
+          const note = arr[origStep];
+          arr[origStep] = null;
+          arr[newStart] = note;
+        }
+      }
+    } else {
+      const startStep = stepAt(downX);
+      const endStep = stepAt(upEvent.clientX);
+      const start = Math.min(startStep, endStep);
+      const len = Math.abs(endStep - startStep) + 1;
+      arr[start] = isMono ? { degree: rowDegree, len } : { degrees: chordDegrees(rowDegree, 3), len };
+    }
+
+    renderPianoRoll();
+    renderStepGrid();
+    if (engine.isPlaying) engine.updatePattern(currentPattern);
+  };
+
+  document.addEventListener("mouseup", onUp);
 });
 
 pianoRollClose.addEventListener("click", closePianoRoll);

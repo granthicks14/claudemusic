@@ -195,7 +195,7 @@ const STYLES = {
     humanize: { timingMs: 6, velocityJitter: 0.18 },
     key: "C2",
     scale: "minor",
-    progression: [0, 3, 4, 3],
+    progressions: [[0, 3, 4, 3], [0, 5, 3, 4], [0, 6, 3, 4], [0, 3, 6, 2]],
     defaultFlavors: { kick: "boombap", snare: "crisp", hihat: "dark", perc: "shaker", bass: "warm", piano: "electric", lead: "flute", strings: "soul", stab: "pluck-chord", organ: "gospel" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc"],
@@ -215,6 +215,22 @@ const STYLES = {
         },
         optionalProbability: 0.35,
       },
+      mainVariants: [{
+        core: {
+          kick:    [1,0,0,1, 0,0,0,0, 1,0,1,0, 0,0,0,0],
+          snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,1],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+          perc:    [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,0,1,0, 0,1,0,0, 0,0,0,1, 0,1,0,0],
+          snare:   [0,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+          openhat: [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+          perc:    [0,1,0,0, 0,0,1,0, 0,1,0,0, 0,0,1,0],
+        },
+        optionalProbability: 0.3,
+      }],
     },
     melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "strings", "organ", "stab"] },
     melody: {
@@ -253,7 +269,7 @@ const STYLES = {
     humanize: { timingMs: 2, velocityJitter: 0.12 },
     key: "C2",
     scale: "minor",
-    progression: [0, 5],
+    progressions: [[0, 5], [0, 3], [0, 4], [0, 5, 3, 4]],
     defaultFlavors: { kick: "808", snare: "clap", hihat: "bright", bass: "808", lead: "bell", stab: "bell-chord", vocal: "ooh" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash", "fx"],
@@ -273,6 +289,22 @@ const STYLES = {
         hihatRollSteps: [7, 15],
         hihatRollProbability: 0.45,
       },
+      mainVariants: [{
+        core: {
+          kick:    [1,0,0,0, 0,0,0,1, 0,0,1,0, 0,0,1,0],
+          snare:   [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          hihat:   [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,1,0],
+        },
+        optional: {
+          kick:    [0,1,0,0, 0,0,1,0, 0,0,0,0, 0,1,0,0],
+          snare:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1],
+          openhat: [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,0,0],
+        },
+        optionalProbability: 0.4,
+        hihatRollSteps: [3, 11],
+        hihatRollProbability: 0.45,
+      }],
     },
     melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["stab", "vocal"] },
     melody: {
@@ -301,7 +333,7 @@ const STYLES = {
     humanize: { timingMs: 2, velocityJitter: 0.08 },
     key: "C2",
     scale: "dorian",
-    progression: [0, 3, 4, 0],
+    progressions: [[0, 3, 4, 0], [0, 3], [0, 6, 3, 0], [0, 4, 3, 0]],
     defaultFlavors: { kick: "fourfloor", snare: "clap", hihat: "bright", perc: "conga", bass: "synth", piano: "pluck", pad: "ensemble", lead: "saw", stab: "square-chord", vocal: "ahh" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc", "crash", "fx"],
@@ -319,6 +351,20 @@ const STYLES = {
         },
         optionalProbability: 0.3,
       },
+      mainVariants: [{
+        core: {
+          kick:    [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+          snare:   [0,0,0,0, 1,0,0,0, 0,0,1,0, 1,0,0,0],
+          hihat:   [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
+          openhat: [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+          perc:    [0,0,0,1, 0,0,0,1, 0,0,0,1, 0,0,0,1],
+        },
+        optional: {
+          hihat:   [1,0,0,1, 1,0,0,1, 1,0,0,1, 1,0,0,1],
+          perc:    [1,0,1,0, 0,1,0,0, 1,0,1,0, 0,1,0,0],
+        },
+        optionalProbability: 0.3,
+      }],
     },
     melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "pad", "stab", "vocal"] },
     melody: {
@@ -357,7 +403,7 @@ const STYLES = {
     humanize: { timingMs: 12, velocityJitter: 0.25 },
     key: "E2",
     scale: "major",
-    progression: [0, 4, 5, 3],
+    progressions: [[0, 4, 5, 3], [0, 3, 4, 0], [5, 3, 0, 4], [0, 5, 3, 4]],
     defaultFlavors: { kick: "acoustic", snare: "acoustic", hihat: "bright", bass: "pluck", guitar: "power" },
     drums: {
       instruments: ["kick", "snare", "hihat", "tom", "crash"],
@@ -375,6 +421,19 @@ const STYLES = {
         },
         optionalProbability: 0.3,
       },
+      mainVariants: [{
+        core: {
+          kick:  [1,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
+          snare: [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          hihat: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+          tom:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:  [0,0,1,0, 0,1,0,0, 0,0,1,0, 0,0,0,1],
+          snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optionalProbability: 0.3,
+      }],
     },
     melodic: { monoInstruments: ["bass", "guitar"], chordInstruments: [] },
     melody: {
@@ -392,7 +451,7 @@ const STYLES = {
     humanize: { timingMs: 5, velocityJitter: 0.15 },
     key: "A1",
     scale: "minor",
-    progression: [0, 3],
+    progressions: [[0, 3], [0, 4], [0, 5], [0, 3, 4, 0]],
     defaultFlavors: { kick: "snappy", snare: "rimshot", hihat: "bright", perc: "conga", bass: "warm", lead: "saw", horn: "brass", stab: "pluck-chord", vocal: "ooh" },
     drums: {
       instruments: ["kick", "snare", "hihat", "tom", "perc", "crash"],
@@ -410,6 +469,20 @@ const STYLES = {
         },
         optionalProbability: 0.35,
       },
+      mainVariants: [{
+        core: {
+          kick:  [1,0,0,0, 0,0,0,0, 1,0,0,1, 0,0,0,0],
+          snare: [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,0,0],
+          hihat: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+          perc:  [0,0,0,1, 0,1,0,0, 0,0,0,1, 0,1,0,0],
+        },
+        optional: {
+          kick:  [0,0,0,0, 1,0,0,0, 0,0,0,0, 0,0,1,0],
+          snare: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,1,0],
+          perc:  [0,1,0,0, 0,0,0,1, 0,1,0,0, 0,0,0,1],
+        },
+        optionalProbability: 0.35,
+      }],
     },
     melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["horn", "stab", "vocal"] },
     melody: {
@@ -443,7 +516,7 @@ const STYLES = {
     humanize: { timingMs: 10, velocityJitter: 0.2 },
     key: "D2",
     scale: "dorian",
-    progression: [0, 3, 4, 0],
+    progressions: [[0, 3, 4, 0], [0, 2, 3, 0], [0, 4, 3, 0], [0, 3]],
     ambience: "vinyl",
     defaultFlavors: { kick: "lofi", snare: "fat", hihat: "vinyl", perc: "shaker", bass: "warm", piano: "electric", pad: "airy", lead: "flute", strings: "soul", stab: "pluck-chord", marimba: "marimba" },
     drums: {
@@ -463,6 +536,21 @@ const STYLES = {
         },
         optionalProbability: 0.25,
       },
+      mainVariants: [{
+        core: {
+          kick:  [1,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
+          snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat: [1,0,0,1, 0,1,0,0, 1,0,0,1, 0,1,0,0],
+          perc:  [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:  [0,0,1,0, 0,0,0,1, 0,0,1,0, 0,0,0,0],
+          hihat: [0,1,0,0, 1,0,1,0, 0,1,0,0, 1,0,1,0],
+          snare: [0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0],
+          perc:  [0,0,1,0, 0,0,0,0, 0,0,1,0, 0,0,0,1],
+        },
+        optionalProbability: 0.28,
+      }],
     },
     melodic: { monoInstruments: ["bass", "lead", "marimba"], chordInstruments: ["piano", "pad", "strings", "stab"] },
     melody: {
@@ -502,7 +590,7 @@ const STYLES = {
     humanize: { timingMs: 2, velocityJitter: 0.12 },
     key: "C2",
     scale: "phrygian",
-    progression: [0, 3],
+    progressions: [[0, 3], [0, 1, 0], [0, 1, 3, 0], [0, 3, 1, 0]],
     defaultFlavors: { kick: "808", snare: "trapsnap", hihat: "dark", bass: "drillslide", piano: "electric", stab: "pluck-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash"],
@@ -521,6 +609,21 @@ const STYLES = {
         hihatRollSteps: [5, 13],
         hihatRollProbability: 0.4,
       },
+      mainVariants: [{
+        core: {
+          kick:    [1,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,1,0],
+          snare:   [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          hihat:   [1,1,0,1, 0,1,1,0, 1,0,1,1, 0,1,1,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,0,1,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0],
+        },
+        optionalProbability: 0.3,
+        hihatRollSteps: [3, 9],
+        hihatRollProbability: 0.4,
+      }],
     },
     melodic: { monoInstruments: ["bass"], chordInstruments: ["piano", "stab"] },
     melody: {
@@ -548,7 +651,7 @@ const STYLES = {
     humanize: { timingMs: 5, velocityJitter: 0.15 },
     key: "C2",
     scale: "major",
-    progression: [0, 3, 4, 0],
+    progressions: [[0, 3, 4, 0], [0, 4, 5, 3], [0, 5, 3, 4], [0, 1, 3, 4]],
     defaultFlavors: { kick: "acoustic", snare: "clap", hihat: "bright", perc: "shaker", bass: "logdrum", guitar: "nylon", pad: "warm", stab: "pluck-chord", organ: "drawbar", marimba: "marimba" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc"],
@@ -566,6 +669,20 @@ const STYLES = {
         },
         optionalProbability: 0.3,
       },
+      mainVariants: [{
+        core: {
+          kick:    [1,0,1,0, 0,0,1,0, 1,0,0,1, 0,0,1,0],
+          snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat:   [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+          perc:    [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+        },
+        optional: {
+          hihat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+          openhat: [0,0,0,1, 0,0,0,0, 0,0,0,1, 0,0,0,0],
+        },
+        optionalProbability: 0.3,
+      }],
     },
     melodic: { monoInstruments: ["bass", "guitar", "marimba"], chordInstruments: ["pad", "organ", "stab"] },
     melody: {
@@ -600,7 +717,7 @@ const STYLES = {
     humanize: { timingMs: 2, velocityJitter: 0.1 },
     key: "E1",
     scale: "minor",
-    progression: [0, 4],
+    progressions: [[0, 4], [0, 3], [0, 5], [0, 6, 3, 4]],
     defaultFlavors: { kick: "gritty", snare: "fat", hihat: "metallic", bass: "wobble", stab: "square-chord", vocal: "ahh" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash", "fx"],
@@ -618,6 +735,20 @@ const STYLES = {
         },
         optionalProbability: 0.3,
       },
+      mainVariants: [{
+        core: {
+          kick:    [1,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,0,0],
+          snare:   [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          hihat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,1,0],
+          hihat:   [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+          openhat: [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,0],
+        },
+        optionalProbability: 0.3,
+      }],
     },
     melodic: { monoInstruments: ["bass"], chordInstruments: ["stab", "vocal"] },
     melody: {
@@ -645,7 +776,7 @@ const STYLES = {
     humanize: { timingMs: 8, velocityJitter: 0.16 },
     key: "F2",
     scale: "major",
-    progression: [0, 5, 1, 4],
+    progressions: [[0, 5, 1, 4], [0, 3, 5, 4], [0, 2, 3, 4], [5, 3, 0, 4]],
     defaultFlavors: { kick: "acoustic", snare: "fat", hihat: "dark", perc: "shaker", bass: "pluck", piano: "rhodes", pad: "choir", lead: "flute", strings: "orchestral", organ: "drawbar" },
     drums: {
       instruments: ["kick", "snare", "hihat", "perc"],
@@ -663,6 +794,20 @@ const STYLES = {
         },
         optionalProbability: 0.3,
       },
+      mainVariants: [{
+        core: {
+          kick:  [1,0,0,1, 0,0,0,0, 1,0,0,0, 0,0,1,0],
+          snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+          perc:  [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
+        },
+        optional: {
+          kick:  [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,0,0],
+          hihat: [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+          perc:  [0,1,0,0, 1,0,0,1, 0,1,0,0, 1,0,0,1],
+        },
+        optionalProbability: 0.3,
+      }],
     },
     melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "pad", "strings", "organ"] },
     melody: {
@@ -701,7 +846,7 @@ const STYLES = {
     humanize: { timingMs: 3, velocityJitter: 0.14 },
     key: "C2",
     scale: "minor",
-    progression: [0, 4],
+    progressions: [[0, 4], [0, 3], [0, 5], [0, 6, 3, 4]],
     defaultFlavors: { kick: "gritty", snare: "trapsnap", hihat: "metallic", perc: "cowbell", bass: "distorted", lead: "bell", vocal: "ahh", stab: "bell-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc", "crash"],
@@ -722,6 +867,23 @@ const STYLES = {
         hihatRollSteps: [7, 15],
         hihatRollProbability: 0.4,
       },
+      mainVariants: [{
+        core: {
+          kick:    [1,0,0,0, 0,0,1,0, 0,0,1,0, 0,0,0,1],
+          snare:   [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          hihat:   [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1],
+          perc:    [1,0,1,0, 0,1,0,0, 1,0,1,0, 0,1,0,0],
+        },
+        optional: {
+          kick:    [0,0,1,0, 0,0,0,0, 0,1,0,0, 0,0,0,0],
+          snare:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1],
+          perc:    [0,1,0,1, 0,0,1,0, 0,1,0,1, 0,0,1,0],
+        },
+        optionalProbability: 0.35,
+        hihatRollSteps: [3, 11],
+        hihatRollProbability: 0.4,
+      }],
     },
     melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["vocal", "stab"] },
     melody: {
@@ -750,7 +912,7 @@ const STYLES = {
     humanize: { timingMs: 2, velocityJitter: 0.1 },
     key: "C2",
     scale: "minor",
-    progression: [0, 3],
+    progressions: [[0, 3], [0, 5], [0, 4], [0, 5, 3, 4]],
     defaultFlavors: { kick: "snappy", snare: "clap", hihat: "bright", bass: "sub", vocal: "ooh", stab: "square-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat"],
@@ -768,6 +930,20 @@ const STYLES = {
         },
         optionalProbability: 0.3,
       },
+      mainVariants: [{
+        core: {
+          kick:    [1,0,1,0, 0,1,0,0, 1,0,0,1, 0,0,1,0],
+          snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,1,0,0, 0,0,1,0, 0,1,0,0, 0,1,0,1],
+          hihat:   [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+          openhat: [0,0,0,1, 0,0,0,0, 0,0,0,1, 0,0,0,0],
+        },
+        optionalProbability: 0.3,
+      }],
     },
     melodic: { monoInstruments: ["bass"], chordInstruments: ["vocal", "stab"] },
     melody: {
@@ -795,7 +971,7 @@ const STYLES = {
     humanize: { timingMs: 3, velocityJitter: 0.15 },
     key: "E1",
     scale: "minor",
-    progression: [0, 3, 4, 0],
+    progressions: [[0, 3, 4, 0], [0, 5, 3, 4], [0, 4], [0, 6, 3, 4]],
     defaultFlavors: { kick: "acoustic", snare: "crisp", hihat: "bright", bass: "reese", pad: "airy", stab: "square-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash"],
@@ -813,6 +989,20 @@ const STYLES = {
         },
         optionalProbability: 0.35,
       },
+      mainVariants: [{
+        core: {
+          kick:    [1,0,0,0, 0,0,0,1, 0,0,1,0, 0,0,0,0],
+          snare:   [0,0,0,1, 1,0,0,0, 0,0,0,1, 1,0,0,0],
+          hihat:   [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,0,1,0, 0,0,0,0, 0,1,0,0, 0,0,1,0],
+          snare:   [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
+          openhat: [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+        },
+        optionalProbability: 0.35,
+      }],
     },
     melodic: { monoInstruments: ["bass"], chordInstruments: ["pad", "stab"] },
     melody: {
@@ -840,7 +1030,7 @@ const STYLES = {
     humanize: { timingMs: 4, velocityJitter: 0.12 },
     key: "A1",
     scale: "minor",
-    progression: [0, 5, 3, 4],
+    progressions: [[0, 5, 3, 4], [0, 3, 4, 0], [0, 6, 3, 4], [0, 3]],
     defaultFlavors: { kick: "fourfloor", snare: "fat", hihat: "bright", bass: "synth", lead: "brasslead", pad: "warm", stab: "square-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash"],
@@ -858,6 +1048,20 @@ const STYLES = {
         },
         optionalProbability: 0.3,
       },
+      mainVariants: [{
+        core: {
+          kick:    [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+          snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,0,1,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+          hihat:   [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+          openhat: [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+        },
+        optionalProbability: 0.3,
+      }],
     },
     melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["pad", "stab"] },
     melody: {
@@ -886,7 +1090,7 @@ const STYLES = {
     humanize: { timingMs: 3, velocityJitter: 0.13 },
     key: "C2",
     scale: "minor",
-    progression: [0, 5, 3, 4],
+    progressions: [[0, 5, 3, 4], [0, 3, 4, 0], [0, 4], [0, 6, 3, 4]],
     defaultFlavors: { kick: "808", snare: "trapsnap", hihat: "dark", bass: "808", kalimba: "kalimba", vocal: "ahh", stab: "bell-chord" },
     drums: {
       // Modeled on the Kanye West "808s & Heartbreak" legacy (TR-808,
@@ -910,6 +1114,22 @@ const STYLES = {
         hihatRollSteps: [11],
         hihatRollProbability: 0.35,
       },
+      mainVariants: [{
+        core: {
+          kick:    [1,0,0,0, 0,0,1,0, 0,1,0,0, 0,0,0,1],
+          snare:   [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          hihat:   [1,0,1,0, 0,1,0,0, 1,0,0,1, 0,1,0,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,0,1,0, 0,0,0,0, 0,0,0,0, 0,1,0,0],
+          snare:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1],
+          openhat: [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,0],
+        },
+        optionalProbability: 0.25,
+        hihatRollSteps: [5],
+        hihatRollProbability: 0.35,
+      }],
     },
     melodic: { monoInstruments: ["bass", "kalimba"], chordInstruments: ["vocal", "stab"] },
     melody: {
@@ -1030,7 +1250,30 @@ function buildChordBar(style, variant, barRootDegree) {
   return bar;
 }
 
-function generateVariation(style, bars) {
+// A genre's chord progression and core drum groove used to be a single
+// hardcoded constant, which meant every generated beat in that genre had
+// the exact same harmonic shape and the exact same rhythmic backbone
+// forever - only the melody notes and instrument timbres ever varied. Both
+// now pick randomly from a small pool of genuinely different, genre-
+// appropriate options every time a beat is generated.
+function pickProgression(style) {
+  const options = style.progressions || [style.progression];
+  return options[Math.floor(Math.random() * options.length)];
+}
+
+function pickDrumMain(style) {
+  const variants = style.drums.mainVariants;
+  if (!variants || !variants.length) return style.drums.main;
+  const pool = [style.drums.main, ...variants];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function resolveGenerationStyle(style) {
+  return { ...style, drums: { ...style.drums, main: pickDrumMain(style) }, progression: pickProgression(style) };
+}
+
+function generateVariation(rawStyle, bars) {
+  const style = resolveGenerationStyle(rawStyle);
   const structure = buildStructure(bars);
   const totalSteps = bars * STEPS_PER_BAR;
   const barRootDegrees = structure.map((_, i) => style.progression[i % style.progression.length]);
@@ -1151,7 +1394,8 @@ function totalSongBars() {
   return SONG_SECTIONS.reduce((s, sec) => s + sec.bars, 0);
 }
 
-function generateSongVariation(style) {
+function generateSongVariation(rawStyle) {
+  const style = resolveGenerationStyle(rawStyle);
   const barMetas = expandSongSections();
   const bars = barMetas.length;
   const totalSteps = bars * STEPS_PER_BAR;

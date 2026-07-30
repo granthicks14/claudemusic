@@ -31,6 +31,18 @@ Type something like *"dark energetic trap with vocal chops"* or *"chill lofi pia
 
 If nothing matches a known genre, it says so and falls back to the closest reasonable genre rather than silently guessing.
 
+## Every generation is a genuinely different beat, not the same skeleton with new decoration
+
+Direct feedback: regenerating (or picking the same genre again after a refresh) still felt like "the same vibe every time." The root cause was real — the instrument timbres and melody notes varied, but the actual structural backbone of a beat never did: **tempo, key, chord progression, and the core drum groove were all hardcoded constants**, identical on every single generation of a given genre. That's now fixed at every one of those levels:
+
+- **Tempo** rolls a fresh value inside the genre's real tempo range on every generation, instead of always landing on the exact same default BPM.
+- **Key** rolls a fresh root note (any of the 12 chromatic pitch classes, same octave/register the genre was tuned for) on every generation, instead of every single beat in a genre being written in the exact same key forever — real songs in the same genre absolutely aren't all in one key.
+- **Swing** gets a small jitter around the genre's default feel instead of being pinned to one exact percentage.
+- **Chord progression** — every genre now has 3–4 real alternative progressions (drawn from genuinely common, well-documented progressions appropriate to that genre's scale and mood — pop's I-V-vi-IV "axis" family, classic minor i-VI-iv-v and i-VII-iv-v loops, drill's flat-2 Phrygian shapes, jazzy R&B ii-V motion, and more), and one is picked at random each generation instead of the harmonic shape being frozen forever.
+- **The core drum groove** — every genre now has a second, hand-built alternate groove alongside the original (a different kick/snare/hi-hat placement that's still authentic to the genre — e.g. Drill's alternate keeps the signature beat-3 snare lock but shifts the kick's slide points; House's alternate keeps the four-on-the-floor kick that defines the genre but changes the snare/clap/hat pattern around it), and one of the two is picked at random each generation, on top of the existing per-hit optional-fill randomization.
+
+All four roll independently on every "Generate Beat" click, every prompt-box generation, and every fresh genre pick — so two beats in the same genre, generated seconds apart, can now differ in tempo, key, chord changes, and rhythmic backbone, on top of the instrument sounds and melody that already varied.
+
 ## A full song, not just a loop
 
 Next to "4 bars" / "8 bars" is a **Full Song** option: instead of one repeating loop, it builds an ~52-bar arrangement (Intro → Verse 1 → Chorus 1 → Verse 2 → Chorus 2 → Bridge → Final Chorus → Outro, roughly 1.5–2 minutes depending on tempo) with the section labels shown above the grid. This is built on real arrangement technique researched for this build:

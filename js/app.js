@@ -99,6 +99,49 @@ function populateKeySelect(keyStr) {
   }
 }
 
+// Tempo/key/swing used to reset to the exact same genre-default numbers on
+// every single generation, which is a big part of why repeated beats in
+// the same genre could feel like "the same vibe every time" - the melody
+// notes and instrument timbres varied, but the tempo, the key the whole
+// song was in, and the feel of the swing never did. Real songs in the same
+// genre are absolutely not all in the same key at the same BPM, so all
+// three now roll fresh within a sensible range on every generation instead
+// of only being changeable by hand.
+function randomizeKey(baseKeyStr) {
+  const octave = baseKeyStr.match(/-?\d+$/)[0];
+  const letter = NOTE_NAMES[Math.floor(Math.random() * NOTE_NAMES.length)];
+  return letter + octave;
+}
+
+function randomizeTempo(tempoRange) {
+  return Math.round(tempoRange.min + Math.random() * (tempoRange.max - tempoRange.min));
+}
+
+function randomizeSwing(baseSwing) {
+  const jitter = (Math.random() * 2 - 1) * 0.04;
+  return Math.max(0, Math.min(0.3, baseSwing + jitter));
+}
+
+function rollTempoKeySwing(baseStyle) {
+  const key = randomizeKey(baseStyle.key);
+  populateKeySelect(key);
+  activeStyle.key = key;
+  engine.updateKey(activeStyle);
+
+  const tempo = randomizeTempo(baseStyle.tempo);
+  tempoSlider.min = baseStyle.tempo.min;
+  tempoSlider.max = baseStyle.tempo.max;
+  tempoSlider.value = tempo;
+  tempoValue.textContent = tempo;
+  engine.updateTempo(tempo);
+
+  const swing = randomizeSwing(baseStyle.swing);
+  const swingPct = Math.round(swing * 100);
+  swingSlider.value = swingPct;
+  swingValue.textContent = swingPct;
+  engine.setSwing(swing);
+}
+
 function selectStyle(id) {
   selectedStyleId = id;
   baseStyle = STYLES[id];
@@ -113,16 +156,7 @@ function selectStyle(id) {
   engine.ensureContext();
   engine.setMasterVolume(Number(masterSlider.value) / 100);
 
-  populateKeySelect(baseStyle.key);
-  tempoSlider.min = baseStyle.tempo.min;
-  tempoSlider.max = baseStyle.tempo.max;
-  tempoSlider.value = baseStyle.tempo.default;
-  tempoValue.textContent = baseStyle.tempo.default;
-
-  const swingPct = Math.round(baseStyle.swing * 100);
-  swingSlider.value = swingPct;
-  swingValue.textContent = swingPct;
-  engine.setSwing(baseStyle.swing);
+  rollTempoKeySwing(baseStyle);
 
   const sidechainOn = SIDECHAIN_DEFAULT_ON.has(id);
   engine.setSidechain(sidechainOn);
@@ -808,6 +842,7 @@ function showShuffleStatus({ changed, palette }) {
 }
 
 generateBtn.addEventListener("click", () => {
+  rollTempoKeySwing(baseStyle);
   showShuffleStatus(shuffleFlavors());
   generatePattern();
 });

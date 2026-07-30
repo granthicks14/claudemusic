@@ -1,8 +1,21 @@
+const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "bass", "piano", "lead", "pad", "stab"];
+
+const DEFAULT_TRACK_VOLUME = {
+  kick: 1, snare: 0.9, hihat: 0.6, openhat: 0.6, tom: 0.85, perc: 0.55, crash: 0.8,
+  bass: 0.9, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75,
+};
+
+const BASE_VELOCITY = {
+  kick: 1, snare: 0.9, hihat: 0.7, openhat: 0.7, tom: 0.85, perc: 0.6, crash: 0.9,
+  bass: 0.8, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75,
+};
+
 class BeatEngine {
   constructor() {
     this.ctx = null;
     this.pattern = null;
     this.style = null;
+    this.rootMidi = 48;
     this.tempo = 100;
     this.stepCount = 16;
     this.currentStep = 0;
@@ -13,15 +26,67 @@ class BeatEngine {
     this.isPlaying = false;
     this.onStep = null;
     this.ambienceSource = null;
+    this.flavors = {};
+    this.masterGain = null;
+    this.trackGains = {};
+    this.trackState = {};
+    for (const t of ALL_TRACKS) {
+      this.trackState[t] = { volume: DEFAULT_TRACK_VOLUME[t], muted: false, solo: false };
+    }
   }
 
   ensureContext() {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.value = 0.9;
+      this.masterGain.connect(this.ctx.destination);
+      for (const t of ALL_TRACKS) {
+        const g = this.ctx.createGain();
+        g.gain.value = this.trackState[t].volume;
+        g.connect(this.masterGain);
+        this.trackGains[t] = g;
+      }
     }
     if (this.ctx.state === "suspended") {
       this.ctx.resume();
     }
+  }
+
+  dest(inst) {
+    return this.trackGains[inst] || this.masterGain;
+  }
+
+  recomputeGains() {
+    const anySolo = ALL_TRACKS.some((t) => this.trackState[t].solo);
+    for (const t of ALL_TRACKS) {
+      const s = this.trackState[t];
+      let level = s.volume;
+      if (s.muted) level = 0;
+      if (anySolo && !s.solo) level = 0;
+      if (this.trackGains[t]) this.trackGains[t].gain.value = level;
+    }
+  }
+
+  setTrackVolume(inst, value) {
+    this.trackState[inst].volume = value;
+    this.recomputeGains();
+  }
+
+  toggleMute(inst) {
+    this.trackState[inst].muted = !this.trackState[inst].muted;
+    this.recomputeGains();
+    return this.trackState[inst].muted;
+  }
+
+  toggleSolo(inst) {
+    this.trackState[inst].solo = !this.trackState[inst].solo;
+    this.recomputeGains();
+    return this.trackState[inst].solo;
+  }
+
+  setMasterVolume(value) {
+    if (this.masterGain) this.masterGain.gain.value = value;
   }
 
   jitterTime(time) {
@@ -43,6 +108,8 @@ class BeatEngine {
     return buffer;
   }
 
+  // ---- Drums ----
+
   playKick(time, vel, flavor) {
     const ctx = this.ctx;
     const presets = {
@@ -61,7 +128,7 @@ class BeatEngine {
     osc.frequency.exponentialRampToValueAtTime(p.endFreq, time + p.decay * 0.4);
     gain.gain.setValueAtTime(vel, time);
     gain.gain.exponentialRampToValueAtTime(0.001, time + p.decay);
-    osc.connect(gain).connect(ctx.destination);
+    osc.connect(gain).connect(this.dest("kick"));
     osc.start(time);
     osc.stop(time + p.decay + 0.05);
 
@@ -72,7 +139,7 @@ class BeatEngine {
       osc2.frequency.exponentialRampToValueAtTime(p.endFreq * 1.3, time + 0.08);
       gain2.gain.setValueAtTime(vel * 0.4, time);
       gain2.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
-      osc2.connect(gain2).connect(ctx.destination);
+      osc2.connect(gain2).connect(this.dest("kick"));
       osc2.start(time);
       osc2.stop(time + 0.12);
     }
@@ -99,7 +166,7 @@ class BeatEngine {
         const g = ctx.createGain();
         g.gain.setValueAtTime(vel * 0.8, time + off);
         g.gain.exponentialRampToValueAtTime(0.01, time + off + p.noiseDecay);
-        noise.connect(bp).connect(g).connect(ctx.destination);
+        noise.connect(bp).connect(g).connect(this.dest("snare"));
         noise.start(time + off);
         noise.stop(time + off + p.noiseDecay);
       }
@@ -114,7 +181,7 @@ class BeatEngine {
     const noiseGain = ctx.createGain();
     noiseGain.gain.setValueAtTime(vel, time);
     noiseGain.gain.exponentialRampToValueAtTime(0.01, time + p.noiseDecay);
-    noise.connect(filter).connect(noiseGain).connect(ctx.destination);
+    noise.connect(filter).connect(noiseGain).connect(this.dest("snare"));
     noise.start(time);
     noise.stop(time + p.noiseDecay);
 
@@ -125,13 +192,13 @@ class BeatEngine {
       osc.frequency.setValueAtTime(p.toneFreq, time);
       oscGain.gain.setValueAtTime(vel * 0.7, time);
       oscGain.gain.exponentialRampToValueAtTime(0.01, time + p.toneDecay);
-      osc.connect(oscGain).connect(ctx.destination);
+      osc.connect(oscGain).connect(this.dest("snare"));
       osc.start(time);
       osc.stop(time + p.toneDecay);
     }
   }
 
-  playHihat(time, vel, open, flavor) {
+  playHihat(time, vel, open, flavor, trackKey) {
     const ctx = this.ctx;
     const presets = {
       bright: { hp: 7500, lp: null },
@@ -157,17 +224,17 @@ class BeatEngine {
       lp.frequency.value = p.lp;
       node = node.connect(lp);
     }
-    node.connect(gain).connect(ctx.destination);
+    node.connect(gain).connect(this.dest(trackKey));
     noise.start(time);
     noise.stop(time + decay);
   }
 
-  playHihatRoll(time, stepDuration, open, flavor) {
+  playHihatRoll(time, stepDuration, open, flavor, trackKey) {
     const hits = 3;
     for (let i = 0; i < hits; i++) {
       const t = time + (i * stepDuration) / hits;
       const vel = 0.5 + (i / hits) * 0.5;
-      this.playHihat(t, this.jitterVel(vel), open && i === hits - 1, flavor);
+      this.playHihat(t, this.jitterVel(vel), open && i === hits - 1, flavor, trackKey);
     }
   }
 
@@ -180,7 +247,7 @@ class BeatEngine {
     osc.frequency.exponentialRampToValueAtTime(startFreq * 0.55, time + 0.22);
     gain.gain.setValueAtTime(vel, time);
     gain.gain.exponentialRampToValueAtTime(0.001, time + 0.28);
-    osc.connect(gain).connect(ctx.destination);
+    osc.connect(gain).connect(this.dest("tom"));
     osc.start(time);
     osc.stop(time + 0.3);
   }
@@ -195,7 +262,7 @@ class BeatEngine {
       osc.frequency.exponentialRampToValueAtTime(freq * 0.7, time + 0.12);
       gain.gain.setValueAtTime(vel * 0.8, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + 0.14);
-      osc.connect(gain).connect(ctx.destination);
+      osc.connect(gain).connect(this.dest("perc"));
       osc.start(time);
       osc.stop(time + 0.16);
       return;
@@ -208,7 +275,7 @@ class BeatEngine {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(vel * 0.4, time);
     gain.gain.exponentialRampToValueAtTime(0.01, time + 0.08);
-    noise.connect(bp).connect(gain).connect(ctx.destination);
+    noise.connect(bp).connect(gain).connect(this.dest("perc"));
     noise.start(time);
     noise.stop(time + 0.08);
   }
@@ -223,7 +290,7 @@ class BeatEngine {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(vel * 0.7, time);
     gain.gain.exponentialRampToValueAtTime(0.001, time + 1.4);
-    noise.connect(hp).connect(gain).connect(ctx.destination);
+    noise.connect(hp).connect(gain).connect(this.dest("crash"));
     noise.start(time);
     noise.stop(time + 1.4);
   }
@@ -239,6 +306,7 @@ class BeatEngine {
       osc.frequency.exponentialRampToValueAtTime(freq, time + 0.09);
       gain.gain.setValueAtTime(vel, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + durationSeconds);
+      osc.connect(gain).connect(this.dest("bass"));
     } else if (flavor === "synth") {
       osc.type = "sawtooth";
       osc.frequency.setValueAtTime(freq, time);
@@ -247,20 +315,185 @@ class BeatEngine {
       filter.frequency.value = 900;
       gain.gain.setValueAtTime(vel * 0.8, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + durationSeconds);
-      osc.connect(filter).connect(gain).connect(ctx.destination);
-      osc.start(time);
-      osc.stop(time + durationSeconds + 0.05);
-      return;
+      osc.connect(filter).connect(gain).connect(this.dest("bass"));
     } else {
       osc.type = "sine";
       osc.frequency.setValueAtTime(freq, time);
       gain.gain.setValueAtTime(vel * 0.8, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + durationSeconds);
+      osc.connect(gain).connect(this.dest("bass"));
     }
-
-    osc.connect(gain).connect(ctx.destination);
     osc.start(time);
     osc.stop(time + durationSeconds + 0.05);
+  }
+
+  // ---- Melodic voices ----
+
+  playPianoVoice(time, freq, durationSeconds, vel, flavor) {
+    const ctx = this.ctx;
+    const dest = this.dest("piano");
+    const dur = Math.min(durationSeconds, 1.4);
+
+    if (flavor === "pluck") {
+      const osc = ctx.createOscillator();
+      osc.type = "triangle";
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(3200, time);
+      filter.frequency.exponentialRampToValueAtTime(400, time + 0.35);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + Math.max(dur, 0.4));
+      osc.frequency.setValueAtTime(freq, time);
+      osc.connect(filter).connect(gain).connect(dest);
+      osc.start(time);
+      osc.stop(time + Math.max(dur, 0.4) + 0.05);
+      return;
+    }
+
+    const osc1 = ctx.createOscillator();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(freq, time);
+    const osc2 = ctx.createOscillator();
+    osc2.type = "triangle";
+    osc2.frequency.setValueAtTime(freq * 1.004, time);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(vel, time + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+    let node2 = osc2;
+    if (flavor === "grand") {
+      const osc3 = ctx.createOscillator();
+      osc3.type = "sine";
+      osc3.frequency.setValueAtTime(freq * 2.01, time);
+      const g3 = ctx.createGain();
+      g3.gain.setValueAtTime(vel * 0.15, time);
+      g3.gain.exponentialRampToValueAtTime(0.001, time + dur * 0.5);
+      osc3.connect(g3).connect(dest);
+      osc3.start(time);
+      osc3.stop(time + dur + 0.1);
+    }
+
+    osc1.connect(gain).connect(dest);
+    osc2.connect(gain);
+    osc1.start(time);
+    osc2.start(time);
+    osc1.stop(time + dur + 0.1);
+    osc2.stop(time + dur + 0.1);
+  }
+
+  playLeadVoice(time, freq, durationSeconds, vel, flavor) {
+    const ctx = this.ctx;
+    const dest = this.dest("lead");
+    const dur = Math.min(durationSeconds, 1);
+
+    if (flavor === "bell") {
+      const osc1 = ctx.createOscillator();
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(freq, time);
+      const osc2 = ctx.createOscillator();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(freq * 2.76, time);
+      const gain1 = ctx.createGain();
+      gain1.gain.setValueAtTime(vel, time);
+      gain1.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      const gain2 = ctx.createGain();
+      gain2.gain.setValueAtTime(vel * 0.3, time);
+      gain2.gain.exponentialRampToValueAtTime(0.001, time + dur * 0.4);
+      osc1.connect(gain1).connect(dest);
+      osc2.connect(gain2).connect(dest);
+      osc1.start(time);
+      osc2.start(time);
+      osc1.stop(time + dur + 0.1);
+      osc2.stop(time + dur + 0.1);
+      return;
+    }
+
+    const osc = ctx.createOscillator();
+    osc.type = flavor === "square" ? "square" : "sawtooth";
+    osc.frequency.setValueAtTime(freq, time);
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(flavor === "square" ? 2400 : 4000, time);
+    filter.frequency.exponentialRampToValueAtTime(600, time + dur);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(vel, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+    osc.connect(filter).connect(gain).connect(dest);
+    osc.start(time);
+    osc.stop(time + dur + 0.05);
+  }
+
+  playPadVoice(time, freq, durationSeconds, vel, flavor) {
+    const ctx = this.ctx;
+    const dest = this.dest("pad");
+    const attack = 0.25;
+    const dur = Math.max(durationSeconds, 0.6);
+    const detunes = flavor === "strings" ? [0, 0.006, -0.006] : flavor === "airy" ? [0] : [0, 0.004];
+    const type = flavor === "airy" ? "sine" : "sawtooth";
+
+    for (const d of detunes) {
+      const osc = ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq * (1 + d), time);
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = flavor === "airy" ? 2200 : 1500;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel / detunes.length, time + attack);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      osc.connect(filter).connect(gain).connect(dest);
+      osc.start(time);
+      osc.stop(time + dur + 0.1);
+    }
+  }
+
+  playStabVoice(time, freq, durationSeconds, vel, flavor) {
+    const ctx = this.ctx;
+    const dest = this.dest("stab");
+    const dur = Math.min(durationSeconds, 0.5);
+
+    if (flavor === "bell-chord") {
+      this.playLeadVoiceTo(time, freq, dur, vel, "bell", dest);
+      return;
+    }
+    const osc = ctx.createOscillator();
+    osc.type = flavor === "square-chord" ? "square" : "sawtooth";
+    osc.frequency.setValueAtTime(freq, time);
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(3500, time);
+    filter.frequency.exponentialRampToValueAtTime(500, time + dur);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(vel, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+    osc.connect(filter).connect(gain).connect(dest);
+    osc.start(time);
+    osc.stop(time + dur + 0.05);
+  }
+
+  playLeadVoiceTo(time, freq, dur, vel, flavor, dest) {
+    const ctx = this.ctx;
+    const osc1 = ctx.createOscillator();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(freq, time);
+    const osc2 = ctx.createOscillator();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(freq * 2.76, time);
+    const gain1 = ctx.createGain();
+    gain1.gain.setValueAtTime(vel, time);
+    gain1.gain.exponentialRampToValueAtTime(0.001, time + dur);
+    const gain2 = ctx.createGain();
+    gain2.gain.setValueAtTime(vel * 0.3, time);
+    gain2.gain.exponentialRampToValueAtTime(0.001, time + dur * 0.4);
+    osc1.connect(gain1).connect(dest);
+    osc2.connect(gain2).connect(dest);
+    osc1.start(time);
+    osc2.start(time);
+    osc1.stop(time + dur + 0.1);
+    osc2.stop(time + dur + 0.1);
   }
 
   startAmbience(kind) {
@@ -279,7 +512,7 @@ class BeatEngine {
     filter.frequency.value = 3000;
     const gain = ctx.createGain();
     gain.gain.value = 0.05;
-    source.connect(filter).connect(gain).connect(ctx.destination);
+    source.connect(filter).connect(gain).connect(this.masterGain);
     source.start();
     this.ambienceSource = source;
   }
@@ -297,31 +530,48 @@ class BeatEngine {
 
   scheduleStep(step, time) {
     const p = this.pattern;
-    const flavors = this.style.flavors;
+    const flavors = this.flavors;
     const dur = this.stepDuration();
 
     for (const inst of Object.keys(p.instruments)) {
       const val = p.instruments[inst][step];
       if (!val) continue;
-      const t = this.jitterTime(time);
 
-      if (inst === "kick") this.playKick(t, this.jitterVel(1), flavors.kick);
-      else if (inst === "snare") this.playSnare(t, this.jitterVel(0.9), flavors.snare);
-      else if (inst === "hihat") {
-        if (val === "roll") this.playHihatRoll(time, dur, false, flavors.hihat);
-        else this.playHihat(t, this.jitterVel(0.7), false, flavors.hihat);
-      } else if (inst === "openhat") {
-        if (val === "roll") this.playHihatRoll(time, dur, true, flavors.hihat);
-        else this.playHihat(t, this.jitterVel(0.7), true, flavors.hihat);
-      } else if (inst === "tom") this.playTom(t, this.jitterVel(0.85));
-      else if (inst === "perc") this.playPerc(t, this.jitterVel(0.6), flavors.perc);
-      else if (inst === "crash") this.playCrash(t, this.jitterVel(0.9));
-    }
+      if (inst === "kick" || inst === "snare" || inst === "tom" || inst === "crash" || inst === "perc") {
+        const t = this.jitterTime(time);
+        const vel = this.jitterVel(BASE_VELOCITY[inst]);
+        if (inst === "kick") this.playKick(t, vel, flavors.kick);
+        else if (inst === "snare") this.playSnare(t, vel, flavors.snare);
+        else if (inst === "tom") this.playTom(t, vel);
+        else if (inst === "crash") this.playCrash(t, vel);
+        else if (inst === "perc") this.playPerc(t, vel, flavors.perc);
+        continue;
+      }
 
-    const note = p.bass[step];
-    if (note) {
+      if (inst === "hihat" || inst === "openhat") {
+        const open = inst === "openhat";
+        if (val === "roll") this.playHihatRoll(time, dur, open, flavors.hihat, inst);
+        else this.playHihat(this.jitterTime(time), this.jitterVel(BASE_VELOCITY[inst]), open, flavors.hihat, inst);
+        continue;
+      }
+
+      // melodic
       const t = this.jitterTime(time);
-      this.playBass(t, note.freq, note.len * dur, this.jitterVel(0.8), flavors.bass);
+      const noteDur = val.len * dur;
+      if (val.degrees) {
+        for (const deg of val.degrees) {
+          const freq = degreeToFreq(this.rootMidi, this.style.scale, deg);
+          const vel = this.jitterVel(BASE_VELOCITY[inst] * 0.85);
+          if (inst === "piano") this.playPianoVoice(t, freq, noteDur, vel, flavors.piano);
+          else if (inst === "pad") this.playPadVoice(t, freq, noteDur, vel, flavors.pad);
+          else if (inst === "stab") this.playStabVoice(t, freq, noteDur, vel, flavors.stab);
+        }
+      } else if (val.degree !== undefined) {
+        const freq = degreeToFreq(this.rootMidi, this.style.scale, val.degree);
+        const vel = this.jitterVel(BASE_VELOCITY[inst]);
+        if (inst === "bass") this.playBass(t, freq, noteDur, vel, flavors.bass);
+        else if (inst === "lead") this.playLeadVoice(t, freq, noteDur, vel, flavors.lead);
+      }
     }
   }
 
@@ -346,12 +596,15 @@ class BeatEngine {
     this.timerId = setTimeout(() => this.scheduler(), this.lookahead);
   }
 
-  start(pattern, style, tempo) {
+  start(pattern, style, flavors, tempo) {
     this.ensureContext();
     this.pattern = pattern;
     this.style = style;
+    this.flavors = flavors;
+    this.rootMidi = noteNameToMidi(style.key);
     this.tempo = tempo;
-    this.stepCount = pattern.instruments.kick ? pattern.instruments.kick.length : pattern.bass.length;
+    const anyTrack = Object.values(pattern.instruments)[0];
+    this.stepCount = anyTrack ? anyTrack.length : STEPS_PER_BAR;
     this.currentStep = 0;
     this.nextNoteTime = this.ctx.currentTime + 0.05;
     this.isPlaying = true;
@@ -361,6 +614,11 @@ class BeatEngine {
 
   updatePattern(pattern) {
     this.pattern = pattern;
+  }
+
+  updateKey(style) {
+    this.style = style;
+    this.rootMidi = noteNameToMidi(style.key);
   }
 
   updateTempo(tempo) {

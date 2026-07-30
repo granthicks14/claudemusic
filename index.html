@@ -3,36 +3,65 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Beat Generator</title>
+<title>Beat Studio</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <main class="app">
-    <h1>Beat Generator</h1>
-    <p class="subtitle">Pick a style, generate a beat, hit play.</p>
+  <div class="app">
+    <header class="app-header">
+      <h1>Beat Studio</h1>
+      <p class="subtitle">Pick a style, build a full arrangement, then produce it your way.</p>
+    </header>
 
     <section id="style-select" class="style-grid"></section>
 
-    <section class="controls" id="controls" hidden>
-      <div class="control-row">
-        <button id="generate-btn">Generate Beat</button>
-        <button id="play-btn">Play</button>
-        <div id="bars-select" class="bars-select">
+    <section id="workspace" class="workspace" hidden>
+      <div class="transport">
+        <button id="play-btn" class="transport-btn play">▶ Play</button>
+        <button id="generate-btn" class="transport-btn">Generate Beat</button>
+        <button id="shuffle-btn" class="transport-btn">Shuffle Sounds</button>
+
+        <div id="bars-select" class="segmented">
           <button data-bars="4" class="selected">4 bars</button>
           <button data-bars="8">8 bars</button>
         </div>
+
+        <div class="transport-field">
+          <label for="key-select">Key</label>
+          <select id="key-select"></select>
+        </div>
+
+        <div class="transport-field">
+          <label for="tempo-slider">Tempo <span id="tempo-value"></span></label>
+          <input type="range" id="tempo-slider">
+        </div>
+
+        <div class="transport-field">
+          <label for="master-slider">Master</label>
+          <input type="range" id="master-slider" min="0" max="100" value="90">
+        </div>
       </div>
-      <div class="control-row">
-        <label for="tempo-slider">Tempo: <span id="tempo-value"></span> BPM</label>
-        <input type="range" id="tempo-slider">
-      </div>
+
+      <p class="hint">Click any cell to edit it directly. Click a track name to open its piano roll and place exact notes/chords.</p>
+
       <div class="grid-wrap">
         <div id="section-row" class="section-row"></div>
         <div id="step-grid" class="step-grid"></div>
       </div>
-    </section>
-  </main>
 
+      <div id="piano-roll" class="piano-roll" hidden>
+        <div class="piano-roll-header">
+          <span id="piano-roll-title"></span>
+          <button id="piano-roll-close">Close ✕</button>
+        </div>
+        <div class="grid-wrap">
+          <div id="piano-roll-grid" class="piano-roll-grid"></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="js/theory.js"></script>
   <script src="js/patterns.js"></script>
   <script src="js/audio-engine.js"></script>
   <script src="js/app.js"></script>

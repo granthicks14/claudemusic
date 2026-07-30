@@ -297,6 +297,20 @@ class BeatEngine {
       // either the 909 or the 808.
       "909": { startFreq: 150, endFreq: 58, decay: 0.22 },
       linn: { startFreq: 105, endFreq: 42, decay: 0.4 },
+      // Three more free/documented machines researched the same way -
+      // circuit behavior, not a copyrighted sample. The TR-707 (1985) was
+      // Roland's first 12-bit PCM sample-based machine rather than analog
+      // synthesis, so it reads tighter and more mid-focused with a shorter
+      // decay than the analog 808/909 - the freestyle/early-house sound.
+      // The TR-606 "Drumatix" (1981) is a tiny, thin analog companion to
+      // the TB-303 with almost no low-end weight and a fast, clicky decay -
+      // the acid-house/early-techno sound. The Oberheim DMX (1980) is one
+      // of the first sampling drum machines and basically defined the
+      // sound of early-80s hip-hop (Run-DMC, Whodini) - a hard, gated,
+      // compressed-sounding punch with more midrange snap than an 808.
+      "707": { startFreq: 155, endFreq: 68, decay: 0.19 },
+      "606": { startFreq: 190, endFreq: 95, decay: 0.1 },
+      dmx: { startFreq: 135, endFreq: 62, decay: 0.16 },
     };
     const p = presets[flavor] || presets.boombap;
     const jitter = 0.92 + Math.random() * 0.16;
@@ -386,6 +400,37 @@ class BeatEngine {
       click.start(time);
       click.stop(time + 0.018);
     }
+
+    if (flavor === "707") {
+      // A PCM sample's transient is a clean, fast broadband tick rather
+      // than the analog machines' resonant click circuits - shorter and
+      // less filtered than the 808/909 click above.
+      const click = ctx.createBufferSource();
+      click.buffer = this.makeNoiseBuffer(0.008);
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 2800;
+      const clickGain = ctx.createGain();
+      clickGain.gain.setValueAtTime(vel * 0.3, time);
+      clickGain.gain.exponentialRampToValueAtTime(0.001, time + 0.008);
+      click.connect(hp).connect(clickGain).connect(this.dest("kick"));
+      click.start(time);
+      click.stop(time + 0.01);
+    }
+
+    if (flavor === "dmx") {
+      // The DMX's reputation for a hard, "gated" punch comes from its
+      // sample being run through a fast analog compressor on the way out -
+      // approximated here with a touch of waveshaper saturation on top of
+      // the pitched body, the same "drive it a little for extra bite"
+      // trick the true-808 bass/kick already leans on elsewhere.
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = this.makeDistortionCurve(14);
+      const driveGain = ctx.createGain();
+      driveGain.gain.setValueAtTime(vel * 0.5, time);
+      driveGain.gain.exponentialRampToValueAtTime(0.001, time + p.decay * 0.6);
+      osc.connect(shaper).connect(driveGain).connect(this.dest("kick"));
+    }
   }
 
   playSnare(time, vel, flavor) {
@@ -406,6 +451,13 @@ class BeatEngine {
       // snare with a touch more tail than the 909's short snap.
       "909snare": { noiseHp: 2200, noiseDecay: 0.16, toneFreq: 205, toneDecay: 0.1 },
       linn: { noiseHp: 1500, noiseDecay: 0.24, toneFreq: 195, toneDecay: 0.16 },
+      // TR-707: clean PCM-sample snap, tight and bright with very little
+      // low-mid body - the freestyle/early-house snare. DMX: a hard,
+      // bright, slightly metallic "clang" with a short, compressed-sounding
+      // tail - the early-hip-hop snare, distinct from the 909's rounder
+      // metallic ring by having more upper-mid bite and less low tone.
+      "707": { noiseHp: 2600, noiseDecay: 0.13, toneFreq: 240, toneDecay: 0.08 },
+      dmx: { noiseHp: 3000, noiseDecay: 0.1, toneFreq: 340, toneDecay: 0.07 },
     };
     const p = presets[flavor] || presets.crisp;
 
@@ -463,6 +515,12 @@ class BeatEngine {
       tape: { hp: 5500, lp: 9500, peak: 6500 },
       sizzle: { hp: 9500, lp: null, peak: 11000 },
       lofi808: { hp: 7000, lp: 10500 },
+      // TR-707: a clean PCM sample, tighter and less splashy than the
+      // analog-noise hats above. TR-606: thin, papery, higher-pitched -
+      // the 606's tiny analog circuit never had much hat body to begin
+      // with, which is exactly its charm in early acid/techno.
+      "707": { hp: 8000, lp: 12500, peak: 9500 },
+      "606": { hp: 9800, lp: null },
     };
     const decay = open ? 0.32 + Math.random() * 0.1 : 0.05 + Math.random() * 0.02;
 
@@ -530,8 +588,28 @@ class BeatEngine {
     }
   }
 
-  playTom(time, vel) {
+  playTom(time, vel, flavor) {
     const ctx = this.ctx;
+    if (flavor === "simmons") {
+      // The Simmons SDS-V (1981) is the definitive 80s "electronic tom" -
+      // not a drum sound at all really, but a pure sine with a fast,
+      // dramatic downward pitch sweep and a much longer ring than any
+      // acoustic tom (Duran Duran, Phil Collins-era pop). The sweep here
+      // is roughly triple the acoustic tom's pitch drop and stretched
+      // over a longer decay to get that unmistakable electronic "pew."
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      const gain = ctx.createGain();
+      const startFreq = 340 + Math.random() * 30;
+      osc.frequency.setValueAtTime(startFreq, time);
+      osc.frequency.exponentialRampToValueAtTime(startFreq * 0.18, time + 0.35);
+      gain.gain.setValueAtTime(vel, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.45);
+      osc.connect(gain).connect(this.dest("tom"));
+      osc.start(time);
+      osc.stop(time + 0.48);
+      return;
+    }
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     const startFreq = 160 + Math.random() * 20;
@@ -670,6 +748,31 @@ class BeatEngine {
       strike.connect(strikeFilter).connect(strikeGain).connect(this.dest("perc"));
       strike.start(time);
       strike.stop(time + 0.035);
+      return;
+    }
+    if (flavor === "cr78") {
+      // The Roland CR-78 (1978) was the first microprocessor drum machine,
+      // and its bongo-ish percussion is built from simple RC-triggered
+      // analog oscillators with a fast decay - a boxier, more synthetic
+      // "plasticky" resonance than the smoother sine-based conga/bongo
+      // already in this engine (Phil Collins' "In the Air Tonight" and the
+      // Human League both leaned on this exact machine). A resonant
+      // bandpass on a triangle wave, decaying much faster than the cowbell
+      // above, gets that dry boxiness right.
+      const osc = ctx.createOscillator();
+      osc.type = "triangle";
+      const freq = 480 + Math.random() * 60;
+      osc.frequency.setValueAtTime(freq, time);
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = freq;
+      bp.Q.value = 8;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.65, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.09);
+      osc.connect(bp).connect(gain).connect(this.dest("perc"));
+      osc.start(time);
+      osc.stop(time + 0.1);
       return;
     }
     const noise = ctx.createBufferSource();
@@ -1387,6 +1490,61 @@ class BeatEngine {
       gain.gain.linearRampToValueAtTime(vel * 0.75, time + 0.04);
       gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
       osc.connect(bp).connect(gain).connect(dest);
+      osc.start(time);
+      osc.stop(time + dur + 0.05);
+      return;
+    }
+
+    if (flavor === "frenchhorn") {
+      // A French horn's long, tightly-coiled conical bore and the
+      // player's hand damping the bell heavily roll off the upper
+      // harmonics compared to a trumpet's bright, open cylindrical bore -
+      // a lowpass (rounding everything above the cutoff) is the right
+      // shape for that, not the narrow resonant bandpass every other horn
+      // flavor here uses. The attack is also noticeably slower: a horn
+      // genuinely speaks more slowly than a trumpet does.
+      const dur = Math.min(durationSeconds, 0.6);
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freq, time);
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 1100;
+      lp.Q.value = 0.7;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.8, time + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      osc.connect(lp).connect(gain).connect(dest);
+      osc.start(time);
+      osc.stop(time + dur + 0.05);
+      return;
+    }
+
+    if (flavor === "oboe") {
+      // A double reed (two reeds buzzing against each other, versus the
+      // clarinet's single reed against a fixed mouthpiece) produces a much
+      // richer spectrum with strong even harmonics too, plus a pronounced
+      // resonant "nasal" formant around 1.2kHz - a narrow high-Q peaking
+      // filter on a full sawtooth gets both of those right where the
+      // clarinet's odd-harmonics-only square wave deliberately can't.
+      const dur = Math.min(durationSeconds, 0.5);
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freq, time);
+      const peak = ctx.createBiquadFilter();
+      peak.type = "peaking";
+      peak.frequency.value = 1200;
+      peak.Q.value = 5;
+      peak.gain.value = 11;
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 3200;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.8, time + 0.025);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      osc.connect(peak).connect(lp).connect(gain).connect(dest);
       osc.start(time);
       osc.stop(time + dur + 0.05);
       return;
@@ -2271,6 +2429,21 @@ class BeatEngine {
     return 60 / this.tempo / 4;
   }
 
+  // Custom-chord patterns carry a per-bar {rootMidi, scale} in
+  // pattern.barChordContexts (see buildBarContextsFromChords in
+  // patterns.js) instead of relying on the single genre-wide rootMidi/scale
+  // every other pattern uses - this is the one place playback needs to
+  // know the difference.
+  freqForDegree(deg, step) {
+    const contexts = this.pattern.barChordContexts;
+    if (contexts && contexts.length) {
+      const barIdx = Math.floor(step / STEPS_PER_BAR) % contexts.length;
+      const ctx = contexts[barIdx];
+      return degreeToFreq(ctx.rootMidi, ctx.scale, deg);
+    }
+    return degreeToFreq(this.rootMidi, this.style.scale, deg);
+  }
+
   scheduleStep(step, time) {
     const p = this.pattern;
     const flavors = this.flavors;
@@ -2286,7 +2459,7 @@ class BeatEngine {
         const vel = this.jitterVel(BASE_VELOCITY[inst]) * autoMul;
         if (inst === "kick") this.playKick(t, vel, flavors.kick);
         else if (inst === "snare") this.playSnare(t, vel, flavors.snare);
-        else if (inst === "tom") this.playTom(t, vel);
+        else if (inst === "tom") this.playTom(t, vel, flavors.tom);
         else if (inst === "crash") this.playCrash(t, vel);
         else if (inst === "perc") this.playPerc(t, vel, flavors.perc);
         else if (inst === "fx") this.playFxRiser(t, vel, flavors.fx);
@@ -2305,7 +2478,7 @@ class BeatEngine {
       const noteDur = val.len * dur;
       if (val.degrees) {
         for (const deg of val.degrees) {
-          const freq = degreeToFreq(this.rootMidi, this.style.scale, deg);
+          const freq = this.freqForDegree(deg, step);
           const vel = this.jitterVel(BASE_VELOCITY[inst] * 0.85) * autoMul;
           if (inst === "piano") this.playPianoVoice(t, freq, noteDur, vel, flavors.piano);
           else if (inst === "pad") this.playPadVoice(t, freq, noteDur, vel, flavors.pad);
@@ -2316,7 +2489,7 @@ class BeatEngine {
           else if (inst === "vocal") this.playVocalVoice(t, freq, noteDur, vel, flavors.vocal);
         }
       } else if (val.degree !== undefined) {
-        const freq = degreeToFreq(this.rootMidi, this.style.scale, val.degree);
+        const freq = this.freqForDegree(val.degree, step);
         const vel = this.jitterVel(BASE_VELOCITY[inst]) * autoMul;
         if (inst === "bass") this.playBass(t, freq, noteDur, vel, flavors.bass);
         else if (inst === "lead") this.playLeadVoice(t, freq, noteDur, vel, flavors.lead);

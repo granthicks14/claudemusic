@@ -33,6 +33,14 @@ const reelOverlay = document.getElementById("reel-overlay");
 const reelCanvas = document.getElementById("reel-canvas");
 const reelStatus = document.getElementById("reel-status");
 const reelCancelBtn = document.getElementById("reel-cancel");
+const chordInput = document.getElementById("chord-input");
+const chordClearBtn = document.getElementById("chord-clear-btn");
+const chordChips = document.getElementById("chord-chips");
+
+// Widened from 264px to fit the new per-track flavor picker alongside the
+// name/mute/solo/automation/volume/reverb controls without squeezing the
+// track name to nothing.
+const TRACK_HEADER_WIDTH = 356;
 
 const DRUM_ORDER = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "fx"];
 const MELODIC_ORDER = ["bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "marimba", "arp"];
@@ -45,6 +53,22 @@ const TRACK_LABELS = {
 };
 
 const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, strings: 4, horn: 1, organ: 4, vocal: 1, kalimba: 1, marimba: 1, arp: 1 };
+
+// Flavors are otherwise only ever set by a genre's defaults or by the
+// random shuffle - there was no way to deliberately reach for, say, "I
+// want the TR-909 kit" or "give this a DMX snare" by name. Every track
+// with a FLAVOR_POOLS entry gets a real dropdown in its header instead, so
+// every researched kit/instrument color in the app is directly choosable,
+// not just something you might land on by luck.
+const FLAVOR_LABELS = {
+  "909": "TR-909", "909snare": "TR-909", linn: "LinnDrum", "707": "TR-707", "606": "TR-606", dmx: "DMX",
+  timpani: "Timpani", clarinet: "Clarinet", frenchhorn: "French Horn", oboe: "Oboe", cr78: "CR-78",
+  simmons: "Simmons SDS-V", "808": "808",
+};
+function flavorLabel(key) {
+  if (FLAVOR_LABELS[key]) return FLAVOR_LABELS[key];
+  return key.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 const STYLE_ACCENTS = {
   hiphop: "#ff6b6b", trap: "#a55eea", house: "#26de81", rock: "#fd9644", reggaeton: "#fed330", lofi: "#45aaf2",
@@ -70,6 +94,7 @@ let selectedBars = 4;
 let arrangementMode = "loop";
 let openPianoRollInst = null;
 let openAutomationInst = null;
+let customChords = null; // parsed chord array, or null to use the genre's own progressions - sticks across genre switches on purpose
 
 function activeRows() {
   return [
@@ -183,6 +208,7 @@ function selectStyle(id) {
 }
 
 function generatePattern() {
+  activeStyle.customChords = customChords;
   currentPattern = arrangementMode === "song" ? generateSongVariation(activeStyle) : generateVariation(activeStyle, selectedBars);
   renderSectionRow();
   renderStepGrid();
@@ -198,6 +224,59 @@ function pushAutomationToEngine() {
     engine.setAutomation(track, automation[track] || null);
   }
 }
+
+// Custom chord input: typing "Cm7 Fm7 Ab Bb7" and picking, say, Trap builds
+// a trap beat around exactly those chords (one per bar, cycling to fill the
+// arrangement) instead of one of Trap's own random progressions - the
+// drum groove, swing, and melodic rhythm feel all stay genre-authored, only
+// the harmony changes. Sticks across genre switches on purpose, so you can
+// audition the same chords in several styles.
+function renderChordChips(chords, invalid) {
+  chordChips.innerHTML = "";
+  for (const c of chords) {
+    const chip = document.createElement("span");
+    chip.className = "chord-chip";
+    chip.textContent = c.label;
+    chordChips.appendChild(chip);
+  }
+  for (const tok of invalid) {
+    const chip = document.createElement("span");
+    chip.className = "chord-chip invalid";
+    chip.textContent = `? ${tok}`;
+    chip.title = "Couldn't parse this as a chord - try things like Cm7, F#, Bb7, Asus4, Gdim7";
+    chordChips.appendChild(chip);
+  }
+}
+
+function applyChordInput(regenerate) {
+  const text = chordInput.value.trim();
+  if (!text) {
+    customChords = null;
+    renderChordChips([], []);
+    if (regenerate && activeStyle) generatePattern();
+    return;
+  }
+  const { chords, invalid } = parseChordProgression(text);
+  renderChordChips(chords, invalid);
+  customChords = chords.length ? chords : null;
+  if (regenerate && activeStyle) generatePattern();
+}
+
+let chordInputTimer = null;
+chordInput.addEventListener("input", () => {
+  clearTimeout(chordInputTimer);
+  chordInputTimer = setTimeout(() => applyChordInput(true), 550);
+});
+chordInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    clearTimeout(chordInputTimer);
+    applyChordInput(true);
+  }
+});
+chordClearBtn.addEventListener("click", () => {
+  chordInput.value = "";
+  applyChordInput(true);
+});
 
 function sectionTypeClass(label) {
   const l = label.toLowerCase();
@@ -239,9 +318,16 @@ function trackHeaderHTML(track) {
   const automationBtn = isMelodic
     ? `<button class="track-btn auto-btn ${hasAutomation ? "has-automation" : ""} ${openAutomationInst === track ? "on" : ""}" data-action="automation" data-track="${track}" title="Edit volume over the song">A</button>`
     : "";
+  const pool = FLAVOR_POOLS[track];
+  const flavorPicker = pool
+    ? `<select class="track-flavor" data-track="${track}" title="Instrument sound / kit">${pool
+        .map((f) => `<option value="${f}" ${currentFlavors[track] === f ? "selected" : ""}>${flavorLabel(f)}</option>`)
+        .join("")}</select>`
+    : "";
   return `
     <span class="track-color" style="background:${TRACK_COLOR[track]};box-shadow:0 0 5px 1px ${TRACK_COLOR[track]}"></span>
     <button class="track-name" data-track="${track}" title="Open piano roll">${TRACK_LABELS[track]}</button>
+    ${flavorPicker}
     <button class="track-btn mute-btn ${state.muted ? "on" : ""}" data-action="mute" data-track="${track}">M</button>
     <button class="track-btn solo-btn ${state.solo ? "on" : ""}" data-action="solo" data-track="${track}">S</button>
     ${automationBtn}
@@ -263,10 +349,21 @@ function barDividerBackground(bars) {
   ].join(", ");
 }
 
-function noteNameFor(track, note) {
-  const rootMidi = noteNameToMidi(activeStyle.key);
+// Custom chords give each bar its own {rootMidi, scale}; everything else
+// still keys off a single fixed genre key/scale for the whole pattern.
+function contextForStep(step) {
+  const contexts = currentPattern && currentPattern.barChordContexts;
+  if (contexts && contexts.length) {
+    const barIdx = Math.floor(step / STEPS_PER_BAR) % contexts.length;
+    return contexts[barIdx];
+  }
+  return { rootMidi: noteNameToMidi(activeStyle.key), scale: activeStyle.scale };
+}
+
+function noteNameFor(track, note, step) {
+  const ctx = contextForStep(step || 0);
   const degree = note.degree !== undefined ? note.degree : note.degrees[0];
-  return degreeToLabel(rootMidi, activeStyle.scale, degree);
+  return degreeToLabel(ctx.rootMidi, ctx.scale, degree);
 }
 
 function renderNoteBars(lane, track, steps) {
@@ -281,11 +378,11 @@ function renderNoteBars(lane, track, steps) {
     bar.style.left = (i / steps) * 100 + "%";
     bar.style.width = (note.len / steps) * 100 + "%";
     bar.style.background = `linear-gradient(180deg, ${TRACK_COLOR[track]}, ${TRACK_COLOR[track]}cc)`;
-    bar.title = `${noteNameFor(track, note)} · ${note.len} step${note.len === 1 ? "" : "s"}`;
+    bar.title = `${noteNameFor(track, note, i)} · ${note.len} step${note.len === 1 ? "" : "s"}`;
     if (note.len / steps > 0.03) {
       const label = document.createElement("span");
       label.className = "note-bar-label";
-      label.textContent = noteNameFor(track, note);
+      label.textContent = noteNameFor(track, note, i);
       bar.appendChild(label);
     }
     lane.appendChild(bar);
@@ -312,8 +409,8 @@ function renderHitMarks(lane, track, steps) {
 function renderStepGrid() {
   stepGrid.innerHTML = "";
   const steps = selectedBars * STEPS_PER_BAR;
-  stepGrid.style.gridTemplateColumns = `264px repeat(${steps}, 1fr)`;
-  sectionRow.style.gridTemplateColumns = `264px repeat(${steps}, 1fr)`;
+  stepGrid.style.gridTemplateColumns = `${TRACK_HEADER_WIDTH}px repeat(${steps}, 1fr)`;
+  sectionRow.style.gridTemplateColumns = `${TRACK_HEADER_WIDTH}px repeat(${steps}, 1fr)`;
 
   activeRows().forEach((track, rowIndex) => {
     const header = document.createElement("div");
@@ -420,6 +517,14 @@ stepGrid.addEventListener("input", (e) => {
   } else if (e.target.classList.contains("track-rev")) {
     engine.setReverbSend(e.target.dataset.track, Number(e.target.value) / 100);
   }
+});
+
+stepGrid.addEventListener("change", (e) => {
+  if (!e.target.classList.contains("track-flavor")) return;
+  // Mutate in place rather than reassigning currentFlavors - the engine
+  // holds the same object reference once playback has started, so a
+  // flavor swap takes effect on the very next hit, live, mid-song.
+  currentFlavors[e.target.dataset.track] = e.target.value;
 });
 
 function togglePianoRoll(track) {
@@ -576,7 +681,11 @@ function renderPianoRoll() {
   const steps = selectedBars * STEPS_PER_BAR;
   const isMono = MONO_INSTRUMENTS.includes(track);
   const register = REGISTER[track];
-  const rootMidi = noteNameToMidi(activeStyle.key);
+  // Under custom chords, a "row" no longer maps to one fixed pitch (bar 2's
+  // degree 0 can be a different note than bar 1's) - row labels/black-key
+  // shading fall back to the first bar's chord as a best-effort reference
+  // rather than showing something actively wrong for every other bar.
+  const { rootMidi, scale } = contextForStep(0);
 
   const rows = [];
   if (isMono) {
@@ -589,7 +698,7 @@ function renderPianoRoll() {
   pianoRollGrid.style.gridTemplateColumns = "110px 1fr";
 
   rows.forEach((rowDegree, rowIdx) => {
-    const noteLabel = degreeToLabel(rootMidi, activeStyle.scale, rowDegree);
+    const noteLabel = degreeToLabel(rootMidi, scale, rowDegree);
     const label = document.createElement("div");
     label.className = "roll-label";
     label.textContent = isMono ? noteLabel : `${romanForDegree(rowDegree - register)} · ${noteLabel}`;
@@ -602,7 +711,7 @@ function renderPianoRoll() {
     lane.style.backgroundImage = barDividerBackground(selectedBars);
 
     if (isMono) {
-      const midi = scaleDegreeToMidi(rootMidi, activeStyle.scale, rowDegree);
+      const midi = scaleDegreeToMidi(rootMidi, scale, rowDegree);
       const semitone = ((midi % 12) + 12) % 12;
       if (BLACK_KEY_SEMITONES.has(semitone)) {
         label.classList.add("black-key");
@@ -624,7 +733,8 @@ function renderPianoRoll() {
     const rowIndex = rows.indexOf(noteDegree);
     if (rowIndex === -1) continue;
     const lane = pianoRollGrid.children[rowIndex * 2 + 1];
-    renderRollNoteBar(lane, i, note.len, steps, track, degreeToLabel(rootMidi, activeStyle.scale, noteDegree));
+    const noteCtx = contextForStep(i);
+    renderRollNoteBar(lane, i, note.len, steps, track, degreeToLabel(noteCtx.rootMidi, noteCtx.scale, noteDegree));
   }
 }
 

@@ -25,48 +25,68 @@
     <section id="style-select" class="style-grid"></section>
 
     <section id="workspace" class="workspace" hidden>
-      <div class="transport">
-        <button id="play-btn" class="transport-btn play">▶ Play</button>
-        <button id="generate-btn" class="transport-btn">Generate Beat</button>
-
-        <div id="bars-select" class="segmented">
-          <button data-bars="4" class="selected">4 bars</button>
-          <button data-bars="8">8 bars</button>
-          <button data-bars="song">Full Song</button>
+      <div class="control-deck">
+        <div class="control-group">
+          <span class="control-group-label">Playback</span>
+          <div class="control-group-row">
+            <button id="play-btn" class="transport-btn play">▶ Play</button>
+            <button id="generate-btn" class="transport-btn">Generate Beat</button>
+            <div id="bars-select" class="segmented">
+              <button data-bars="4" class="selected">4 bars</button>
+              <button data-bars="8">8 bars</button>
+              <button data-bars="song">Full Song</button>
+            </div>
+          </div>
         </div>
 
-        <div class="transport-field">
-          <label for="key-select">Key</label>
-          <select id="key-select"></select>
+        <div class="control-group">
+          <span class="control-group-label">Sound</span>
+          <div class="control-group-row">
+            <div class="transport-field">
+              <label for="key-select">Key</label>
+              <select id="key-select"></select>
+            </div>
+            <div class="transport-field">
+              <label for="tempo-slider">Tempo <span id="tempo-value"></span></label>
+              <input type="range" id="tempo-slider">
+            </div>
+            <div class="transport-field">
+              <label for="swing-slider">Swing <span id="swing-value"></span>%</label>
+              <input type="range" id="swing-slider" min="0" max="30" value="10">
+            </div>
+            <button id="sidechain-btn" class="transport-btn toggle" title="Duck everything but drums when the kick hits">Sidechain</button>
+            <div class="transport-field">
+              <label for="master-slider">Master</label>
+              <input type="range" id="master-slider" min="0" max="100" value="90">
+            </div>
+          </div>
         </div>
 
-        <div class="transport-field">
-          <label for="tempo-slider">Tempo <span id="tempo-value"></span></label>
-          <input type="range" id="tempo-slider">
+        <div class="control-group">
+          <span class="control-group-label">Export</span>
+          <div class="control-group-row">
+            <div class="transport-field">
+              <label for="reel-duration">Reel length</label>
+              <select id="reel-duration">
+                <option value="15">15s</option>
+                <option value="30" selected>30s</option>
+                <option value="60">60s</option>
+              </select>
+            </div>
+            <button id="export-reel-btn" class="transport-btn" title="Render a vertical video of this beat to download for Instagram Reels / TikTok / Shorts">🎥 Export Reel</button>
+          </div>
         </div>
+      </div>
 
-        <div class="transport-field">
-          <label for="swing-slider">Swing <span id="swing-value"></span>%</label>
-          <input type="range" id="swing-slider" min="0" max="30" value="10">
+      <div class="chords-bar">
+        <div class="chords-bar-head">
+          <label for="chord-input">Build around your own chords <span class="chords-bar-hint">optional — leave blank for a genre-appropriate progression</span></label>
         </div>
-
-        <button id="sidechain-btn" class="transport-btn toggle" title="Duck everything but drums when the kick hits">Sidechain</button>
-
-        <div class="transport-field">
-          <label for="master-slider">Master</label>
-          <input type="range" id="master-slider" min="0" max="100" value="90">
+        <div class="chords-bar-row">
+          <input type="text" id="chord-input" placeholder="e.g. Cm7  Fm7  Ab  Bb7   (one chord per bar, repeats to fill the arrangement)" autocomplete="off" spellcheck="false">
+          <button id="chord-clear-btn" class="transport-btn" title="Go back to this genre's own progressions">Clear</button>
         </div>
-
-        <div class="transport-field">
-          <label for="reel-duration">Reel length</label>
-          <select id="reel-duration">
-            <option value="15">15s</option>
-            <option value="30" selected>30s</option>
-            <option value="60">60s</option>
-          </select>
-        </div>
-
-        <button id="export-reel-btn" class="transport-btn" title="Render a vertical video of this beat to download for Instagram Reels / TikTok / Shorts">🎥 Export Reel</button>
+        <div id="chord-chips" class="chord-chips"></div>
       </div>
 
       <p id="shuffle-status" class="shuffle-status"></p>

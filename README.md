@@ -14,10 +14,10 @@ Then visit `http://localhost:8000`.
 
 ## How it works
 
-- `js/theory.js` — scales (including phrygian for drill's dark mode), keys, chord building, note-name/frequency conversion.
-- `js/patterns.js` — per-genre templates for drums and chordal instruments, each style's key/scale/chord progression, the per-instrument sound-flavor pools that get auto-shuffled on every generation, two arrangement builders (a short intro/main/fill loop, and a full verse/chorus **song structure**), and the **motif-based melody generator** that drives bass, lead, and guitar.
+- `js/theory.js` — scales (including phrygian for drill's dark mode), keys, chord building, note-name/frequency conversion, and the **chord-symbol parser** (`Cm7`, `F#maj7`, `Bb9`, …) that powers the custom-chords feature by building a small 7-note chord-scale per parsed chord.
+- `js/patterns.js` — per-genre templates for drums and chordal instruments, each style's key/scale/chord progression, the per-instrument sound-flavor pools that get auto-shuffled on every generation, two arrangement builders (a short intro/main/fill loop, and a full verse/chorus **song structure**), the **motif-based melody generator** that drives bass, lead, and guitar, and the per-bar chord-context builder used when a user types their own chord progression.
 - `js/audio-engine.js` — synthesizes every instrument live, including a **Karplus-Strong physically-modeled plucked string** for every guitar and pluck-style bass voice, a vibrato string voice, an Amapiano-style log-drum bass, and an LFO wobble bass. Also runs the mixer (volume/mute/solo/reverb send per track) and the mix bus: sidechain ducking, a glue compressor, and a reverb send effect.
-- `js/app.js` — the channel rack UI, the free-form piano roll editor (drag to draw/resize/move notes), the "describe your beat" prompt parser, and the vertical-video exporter (`MediaRecorder` + `canvas.captureStream`).
+- `js/app.js` — the channel rack UI (now with a per-track flavor picker), the free-form piano roll editor (drag to draw/resize/move notes), the "describe your beat" prompt parser, the custom-chords input, and the vertical-video exporter (`MediaRecorder` + `canvas.captureStream`).
 
 ## Describe the beat you want
 
@@ -30,6 +30,14 @@ Type something like *"dark energetic trap with vocal chops"* or *"chill lofi pia
 - **vocal/vocals/choir/singing** → adds a vocal-chop track *if the matched genre doesn't already have one*, per the brief to only add vocals "if that beat needs one"
 
 If nothing matches a known genre, it says so and falls back to the closest reasonable genre rather than silently guessing.
+
+## Build a beat around your own chords
+
+Every genre ships with its own researched chord progressions, but the **"Build around your own chords"** field in the workspace overrides that: type a real progression — `Cm7 Fm7 Ab Bb7`, `Am, F, C, G`, `F#maj7 Bbm9 Gdim7 Csus4` — and pick any genre, and the beat gets built around *exactly* those chords instead. One chord per bar, cycling to fill however many bars are selected (loop, 8-bar, or the full song). Everything else about the genre — the drum groove, swing, tempo feel, and melodic rhythm — stays completely untouched; only the harmony changes, so the same four chords sound like a trap beat, a lo-fi beat, or a synthwave beat depending on what's selected. Chords stick across genre switches on purpose, so the same progression can be auditioned in several styles in a row.
+
+Parsing supports the chord symbols an actual musician would type — `m`/`min`/`-` for minor, `maj7`/`M7` for major 7th (case matters: `Cm7` and `CM7` are different chords, and the parser checks that before anything else), `dim`/`dim7`/`m7b5`, `sus2`/`sus4`, `aug`/`+`, `6`/`m6`/`9`/`add9`, sharps and flats, and a slash bass note (`C/E`) that's accepted without erroring even though the bass note itself isn't tracked yet. Anything that doesn't parse shows up as a flagged chip instead of silently being dropped or crashing the generator.
+
+Under the hood this reuses the exact same motif/chord-voicing engine every genre already runs on, rather than being a bolted-on second system: `js/theory.js`'s harmony model already treats every chord as "root + a 7-note scale, indexed abstractly" (root=index 0, third=index 2, fifth=index 4, seventh=index 6 — see `chordDegrees`), so each parsed chord just gets its own tiny 7-note **chord-scale** built from real chord-scale theory (Dorian under a m7, Mixolydian under a dominant 7th, Locrian under a half-diminished, and so on — the same scale/chord pairing a jazz player reaches for over those changes) and drops straight into the existing machinery. Consecutive chords' roots are voice-led to the closest octave of each other rather than jumping wherever the raw pitch class happens to fall, so `Cm7 → Fm7 → Ab → Bb7` doesn't leap around unnecessarily.
 
 ## Every generation is a genuinely different beat, not the same skeleton with new decoration
 
@@ -151,6 +159,20 @@ The brief asked for free instrument kits — worth being upfront about how that 
 - **Clarinet** — a Horn flavor using a **square wave** instead of the sawtooth every brass flavor uses: a cylindrical, reed-and-closed-end woodwind bore acoustically suppresses even harmonics, and a square wave is exactly that (odd harmonics only), which is the real acoustic reason a clarinet reads as hollow/woody rather than brassy. Same problem as Timpani — added, but nothing defaulted to it. It's now Lo-Fi Chill's default Horn, playing long, soft-landing legato notes for the genre's jazz-cafe side rather than the punchy stabs every other horn use goes for.
 
 Beyond giving the two orphaned kit flavors a real home, the Horn instrument itself was almost unused — only Reggaeton's `defaultFlavors` ever touched it, meaning the other six horn timbres (brass, soft, muted, sax, trumpetstab, section) were sitting in the flavor pool nearly unreachable outside a random shuffle. Horn is now a genre-appropriate chord voice in five genres total: Reggaeton (brass, as before), **Hip-Hop** (muted — the classic chopped-soul-sample horn stab of boom-bap), **R&B/Soul** (section — Motown/Stax-style horns answering the vocal on the offbeats), **Afrobeats** (brass — highlife horn stabs punctuating the guitar hook), and **Lo-Fi Chill** (clarinet, as above). Each got its own hand-written rhythm pattern rather than reusing one shape, so the horn actually plays like the genre it's in.
+
+## Seven more free kits, and a way to actually pick them
+
+Same research approach, seven more machines/instruments deep:
+
+- **Roland TR-707** (1985) — Roland's first *sample-based* (12-bit PCM) drum machine rather than analog synthesis, so it reads tighter, cleaner, and more mid-focused with a shorter decay than the analog 808/909 — the freestyle/early-house sound. New Kick, Snare, and Hi-Hat flavor.
+- **Roland TR-606 "Drumatix"** (1981) — a tiny analog companion to the TB-303 with almost no low-end weight and a fast, clicky decay — the acid-house/early-techno sound. New Kick and Hi-Hat flavor.
+- **Oberheim DMX** (1980) — one of the first sampling drum machines and basically the sound of early-80s hip-hop (Run-DMC, Whodini): a hard, punchy kick pushed through a touch of waveshaper saturation to approximate the machine's reputation for a compressed, "gated" punch, and a bright, metallic-clang snare. New Kick and Snare flavor.
+- **Simmons SDS-V** (1981) — the definitive 80s "electronic tom": not really a drum sound at all, but a pure sine with a fast, dramatic downward pitch sweep and a long ring, the unmistakable "pew" behind a decade of pop (Duran Duran, Phil Collins). New Tom flavor — and Tom didn't even have flavor support before this round, it was one fixed sound everywhere.
+- **Roland CR-78 "CompuRhythm"** (1978) — the first microprocessor-controlled drum machine ("In the Air Tonight," Human League). Its bongo-style percussion came from simple RC-triggered analog oscillators, giving it a boxier, more "plasticky" resonance than a smooth acoustic bongo. New Percussion flavor.
+- **French Horn** — a long, tightly-coiled conical bore and a hand damping the bell roll off the upper harmonics far more than a trumpet's open cylindrical bore does, so this uses a lowpass filter (rounding off the top) rather than the resonant bandpass every other horn flavor here reaches for, plus a slower attack — a horn genuinely speaks more slowly than a trumpet. New Horn flavor.
+- **Oboe** — a double reed (two reeds buzzing against each other, instead of one reed against a fixed mouthpiece) produces a much richer, brighter spectrum than a clarinet's odd-harmonics-only tone, with a pronounced nasal resonance around 1.2kHz — a full sawtooth through a narrow high-Q peaking filter gets both right. New Horn flavor.
+
+None of that matters if it's not actually reachable, though — and before this round, **the only way to hear any of it was luck**: every flavor, kit or otherwise, was set either by a genre's fixed default or by the random shuffle-on-generate, with no way to deliberately say "use the TR-909 kit" or "give the horn an oboe." Every track header now has a real flavor picker — a compact dropdown, right next to the track name, listing every sound that instrument can make. Pick "DMX" from the Kick menu, or "Simmons SDS-V" from the Tom menu, or "Oboe" from the Horn menu, and it's live: it takes effect on the very next hit, even mid-playback, no regenerating required. This is the actual fix for "make the kits usable," not just more of them existing in a pool a shuffle might never land on.
 
 ## A genre-by-genre critical listening pass
 

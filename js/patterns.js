@@ -3,10 +3,11 @@ const STEPS_PER_BAR = 16;
 const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14, arp: 18 };
 
 const FLAVOR_POOLS = {
-  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "909", "linn"],
-  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn"],
-  hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909"],
-  perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani"],
+  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "909", "linn", "707", "606", "dmx"],
+  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn", "707", "dmx"],
+  hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909", "707", "606"],
+  perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78"],
+  tom: ["acoustic", "simmons"],
   bass: ["warm", "synth", "808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright"],
   piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord"],
   lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm"],
@@ -14,7 +15,7 @@ const FLAVOR_POOLS = {
   stab: ["pluck-chord", "square-chord", "bell-chord", "brass-chord", "organ-chord", "string-chord"],
   guitar: ["clean", "power", "muted", "nylon", "acoustic", "jazz", "funk", "twelvestring"],
   strings: ["soul", "orchestral", "staccato", "synth", "pizzicato", "tremolo"],
-  horn: ["brass", "soft", "muted", "sax", "trumpetstab", "section", "clarinet"],
+  horn: ["brass", "soft", "muted", "sax", "trumpetstab", "section", "clarinet", "frenchhorn", "oboe"],
   organ: ["drawbar", "gospel", "church", "combo"],
   vocal: ["ooh", "ahh", "ay", "oh", "choir"],
   kalimba: ["kalimba", "musicbox", "steeldrum"],
@@ -31,10 +32,11 @@ const FLAVOR_POOLS = {
 // applied to a shuffle, so "Generate Beat" lands on a beat that sounds like
 // one production instead of several unrelated instruments stacked together.
 const FLAVOR_TAGS = {
-  kick: { boombap: "warm", "808": "dark", fourfloor: "bright", acoustic: "warm", lofi: "warm", deep: "dark", snappy: "bright", click: "bright", punch: "bright", subkick: "dark", gritty: "dark", roomy: "warm", "909": "bright", linn: "warm" },
-  snare: { crisp: "bright", clap: "bright", fat: "warm", rimshot: "bright", trapsnap: "bright", brush: "warm", gated: "dark", acoustic: "warm", ghost: "dark", layered: "dark", "909snare": "bright", linn: "warm" },
-  hihat: { bright: "bright", dark: "dark", vinyl: "warm", metallic: "bright", analog: "warm", tape: "warm", sizzle: "bright", lofi808: "dark", "909": "bright" },
-  perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright", timpani: "dark" },
+  kick: { boombap: "warm", "808": "dark", fourfloor: "bright", acoustic: "warm", lofi: "warm", deep: "dark", snappy: "bright", click: "bright", punch: "bright", subkick: "dark", gritty: "dark", roomy: "warm", "909": "bright", linn: "warm", "707": "bright", "606": "dark", dmx: "dark" },
+  snare: { crisp: "bright", clap: "bright", fat: "warm", rimshot: "bright", trapsnap: "bright", brush: "warm", gated: "dark", acoustic: "warm", ghost: "dark", layered: "dark", "909snare": "bright", linn: "warm", "707": "bright", dmx: "dark" },
+  hihat: { bright: "bright", dark: "dark", vinyl: "warm", metallic: "bright", analog: "warm", tape: "warm", sizzle: "bright", lofi808: "dark", "909": "bright", "707": "bright", "606": "dark" },
+  perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright", timpani: "dark", cr78: "warm" },
+  tom: { acoustic: "warm", simmons: "bright" },
   bass: { warm: "warm", synth: "bright", "808": "dark", hard808: "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm" },
   piano: { electric: "bright", pluck: "bright", grand: "warm", rhodes: "warm", wurlitzer: "warm", upright: "warm", celesta: "bright", toy: "bright", harpsichord: "bright" },
   lead: { square: "bright", saw: "bright", bell: "bright", flute: "warm", supersaw: "bright", pluck: "bright", sine: "warm", chip: "bright", brasslead: "warm", fm: "bright" },
@@ -42,7 +44,7 @@ const FLAVOR_TAGS = {
   stab: { "pluck-chord": "bright", "square-chord": "bright", "bell-chord": "bright", "brass-chord": "warm", "organ-chord": "warm", "string-chord": "warm" },
   guitar: { clean: "bright", power: "dark", muted: "dark", nylon: "warm", acoustic: "warm", jazz: "warm", funk: "bright", twelvestring: "bright" },
   strings: { soul: "warm", orchestral: "warm", staccato: "bright", synth: "bright", pizzicato: "bright", tremolo: "dark" },
-  horn: { brass: "bright", soft: "warm", muted: "dark", sax: "warm", trumpetstab: "bright", section: "bright", clarinet: "warm" },
+  horn: { brass: "bright", soft: "warm", muted: "dark", sax: "warm", trumpetstab: "bright", section: "bright", clarinet: "warm", frenchhorn: "warm", oboe: "bright" },
   organ: { drawbar: "warm", gospel: "dark", church: "dark", combo: "bright" },
   vocal: { ooh: "warm", ahh: "warm", ay: "bright", oh: "warm", choir: "warm" },
   kalimba: { kalimba: "warm", musicbox: "bright", steeldrum: "bright" },
@@ -416,7 +418,7 @@ const STYLES = {
     key: "E2",
     scale: "major",
     progressions: [[0, 4, 5, 3], [0, 3, 4, 0], [5, 3, 0, 4], [0, 5, 3, 4]],
-    defaultFlavors: { kick: "acoustic", snare: "acoustic", hihat: "bright", bass: "pluck", guitar: "power", perc: "timpani" },
+    defaultFlavors: { kick: "acoustic", snare: "acoustic", hihat: "bright", bass: "pluck", guitar: "power", perc: "timpani", tom: "acoustic" },
     drums: {
       // "perc" is a sparse orchestral timpani hit, not a percussion groove -
       // the same big low arena-rock boom bands like Queen/Muse reach for
@@ -472,7 +474,7 @@ const STYLES = {
     key: "A1",
     scale: "minor",
     progressions: [[0, 3], [0, 4], [0, 5], [0, 3, 4, 0]],
-    defaultFlavors: { kick: "snappy", snare: "rimshot", hihat: "bright", perc: "conga", bass: "warm", lead: "saw", horn: "brass", stab: "pluck-chord", vocal: "ooh" },
+    defaultFlavors: { kick: "snappy", snare: "rimshot", hihat: "bright", perc: "conga", bass: "warm", lead: "saw", horn: "brass", stab: "pluck-chord", vocal: "ooh", tom: "acoustic" },
     drums: {
       instruments: ["kick", "snare", "hihat", "tom", "perc", "crash"],
       main: {
@@ -1369,11 +1371,35 @@ function resolveGenerationStyle(style) {
   return { ...style, drums: { ...style.drums, main: pickDrumMain(style) }, progression: pickProgression(style) };
 }
 
+// User-typed chords ("Cm7 Fm7 Ab Bb7") replace the genre's own progression
+// pool for harmony, one chord per bar cycling round-robin (same convention
+// a genre's own `progressions` arrays already use) - but everything else
+// about the genre (drum groove, swing, melody rhythm feel, chord-stab
+// pattern) is untouched, so it still sounds like that genre, just built
+// around the chords the user actually asked for instead of a random
+// genre-appropriate progression.
+function buildBarContextsFromChords(chords, barCount, baseOctave = 2) {
+  const rootMidis = resolveChordRootMidis(chords, baseOctave);
+  const contexts = [];
+  for (let i = 0; i < barCount; i++) {
+    const idx = i % chords.length;
+    contexts.push({ rootMidi: rootMidis[idx], scale: chords[idx].scale });
+  }
+  return contexts;
+}
+
 function generateVariation(rawStyle, bars) {
   const style = resolveGenerationStyle(rawStyle);
   const structure = buildStructure(bars);
   const totalSteps = bars * STEPS_PER_BAR;
-  const barRootDegrees = structure.map((_, i) => style.progression[i % style.progression.length]);
+  const customChords = rawStyle.customChords;
+  let barRootDegrees, barChordContexts;
+  if (customChords && customChords.length) {
+    barRootDegrees = structure.map(() => 0);
+    barChordContexts = buildBarContextsFromChords(customChords, structure.length);
+  } else {
+    barRootDegrees = structure.map((_, i) => style.progression[i % style.progression.length]);
+  }
 
   const drumBars = structure.map((variant) => buildDrumBar(style, variant));
   for (let i = 1; i < structure.length; i++) {
@@ -1395,7 +1421,7 @@ function generateVariation(rawStyle, bars) {
     instruments[inst] = generateMonoMelody(REGISTER[inst], structure, barRootDegrees, style.melody[inst], totalSteps);
   }
 
-  return { instruments, structure, barRootDegrees, automation: {} };
+  return { instruments, structure, barRootDegrees, barChordContexts, automation: {} };
 }
 
 // ---- Full-song arrangement ----
@@ -1513,7 +1539,14 @@ function generateSongVariation(rawStyle) {
   const barMetas = expandSongSections();
   const bars = barMetas.length;
   const totalSteps = bars * STEPS_PER_BAR;
-  const barRootDegrees = barMetas.map((_, i) => style.progression[i % style.progression.length]);
+  const customChords = rawStyle.customChords;
+  let barRootDegrees, barChordContexts;
+  if (customChords && customChords.length) {
+    barRootDegrees = barMetas.map(() => 0);
+    barChordContexts = buildBarContextsFromChords(customChords, bars);
+  } else {
+    barRootDegrees = barMetas.map((_, i) => style.progression[i % style.progression.length]);
+  }
   const priorityList = priorityInstrumentList(style);
   const totalInstruments = priorityList.length;
 

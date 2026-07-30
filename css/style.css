@@ -256,6 +256,113 @@ body {
   width: 110px;
 }
 
+.control-deck {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.9rem;
+  margin-bottom: 1.1rem;
+}
+
+.control-group {
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.65rem 0.9rem 0.75rem;
+  flex: 1 1 auto;
+}
+
+.control-group-label {
+  display: block;
+  font-size: 0.64rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 0.55rem;
+  font-weight: 700;
+}
+
+.control-group-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.chords-bar {
+  background: linear-gradient(160deg, rgba(165, 94, 234, 0.09), rgba(0, 210, 211, 0.05));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.8rem 1rem 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.chords-bar-head label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.chords-bar-hint {
+  font-weight: 400;
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-left: 0.4rem;
+}
+
+.chords-bar-row {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 0.5rem;
+}
+
+#chord-input {
+  flex: 1;
+  background: #1d1d2b;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 9px;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.88rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+#chord-input:focus {
+  outline: 2px solid var(--accent-2);
+  outline-offset: -1px;
+}
+
+.chord-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  min-height: 1.6rem;
+}
+
+.chord-chip {
+  background: rgba(165, 94, 234, 0.18);
+  border: 1px solid rgba(165, 94, 234, 0.45);
+  color: #e4d4ff;
+  border-radius: 999px;
+  padding: 0.22rem 0.7rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  animation: chip-in 0.18s ease;
+}
+
+.chord-chip.invalid {
+  background: rgba(231, 76, 60, 0.15);
+  border-color: rgba(231, 76, 60, 0.5);
+  color: #ff9d9d;
+  font-family: inherit;
+}
+
+@keyframes chip-in {
+  from { opacity: 0; transform: translateY(2px) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+
 .hint {
   font-size: 0.78rem;
   color: var(--muted);
@@ -351,7 +458,7 @@ body {
   font-weight: 600;
   padding: 0;
   flex: 1 1 auto;
-  min-width: 0;
+  min-width: 34px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -360,6 +467,33 @@ body {
 
 .track-name:hover {
   color: var(--accent-2);
+}
+
+.track-flavor {
+  flex: 0 1 72px;
+  width: 72px;
+  min-width: 42px;
+  height: 19px;
+  background: #232335;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.58rem;
+  padding: 0 1px;
+  cursor: pointer;
+  transition: color 0.12s ease, border-color 0.12s ease;
+}
+
+.track-flavor:hover,
+.track-flavor:focus {
+  color: var(--text);
+  border-color: var(--accent-2);
+  outline: none;
+}
+
+.track-flavor option {
+  background: #1d1d2b;
+  color: var(--text);
 }
 
 .track-btn {

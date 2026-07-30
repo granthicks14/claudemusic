@@ -15,7 +15,7 @@ Then visit `http://localhost:8000`.
 ## How it works
 
 - `js/theory.js` — scales (including phrygian for drill's dark mode), keys, chord building, note-name/frequency conversion.
-- `js/patterns.js` — per-genre templates for drums and chordal instruments, each style's key/scale/chord progression, the sound-flavor pools used by "Shuffle Sounds," two arrangement builders (a short intro/main/fill loop, and a full verse/chorus **song structure**), and the **motif-based melody generator** that drives bass, lead, and guitar.
+- `js/patterns.js` — per-genre templates for drums and chordal instruments, each style's key/scale/chord progression, the per-instrument sound-flavor pools that get auto-shuffled on every generation, two arrangement builders (a short intro/main/fill loop, and a full verse/chorus **song structure**), and the **motif-based melody generator** that drives bass, lead, and guitar.
 - `js/audio-engine.js` — synthesizes every instrument live (including a distorted guitar voice, a vibrato string voice, an Amapiano-style log-drum bass, and an LFO wobble bass), runs the mixer (volume/mute/solo/reverb send per track), and the mix bus: sidechain ducking, a glue compressor, and a reverb send effect.
 - `js/app.js` — the channel rack UI, the free-form piano roll editor (drag to draw/resize/move notes), and the "describe your beat" prompt parser.
 
@@ -55,12 +55,12 @@ Fifteen styles, each modeled on real production conventions researched for this 
 - **Lo-Fi Chill** — softened boom bap, jazzy extended chords, vinyl crackle, a wandering melody with lots of space (Nujabes/J Dilla).
 - **Drill** — a dark phrygian scale, sparse spacious kick, snare locked on beat 3, a tight sliding 808, a single moody piano line — distinct from trap's busier, brighter hook (researched from UK drill production breakdowns).
 - **Afrobeats** — syncopated kick, continuous 16th-note shakers, an Amapiano-style log-drum bass (a hybrid kick/808/percussion tone) that follows the chord root, a highlife guitar hook.
-- **Dubstep** — half-time drums (kick on 1, snare on 3), an LFO-modulated wobble bass with a layered sub, built the way dubstep basses are actually sound-designed.
-- **R&B / Soul** — a laid-back live-feel groove, lush 7th-chord Rhodes, orchestral string swells, a smooth vocal-style top-line melody.
-- **Phonk** *(new)* — a distorted 808 kick that doubles as the bassline, a hypnotic 808-style cowbell (two detuned square oscillators through a resonant bandpass filter, the real circuit trick), an eerie bell hook and vocal chops.
+- **Dubstep** — half-time drums (kick on 1, snare on 3), a gritty saturated kick, an LFO-modulated wobble bass with a layered sub, built the way dubstep basses are actually sound-designed.
+- **R&B / Soul** — a laid-back live-feel groove, lush 7th-chord Rhodes, a formant-synthesized choir pad, orchestral string swells, a smooth vocal-style top-line melody.
+- **Phonk** *(new)* — a gritty, saturated 808 kick that doubles as the bassline, a hypnotic 808-style cowbell (two detuned square oscillators through a resonant bandpass filter, the real circuit trick), an eerie bell hook and vocal chops.
 - **Jersey Club** *(new)* — a bouncy triplet-feel "kick-back" pattern (approximated on the 16-step grid the way most club edits actually chop it), heavily chopped vocal hooks as the lead element, dry and punchy.
 - **Drum & Bass** *(new)* — fast syncopated breakbeat-style drums at ~172 BPM and a growling Reese bass (a stack of four detuned sawtooths beating against each other — the real technique behind the classic DnB bass sound).
-- **Synthwave** *(new)* — 80s gated drums, an analog synth bass and soaring lead, a lush arpeggiated pad/stab bed.
+- **Synthwave** *(new)* — 80s gated drums, an analog synth bass and a brass-lead hook (a resonant bandpass-emphasized saw, the 80s synth-brass-stab timbre synthwave leans on), a lush arpeggiated pad/stab bed.
 - **Rap** *(new)* — researched specifically from Kanye West and Lil Baby's production. Deep 808 bass (the *808s & Heartbreak* legacy: TR-808-driven, minor-key, minimalist), sparse drums that deliberately leave room for the hook rather than competing with it (Lil Baby-style "less is more"), a bouncy triplet-feel kick/hi-hat pattern approximating the 1/12-note ("triplet") quantization Lil Baby's records are known for, an Auto-Tune-style sung vocal hook, and a repeating kalimba melody — the kalimba/melodic-loop sound that's become a signature of modern melodic trap.
 
 ## Real melodies, not random notes — and no more stuck-on-one-pitch lead
@@ -75,11 +75,25 @@ Bass, lead, and guitar are generated the way hit songs actually build a hook, ba
 
 ## Sound kits: way more tone variety per instrument
 
-Researched real synth sound-design technique (unison/detune stacking - "supersaw," the standard trick for a thick, wide synth voice) and applied it, then went through every instrument and added at least one genuinely distinct new voice so Shuffle Sounds has real variety to pull from instead of picking between near-identical options:
+Researched how large sample-library instruments (the GarageBand approach: dozens of patches per instrument category, each a genuinely distinct articulation or synthesis method rather than a EQ tweak on the same patch) organize variety, and applied that same idea here — every instrument now has a substantially bigger, more distinct flavor pool, so a shuffle actually lands somewhere new instead of cycling between a handful of near-identical options:
 
-- **Lead** grew from 4 voices to 8: added **Supersaw** (7 detuned sawtooths stacked together, the classic trance/EDM lead technique), **Pluck** (a snappy short arp voice), **Sine** (a clean, mellow tone as a deliberate contrast to the brighter options), and **Chip** (a vibrato-laden chiptune square wave).
-- **Piano** gained **Celesta** (a bright, bell-like tuned-percussion voice). **Guitar** gained **Jazz** (a mellow hollow-body tone). **Pad** gained **Glass** (a bright bell-partial pad). **Strings** gained **Synth Strings** (a wide 5-voice unison "string machine" sound). **Stab** gained **Brass Chord**. **Horn** gained **Sax** (a more reedy, resonant filter). **Organ** gained **Church** (a slower, longer-sustaining voice). **Vocal** gained a third vowel, **Ay**.
-- **Drums** gained new kit pieces too: kick **Click** (a sharp minimal-techno transient), snare **Brush** (soft and long), hi-hat **Analog** (a warmer vintage drum-machine tone), and percussion **Clave**.
+- **Kick** — 12 flavors, up from 8: added **Punch** (a tight high-transient thump), **Sub Kick** (a very deep, long pure sub), **Gritty** (a saturated, distorted 808-style kick) and **Roomy** (a longer, reverb-heavy kick).
+- **Snare** — 10 flavors: added **Gated**, **Acoustic**, **Ghost** (a quiet unaccented layer), and **Layered** (a thicker snare+tone stack).
+- **Hi-Hat** — 8 flavors: added **Tape** (a rolled-off lo-fi hat), **Sizzle** (an extra-bright resonant peak), and **Lo-Fi 808**.
+- **Percussion** — 7 flavors: added **Tambourine** (a cluster of jangling high-passed noise bursts), **Bongo**, and **Triangle** (a long ringing resonant tone).
+- **Bass** — 12 flavors: added **Growl** (a fast, hard-resonant filtered saw — the aggressive dubstep/bass-music "growl" texture) and **Upright** (a plucked, warm, fast-decaying acoustic-bass approximation).
+- **Piano** — 9 flavors: added **Toy** (a bright, thin, fast-decaying toy-piano tone) and **Harpsichord** (a plucked, harmonic-rich, peaking-filtered pluck).
+- **Lead** — 10 flavors: added **Brass Lead** (a saw through a resonant bandpass, sitting between a supersaw and a real horn) and **FM** (a genuine two-operator FM patch — a modulator oscillator driving the carrier's frequency, the classic metallic/bell FM-synth timbre).
+- **Pad** — 6 flavors: added **Choir** (a 3-voice sawtooth ensemble through vowel-formant bandpasses — the same formant-synthesis trick as the vocal instrument, stretched into a pad) and **Dark** (a moody, heavily lowpass-swept pad).
+- **Stab** — 6 flavors: added **Organ Chord** and **String Chord**.
+- **Guitar** — 8 flavors: added **Funk** (a short, choppy, wah-like bandpass-swept comping stab) and **Twelve-String** (a doubled, detuned, octave-up pair for a shimmering chorus ring).
+- **Strings** — 6 flavors: added **Pizzicato** (fast plucked decay, no vibrato) and **Tremolo** (rapid amplitude-modulated sustain).
+- **Horn** — 6 flavors: added **Trumpet Stab** (a short, bright accent hit) and **Section** (a thicker 4-voice detuned ensemble instead of a solo voice).
+- **Organ** — 4 flavors: added **Combo** (a 60s Vox/Farfisa-style percussive click plus a shallow tremolo).
+- **Vocal** — 5 flavors: added a fourth vowel, **Oh**, and **Choir** (a 3-voice detuned formant stack instead of one voice).
+- **Kalimba** — 3 flavors: added **Steel Drum** (a different inharmonic partial ratio set for a Caribbean-steel-pan character).
+
+That's over 110 total instrument/flavor combinations, every one of them a real, distinct signal path rather than a palette swap.
 
 ## New instruments: pianos, guitars, organ, kalimba, an FX riser, and a synthesized vocal chop
 
@@ -97,6 +111,19 @@ Three techniques pulled directly from mixing research, applied to every beat:
 - **Reverb sends** — every track has its own send level (the small second "R" knob per row) into a shared reverb bus, with sensible per-instrument defaults (kick and bass stay dry for a clean low end; pads, strings, and crash get the most space) — real mix-bus technique, not just one global reverb slider.
 
 Also newly exposed: a **global swing knob** (an FL Studio staple) that overrides the style's default swing live, on top of the existing key selector.
+
+## True 808s
+
+The "808" flavor on kick and bass used to just be a differently-tuned sine wave — real to the ear as "deep," but missing the thing that actually makes an 808 an 808. Researched actual TR-808/808-module behavior and fixed it:
+
+- **The decay no longer depends on how short the trigger note is.** A real 808 rings out on its own long, semi-percussive decay regardless of the played note length — that's the defining "boomy sustain" character. Both the kick and bass 808 voices now hold a ~1.1–1.4s minimum ring time independent of the note/step duration, instead of cutting off with the trigger.
+- **Saturation.** A real 808 module is almost always run a little warm on record; a gentle waveshaper stage now sits on both the kick and bass 808 voices instead of a bare clean sine.
+- **A transient.** The kick 808 gets a short high-passed noise click on the attack; the bass 808 gets a soft noise "knock" — the percussive edge that a pure sine alone doesn't have.
+- **Gritty** (new kick/bass-adjacent flavor) pushes the same saturation stage further for a dirtier, more distorted 808 character, and is now the default kick for Phonk and Dubstep, genres whose drums are characteristically dirtier than a clean 808.
+
+## Mix clarity: EQ carving between kick and bass
+
+Researched a standard mixing move for keeping a kick and bass from masking each other — reciprocal EQ carving — and added it to the master signal path: the kick gets a gentle dip around 150Hz (roughly where bass/808 sits) and the bass gets a gentle dip around 90Hz (roughly where kick sits), so the two trade off the same low-end space instead of fighting for it. Every other non-drum instrument also gets a light 40Hz highpass to keep sub-rumble out of everything that isn't actually a bass or kick element. This applies globally, underneath every genre, transparently to the existing per-track volume/mute/solo/reverb controls.
 
 ## Not a step sequencer for melody
 
@@ -119,8 +146,7 @@ In **Full Song** mode, atmospheric and feature instruments (pad, strings, organ,
 
 - **Channel rack** — every instrument is a row with a color swatch, mute (M), solo (S), a volume fader, and a reverb-send fader. Click empty space on any row's lane to add a hit/note, click an existing one to remove it.
 - **Piano roll** — click a track's name to open its dedicated editor, scale-snapped so nothing plays a wrong note.
-- **Shuffle Sounds** — re-rolls the timbre ("flavor") of every instrument, guaranteed to pick something different each time, with a status line confirming exactly what changed (e.g. "Kick → 808, Snare → clap...").
-- **Generate Beat** — builds a fresh loop or full song from scratch, depending on the selected length.
+- **Generate Beat** (and the prompt-box Generate) — builds a fresh loop or full song from scratch, and re-rolls the timbre ("flavor") of every instrument at the same time, guaranteed to pick something different from what's currently playing. There's no separate shuffle button to press — every beat you generate automatically comes with a fresh set of sounds, with a status line confirming exactly what changed (e.g. "Kick → 808, Snare → clap...").
 
 Every hit also gets small randomized pitch/decay/timing/velocity variation at playback, so nothing ever sounds mechanically identical twice.
 

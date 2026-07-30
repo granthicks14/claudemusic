@@ -3,7 +3,6 @@ const engine = new BeatEngine();
 const styleSelect = document.getElementById("style-select");
 const workspace = document.getElementById("workspace");
 const generateBtn = document.getElementById("generate-btn");
-const shuffleBtn = document.getElementById("shuffle-btn");
 const playBtn = document.getElementById("play-btn");
 const tempoSlider = document.getElementById("tempo-slider");
 const tempoValue = document.getElementById("tempo-value");
@@ -754,7 +753,11 @@ function stopVisualizer() {
   visualizerCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
 }
 
-function shuffleSounds() {
+// Every explicit "give me a beat" action (Generate Beat, or the prompt
+// box) re-rolls each instrument's sound alongside the new pattern, so a
+// fresh beat always comes with a fresh timbre instead of needing a
+// separate manual shuffle step.
+function shuffleFlavors() {
   const changed = [];
   for (const inst of activeRows()) {
     const pool = FLAVOR_POOLS[inst];
@@ -765,18 +768,21 @@ function shuffleSounds() {
     if (next !== current) changed.push(`${TRACK_LABELS[inst]} → ${next}`);
     currentFlavors[inst] = next;
   }
+  return changed;
+}
 
-  shuffleBtn.classList.add("pulse");
-  setTimeout(() => shuffleBtn.classList.remove("pulse"), 300);
-  shuffleStatus.textContent = changed.length ? `Shuffled: ${changed.join(", ")}` : "Nothing to shuffle for this style.";
-  clearTimeout(shuffleSounds._timer);
-  shuffleSounds._timer = setTimeout(() => {
+function showShuffleStatus(changed) {
+  shuffleStatus.textContent = changed.length ? `New sounds: ${changed.join(", ")}` : "";
+  clearTimeout(showShuffleStatus._timer);
+  showShuffleStatus._timer = setTimeout(() => {
     shuffleStatus.textContent = "";
   }, 5000);
 }
 
-generateBtn.addEventListener("click", generatePattern);
-shuffleBtn.addEventListener("click", shuffleSounds);
+generateBtn.addEventListener("click", () => {
+  showShuffleStatus(shuffleFlavors());
+  generatePattern();
+});
 playBtn.addEventListener("click", togglePlay);
 
 tempoSlider.addEventListener("input", () => {
@@ -884,6 +890,7 @@ function generateFromPrompt() {
 
   const { styleId, fallback, mood } = parsePrompt(text);
   selectStyle(styleId);
+  shuffleFlavors();
 
   const notes = [];
   if (fallback) notes.push(`no exact genre match, so here's ${STYLES[styleId].name} as the closest fit`);

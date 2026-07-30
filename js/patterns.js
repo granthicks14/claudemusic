@@ -3,21 +3,21 @@ const STEPS_PER_BAR = 16;
 const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14 };
 
 const FLAVOR_POOLS = {
-  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click"],
-  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush"],
-  hihat: ["bright", "dark", "vinyl", "metallic", "analog"],
-  perc: ["shaker", "conga", "cowbell", "clave"],
-  bass: ["warm", "synth", "808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese"],
-  piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta"],
-  lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip"],
-  pad: ["warm", "ensemble", "airy", "glass"],
-  stab: ["pluck-chord", "square-chord", "bell-chord", "brass-chord"],
-  guitar: ["clean", "power", "muted", "nylon", "acoustic", "jazz"],
-  strings: ["soul", "orchestral", "staccato", "synth"],
-  horn: ["brass", "soft", "muted", "sax"],
-  organ: ["drawbar", "gospel", "church"],
-  vocal: ["ooh", "ahh", "ay"],
-  kalimba: ["kalimba", "musicbox"],
+  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy"],
+  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered"],
+  hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808"],
+  perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle"],
+  bass: ["warm", "synth", "808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright"],
+  piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord"],
+  lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm"],
+  pad: ["warm", "ensemble", "airy", "glass", "choir", "dark"],
+  stab: ["pluck-chord", "square-chord", "bell-chord", "brass-chord", "organ-chord", "string-chord"],
+  guitar: ["clean", "power", "muted", "nylon", "acoustic", "jazz", "funk", "twelvestring"],
+  strings: ["soul", "orchestral", "staccato", "synth", "pizzicato", "tremolo"],
+  horn: ["brass", "soft", "muted", "sax", "trumpetstab", "section"],
+  organ: ["drawbar", "gospel", "church", "combo"],
+  vocal: ["ooh", "ahh", "ay", "oh", "choir"],
+  kalimba: ["kalimba", "musicbox", "steeldrum"],
 };
 
 function M(degreeOffset, len) {
@@ -570,7 +570,7 @@ const STYLES = {
     key: "E1",
     scale: "minor",
     progression: [0, 4],
-    defaultFlavors: { kick: "deep", snare: "fat", hihat: "metallic", bass: "wobble", stab: "square-chord", vocal: "ahh" },
+    defaultFlavors: { kick: "gritty", snare: "fat", hihat: "metallic", bass: "wobble", stab: "square-chord", vocal: "ahh" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash", "fx"],
       main: {
@@ -615,7 +615,7 @@ const STYLES = {
     key: "F2",
     scale: "major",
     progression: [0, 5, 1, 4],
-    defaultFlavors: { kick: "acoustic", snare: "fat", hihat: "dark", perc: "shaker", bass: "pluck", piano: "rhodes", pad: "ensemble", lead: "flute", strings: "orchestral", organ: "drawbar" },
+    defaultFlavors: { kick: "acoustic", snare: "fat", hihat: "dark", perc: "shaker", bass: "pluck", piano: "rhodes", pad: "choir", lead: "flute", strings: "orchestral", organ: "drawbar" },
     drums: {
       instruments: ["kick", "snare", "hihat", "perc"],
       main: {
@@ -671,7 +671,7 @@ const STYLES = {
     key: "C2",
     scale: "minor",
     progression: [0, 4],
-    defaultFlavors: { kick: "808", snare: "trapsnap", hihat: "metallic", perc: "cowbell", bass: "distorted", lead: "bell", vocal: "ahh", stab: "bell-chord" },
+    defaultFlavors: { kick: "gritty", snare: "trapsnap", hihat: "metallic", perc: "cowbell", bass: "distorted", lead: "bell", vocal: "ahh", stab: "bell-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc", "crash"],
       main: {
@@ -810,7 +810,7 @@ const STYLES = {
     key: "A1",
     scale: "minor",
     progression: [0, 5, 3, 4],
-    defaultFlavors: { kick: "fourfloor", snare: "fat", hihat: "bright", bass: "synth", lead: "saw", pad: "warm", stab: "square-chord" },
+    defaultFlavors: { kick: "fourfloor", snare: "fat", hihat: "bright", bass: "synth", lead: "brasslead", pad: "warm", stab: "square-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash"],
       main: {

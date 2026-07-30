@@ -200,7 +200,7 @@ const STYLES = {
     key: "C2",
     scale: "minor",
     progressions: [[0, 3, 4, 3], [0, 5, 3, 4], [0, 6, 3, 4], [0, 3, 6, 2]],
-    defaultFlavors: { kick: "boombap", snare: "crisp", hihat: "dark", perc: "shaker", bass: "warm", piano: "electric", lead: "flute", strings: "soul", stab: "pluck-chord", organ: "gospel" },
+    defaultFlavors: { kick: "boombap", snare: "crisp", hihat: "dark", perc: "shaker", bass: "warm", piano: "electric", lead: "flute", strings: "soul", stab: "pluck-chord", organ: "gospel", horn: "muted" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc"],
       main: {
@@ -236,7 +236,7 @@ const STYLES = {
         optionalProbability: 0.3,
       }],
     },
-    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "strings", "organ", "stab"] },
+    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "strings", "organ", "stab", "horn"] },
     melody: {
       bass: { motifBars: 2, noteLengths: [[4,3],[6,2],[8,1]], restProbability: 0.25, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[-1,1],[1,1],[3,1]], variationProbability: 0.3 },
       lead: { motifBars: 2, noteLengths: [[4,2],[6,2],[8,1],[3,1]], restProbability: 0.4, chordToneProbability: 0.65, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1],[6,1]], variationProbability: 0.5 },
@@ -261,6 +261,14 @@ const STYLES = {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,C(2,3,1), 0,0,0,0, 0,0,0,0],
         optionalProbability: 0.2,
+      },
+      // Classic boom-bap sample-horn stab (think DJ Premier / Wu-Tang era
+      // chopped soul horns) - a short muted-trumpet accent placed on the
+      // "and" of beat 4, sparse enough to stay a garnish, not a lead voice.
+      horn: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,C(0,3,1), 0,0,0,0, 0,0,0,0],
+        optionalProbability: 0.25,
       },
     },
   },
@@ -319,12 +327,12 @@ const STYLES = {
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,C(0,3,1),0, 0,0,0,0, 0,0,0,0],
-        optionalProbability: 0.2,
+        optionalProbability: 0.32,
       },
       vocal: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,C(0,1,1),0],
-        optionalProbability: 0.2,
+        optionalProbability: 0.32,
       },
     },
   },
@@ -389,12 +397,12 @@ const STYLES = {
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,C(0,3,1)],
-        optionalProbability: 0.2,
+        optionalProbability: 0.3,
       },
       vocal: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,C(0,1,1), 0,0,0,0, 0,0,0,C(0,1,1), 0,0,0,0],
-        optionalProbability: 0.25,
+        optionalProbability: 0.32,
       },
     },
   },
@@ -408,20 +416,26 @@ const STYLES = {
     key: "E2",
     scale: "major",
     progressions: [[0, 4, 5, 3], [0, 3, 4, 0], [5, 3, 0, 4], [0, 5, 3, 4]],
-    defaultFlavors: { kick: "acoustic", snare: "acoustic", hihat: "bright", bass: "pluck", guitar: "power" },
+    defaultFlavors: { kick: "acoustic", snare: "acoustic", hihat: "bright", bass: "pluck", guitar: "power", perc: "timpani" },
     drums: {
-      instruments: ["kick", "snare", "hihat", "tom", "crash"],
+      // "perc" is a sparse orchestral timpani hit, not a percussion groove -
+      // the same big low arena-rock boom bands like Queen/Muse reach for
+      // under a huge downbeat. It's genuinely new sonic ground for this
+      // genre's kit rather than a re-skinned existing sound.
+      instruments: ["kick", "snare", "hihat", "tom", "perc", "crash"],
       main: {
         core: {
           kick:  [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],
           snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
           hihat: [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
           tom:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+          perc:  [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         },
         optional: {
           kick:  [0,0,1,0, 0,0,0,0, 0,0,1,0, 0,0,0,1],
           snare: [0,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
           hihat: [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+          perc:  [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         },
         optionalProbability: 0.3,
       },
@@ -431,10 +445,12 @@ const STYLES = {
           snare: [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
           hihat: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
           tom:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+          perc:  [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         },
         optional: {
           kick:  [0,0,1,0, 0,1,0,0, 0,0,1,0, 0,0,0,1],
           snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 0,0,0,0],
+          perc:  [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
         },
         optionalProbability: 0.3,
       }],
@@ -501,8 +517,8 @@ const STYLES = {
       },
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-        optionalProbability: 0.15,
+        optional: [0,0,0,C(0,3,1), 0,0,0,0, 0,0,0,C(2,3,1), 0,0,0,0],
+        optionalProbability: 0.3,
       },
       vocal: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
@@ -522,7 +538,7 @@ const STYLES = {
     scale: "dorian",
     progressions: [[0, 3, 4, 0], [0, 2, 3, 0], [0, 4, 3, 0], [0, 3]],
     ambience: "vinyl",
-    defaultFlavors: { kick: "lofi", snare: "fat", hihat: "vinyl", perc: "shaker", bass: "warm", piano: "electric", pad: "airy", lead: "flute", strings: "soul", stab: "pluck-chord", marimba: "marimba" },
+    defaultFlavors: { kick: "lofi", snare: "fat", hihat: "vinyl", perc: "shaker", bass: "warm", piano: "electric", pad: "airy", lead: "flute", strings: "soul", stab: "pluck-chord", marimba: "marimba", horn: "clarinet" },
     drums: {
       instruments: ["kick", "snare", "hihat", "perc"],
       main: {
@@ -556,7 +572,7 @@ const STYLES = {
         optionalProbability: 0.28,
       }],
     },
-    melodic: { monoInstruments: ["bass", "lead", "marimba"], chordInstruments: ["piano", "pad", "strings", "stab"] },
+    melodic: { monoInstruments: ["bass", "lead", "marimba"], chordInstruments: ["piano", "pad", "strings", "stab", "horn"] },
     melody: {
       bass: { motifBars: 2, noteLengths: [[4,3],[6,2],[8,1]], restProbability: 0.35, chordToneProbability: 0.8, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.35 },
       lead: { motifBars: 2, noteLengths: [[4,2],[6,2],[8,2],[3,1]], restProbability: 0.5, chordToneProbability: 0.7, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-2,1]], variationProbability: 0.45 },
@@ -582,6 +598,14 @@ const STYLES = {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,C(0,3,1),0],
         optionalProbability: 0.15,
+      },
+      // A mellow woodwind color for the jazz-cafe side of lo-fi - long,
+      // soft-landing legato notes rather than stabs, since a clarinet
+      // doesn't punch the way a horn section or synth stab does.
+      horn: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,C(0,3,2),0, 0,0,0,0, 0,0,0,0],
+        optionalProbability: 0.22,
       },
     },
   },
@@ -642,7 +666,7 @@ const STYLES = {
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,C(0,3,1),0, 0,0,0,0, 0,0,0,0],
-        optionalProbability: 0.15,
+        optionalProbability: 0.28,
       },
     },
   },
@@ -656,7 +680,7 @@ const STYLES = {
     key: "C2",
     scale: "major",
     progressions: [[0, 3, 4, 0], [0, 4, 5, 3], [0, 5, 3, 4], [0, 1, 3, 4]],
-    defaultFlavors: { kick: "acoustic", snare: "clap", hihat: "bright", perc: "shaker", bass: "logdrum", guitar: "nylon", pad: "warm", stab: "pluck-chord", organ: "drawbar", marimba: "marimba" },
+    defaultFlavors: { kick: "acoustic", snare: "clap", hihat: "bright", perc: "shaker", bass: "logdrum", guitar: "nylon", pad: "warm", stab: "pluck-chord", organ: "drawbar", marimba: "marimba", horn: "brass" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc"],
       main: {
@@ -688,7 +712,7 @@ const STYLES = {
         optionalProbability: 0.3,
       }],
     },
-    melodic: { monoInstruments: ["bass", "guitar", "marimba"], chordInstruments: ["pad", "organ", "stab"] },
+    melodic: { monoInstruments: ["bass", "guitar", "marimba"], chordInstruments: ["pad", "organ", "stab", "horn"] },
     melody: {
       bass: { motifBars: 1, noteLengths: [[4,3],[3,2],[6,1]], restProbability: 0.25, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.25 },
       guitar: { motifBars: 2, noteLengths: [[2,4],[1,3],[4,1]], restProbability: 0.3, chordToneProbability: 0.7, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[6,1]], variationProbability: 0.4 },
@@ -708,7 +732,15 @@ const STYLES = {
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,0, 0,0,0,C(0,3,1), 0,0,0,0],
-        optionalProbability: 0.2,
+        optionalProbability: 0.3,
+      },
+      // Highlife/afrobeats horn stabs - short punctuating brass hits on
+      // the offbeats, the same call that answers the guitar hook in a lot
+      // of real Afrobeats and highlife records.
+      horn: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,C(0,3,1), 0,0,0,0, 0,0,0,C(2,3,1), 0,0,0,0],
+        optionalProbability: 0.3,
       },
     },
   },
@@ -762,12 +794,12 @@ const STYLES = {
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,C(0,3,1)],
-        optionalProbability: 0.2,
+        optionalProbability: 0.3,
       },
       vocal: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,C(0,1,1)],
-        optionalProbability: 0.15,
+        optionalProbability: 0.26,
       },
     },
   },
@@ -781,7 +813,7 @@ const STYLES = {
     key: "F2",
     scale: "major",
     progressions: [[0, 5, 1, 4], [0, 3, 5, 4], [0, 2, 3, 4], [5, 3, 0, 4]],
-    defaultFlavors: { kick: "acoustic", snare: "fat", hihat: "dark", perc: "shaker", bass: "pluck", piano: "rhodes", pad: "choir", lead: "flute", strings: "orchestral", organ: "drawbar" },
+    defaultFlavors: { kick: "acoustic", snare: "fat", hihat: "dark", perc: "shaker", bass: "pluck", piano: "rhodes", pad: "choir", lead: "flute", strings: "orchestral", organ: "drawbar", horn: "section" },
     drums: {
       instruments: ["kick", "snare", "hihat", "perc"],
       main: {
@@ -813,7 +845,7 @@ const STYLES = {
         optionalProbability: 0.3,
       }],
     },
-    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "pad", "strings", "organ"] },
+    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "pad", "strings", "organ", "horn"] },
     melody: {
       bass: { motifBars: 2, noteLengths: [[4,3],[3,2],[6,2]], restProbability: 0.3, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.3 },
       lead: { motifBars: 2, noteLengths: [[4,2],[6,3],[8,2],[3,1]], restProbability: 0.45, chordToneProbability: 0.7, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.4 },
@@ -838,6 +870,14 @@ const STYLES = {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,0, C(0,3,4),0,0,0, 0,0,0,0],
         optionalProbability: 0.2,
+      },
+      // Motown/Stax-style soul horn section stabs answering the vocal
+      // line on the offbeats - a defining texture of classic soul that
+      // was completely missing from this genre's palette before.
+      horn: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,C(0,3,1),0, 0,0,0,0, 0,0,C(2,3,1),0, 0,0,0,0],
+        optionalProbability: 0.3,
       },
     },
   },
@@ -898,19 +938,19 @@ const STYLES = {
       vocal: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,C(0,1,1),0],
-        optionalProbability: 0.2,
+        optionalProbability: 0.32,
       },
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,C(0,3,1),0, 0,0,0,0, 0,0,0,0],
-        optionalProbability: 0.15,
+        optionalProbability: 0.28,
       },
     },
   },
 
   jerseyclub: {
     name: "Jersey Club",
-    description: "Bouncy triplet-feel kick pattern, chopped vocal hooks, dry and punchy.",
+    description: "Bouncy syncopated kick bursts, chopped vocal hooks, dry and punchy.",
     tempo: { min: 130, max: 140, default: 136 },
     swing: 0.02,
     humanize: { timingMs: 2, velocityJitter: 0.1 },
@@ -962,7 +1002,7 @@ const STYLES = {
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,C(0,3,1)],
-        optionalProbability: 0.2,
+        optionalProbability: 0.3,
       },
     },
   },
@@ -1022,7 +1062,7 @@ const STYLES = {
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, C(0,3,1),0,0,0],
-        optionalProbability: 0.2,
+        optionalProbability: 0.3,
       },
     },
   },
@@ -1160,7 +1200,7 @@ const STYLES = {
       stab: {
         core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         optional: [0,0,0,0, 0,0,C(2,3,1),0, 0,0,0,0, 0,0,0,0],
-        optionalProbability: 0.15,
+        optionalProbability: 0.28,
       },
     },
   },

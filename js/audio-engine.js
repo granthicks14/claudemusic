@@ -342,6 +342,28 @@ class BeatEngine {
 
   playPerc(time, vel, flavor) {
     const ctx = this.ctx;
+    if (flavor === "cowbell") {
+      // Classic 808-style cowbell: two detuned square oscillators through a
+      // resonant bandpass filter, the same trick real cowbell circuits use.
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 800;
+      bp.Q.value = 2.5;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.7, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.28);
+      gain.connect(this.dest("perc"));
+      bp.connect(gain);
+      for (const freq of [540, 800]) {
+        const osc = ctx.createOscillator();
+        osc.type = "square";
+        osc.frequency.setValueAtTime(freq, time);
+        osc.connect(bp);
+        osc.start(time);
+        osc.stop(time + 0.3);
+      }
+      return;
+    }
     if (flavor === "conga") {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -475,6 +497,34 @@ class BeatEngine {
       sub.stop(time + durationSeconds + 0.05);
       lfo.start(time);
       lfo.stop(time + durationSeconds + 0.05);
+    } else if (flavor === "distorted") {
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freq, time);
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = this.makeDistortionCurve(28);
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 1400;
+      gain.gain.setValueAtTime(vel, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + durationSeconds);
+      osc.connect(shaper).connect(filter).connect(gain).connect(this.dest("bass"));
+    } else if (flavor === "reese") {
+      // Classic drum & bass "Reese" bass: a stack of detuned sawtooths
+      // beating against each other for a growling, dissonant texture.
+      gain.gain.setValueAtTime(vel * 0.7, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + durationSeconds);
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 1100;
+      filter.connect(gain).connect(this.dest("bass"));
+      for (const detune of [-0.02, -0.007, 0.007, 0.02]) {
+        const o = ctx.createOscillator();
+        o.type = "sawtooth";
+        o.frequency.setValueAtTime(freq * (1 + detune), time);
+        o.connect(filter);
+        o.start(time);
+        o.stop(time + durationSeconds + 0.05);
+      }
     } else {
       osc.type = "sine";
       osc.frequency.setValueAtTime(freq, time);
@@ -482,8 +532,10 @@ class BeatEngine {
       gain.gain.exponentialRampToValueAtTime(0.001, time + durationSeconds);
       osc.connect(gain).connect(this.dest("bass"));
     }
-    osc.start(time);
-    osc.stop(time + durationSeconds + 0.05);
+    if (flavor !== "reese") {
+      osc.start(time);
+      osc.stop(time + durationSeconds + 0.05);
+    }
   }
 
   makeDistortionCurve(amount) {

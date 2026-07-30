@@ -6,8 +6,8 @@ const FLAVOR_POOLS = {
   kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy"],
   snare: ["crisp", "clap", "fat", "rimshot", "trapsnap"],
   hihat: ["bright", "dark", "vinyl", "metallic"],
-  perc: ["shaker", "conga"],
-  bass: ["warm", "synth", "808", "sub", "pluck", "logdrum", "wobble", "drillslide"],
+  perc: ["shaker", "conga", "cowbell"],
+  bass: ["warm", "synth", "808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese"],
   piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright"],
   lead: ["square", "saw", "bell", "flute"],
   pad: ["warm", "ensemble", "airy"],
@@ -646,6 +646,191 @@ const STYLES = {
       },
     },
   },
+
+  phonk: {
+    name: "Phonk",
+    description: "Distorted 808 kick doubling as the bassline, hypnotic cowbell, an eerie bell hook.",
+    tempo: { min: 130, max: 145, default: 138 },
+    swing: 0.05,
+    humanize: { timingMs: 3, velocityJitter: 0.14 },
+    key: "C2",
+    scale: "minor",
+    progression: [0, 4],
+    defaultFlavors: { kick: "808", snare: "trapsnap", hihat: "metallic", perc: "cowbell", bass: "distorted", lead: "bell", vocal: "ahh", stab: "bell-chord" },
+    drums: {
+      instruments: ["kick", "snare", "hihat", "openhat", "perc", "crash"],
+      main: {
+        core: {
+          kick:    [1,0,0,0, 0,0,0,1, 0,0,1,0, 0,0,0,0],
+          snare:   [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          hihat:   [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1],
+          perc:    [1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0],
+        },
+        optional: {
+          kick:    [0,0,1,0, 0,1,0,0, 0,0,0,0, 1,0,0,0],
+          snare:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1],
+          perc:    [0,1,0,0, 1,0,0,1, 0,1,0,0, 1,0,0,1],
+        },
+        optionalProbability: 0.35,
+        hihatRollSteps: [7, 15],
+        hihatRollProbability: 0.4,
+      },
+    },
+    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["vocal", "stab"] },
+    melody: {
+      bass: { motifBars: 1, noteLengths: [[3,2],[4,3],[2,1]], restProbability: 0.3, chordToneProbability: 0.9, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1],[3,1]], variationProbability: 0.25 },
+      lead: { motifBars: 1, noteLengths: [[2,3],[3,2],[6,1]], restProbability: 0.5, chordToneProbability: 0.6, chordTonePool: [[0,2],[2,2],[4,2]], passingTonePool: [[-1,1],[1,1],[6,1]], variationProbability: 0.4 },
+    },
+    chords: {
+      vocal: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,C(0,1,1),0],
+        optionalProbability: 0.2,
+      },
+      stab: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,C(0,3,1),0, 0,0,0,0, 0,0,0,0],
+        optionalProbability: 0.15,
+      },
+    },
+  },
+
+  jerseyclub: {
+    name: "Jersey Club",
+    description: "Bouncy triplet-feel kick pattern, chopped vocal hooks, dry and punchy.",
+    tempo: { min: 130, max: 140, default: 136 },
+    swing: 0.02,
+    humanize: { timingMs: 2, velocityJitter: 0.1 },
+    key: "C2",
+    scale: "minor",
+    progression: [0, 3],
+    defaultFlavors: { kick: "snappy", snare: "clap", hihat: "bright", bass: "sub", vocal: "ooh", stab: "square-chord" },
+    drums: {
+      instruments: ["kick", "snare", "hihat", "openhat"],
+      main: {
+        core: {
+          kick:    [1,0,0,1, 0,0,1,0, 0,1,0,0, 1,0,0,0],
+          snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,1,0,0, 0,1,0,1, 0,0,1,0, 0,1,0,1],
+          hihat:   [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+          openhat: [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+        },
+        optionalProbability: 0.3,
+      },
+    },
+    melodic: { monoInstruments: ["bass"], chordInstruments: ["vocal", "stab"] },
+    melody: {
+      bass: { motifBars: 1, noteLengths: [[4,3],[8,2]], restProbability: 0.3, chordToneProbability: 0.9, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1]], variationProbability: 0.2 },
+    },
+    chords: {
+      vocal: {
+        core:     [0,0,C(0,1,1),0, 0,0,0,0, 0,0,C(0,1,1),0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,C(2,1,1),0, 0,0,0,0, 0,0,C(2,1,1),0],
+        optionalProbability: 0.35,
+      },
+      stab: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,C(0,3,1)],
+        optionalProbability: 0.2,
+      },
+    },
+  },
+
+  dnb: {
+    name: "Drum & Bass",
+    description: "Fast syncopated breakbeat drums at ~172 BPM, a growling Reese bass.",
+    tempo: { min: 160, max: 176, default: 172 },
+    swing: 0.02,
+    humanize: { timingMs: 3, velocityJitter: 0.15 },
+    key: "E1",
+    scale: "minor",
+    progression: [0, 3, 4, 0],
+    defaultFlavors: { kick: "acoustic", snare: "crisp", hihat: "bright", bass: "reese", pad: "airy", stab: "square-chord" },
+    drums: {
+      instruments: ["kick", "snare", "hihat", "openhat", "crash"],
+      main: {
+        core: {
+          kick:    [1,0,0,0, 0,0,1,0, 0,0,0,0, 0,1,0,0],
+          snare:   [0,0,0,0, 1,0,0,1, 0,0,0,0, 1,0,0,0],
+          hihat:   [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,0,1,0, 0,0,0,0, 0,0,1,0, 0,0,1,0],
+          snare:   [0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0],
+          openhat: [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+        },
+        optionalProbability: 0.35,
+      },
+    },
+    melodic: { monoInstruments: ["bass"], chordInstruments: ["pad", "stab"] },
+    melody: {
+      bass: { motifBars: 1, noteLengths: [[4,3],[8,2],[16,1]], restProbability: 0.25, chordToneProbability: 0.85, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1],[3,1]], variationProbability: 0.25 },
+    },
+    chords: {
+      pad: {
+        core:     [C(0,4,16),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      stab: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, C(0,3,1),0,0,0],
+        optionalProbability: 0.2,
+      },
+    },
+  },
+
+  synthwave: {
+    name: "Synthwave",
+    description: "80s gated drums, an analog synth bass, a soaring lead, lush arpeggiated pads.",
+    tempo: { min: 84, max: 116, default: 100 },
+    swing: 0,
+    humanize: { timingMs: 4, velocityJitter: 0.12 },
+    key: "A1",
+    scale: "minor",
+    progression: [0, 5, 3, 4],
+    defaultFlavors: { kick: "fourfloor", snare: "fat", hihat: "bright", bass: "synth", lead: "saw", pad: "warm", stab: "square-chord" },
+    drums: {
+      instruments: ["kick", "snare", "hihat", "openhat", "crash"],
+      main: {
+        core: {
+          kick:    [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
+          hihat:   [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+          openhat: [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+        },
+        optionalProbability: 0.3,
+      },
+    },
+    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["pad", "stab"] },
+    melody: {
+      bass: { motifBars: 2, noteLengths: [[4,3],[8,2]], restProbability: 0.2, chordToneProbability: 0.9, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.25 },
+      lead: { motifBars: 2, noteLengths: [[4,2],[6,3],[8,2]], restProbability: 0.3, chordToneProbability: 0.75, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.35 },
+    },
+    chords: {
+      pad: {
+        core:     [C(0,4,16),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      stab: {
+        core:     [C(0,2,1),0,C(2,2,1),0, C(0,2,1),0,C(2,2,1),0, C(0,2,1),0,C(2,2,1),0, C(0,2,1),0,C(2,2,1),0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+    },
+  },
 };
 
 function rollTrack(core, optional, probability) {
@@ -771,5 +956,114 @@ function generateVariation(style, bars) {
     instruments[inst] = generateMonoMelody(REGISTER[inst], structure, barRootDegrees, style.melody[inst], totalSteps);
   }
 
+  return { instruments, structure, barRootDegrees };
+}
+
+// ---- Full-song arrangement ----
+// Real tracks build energy over a whole song, not just one repeating bar:
+// an intro that layers instruments in one at a time, a verse that's less
+// intense than the chorus, a chorus that pulls out every layer, a bridge
+// that strips back for contrast before the final chorus, and an outro that
+// unwinds the intro in reverse. This mirrors the "gradual layering / boost
+// energy in the chorus / strip back for the bridge" arrangement techniques
+// producers actually use.
+
+const SONG_SECTIONS = [
+  { type: "intro", label: "Intro", bars: 4 },
+  { type: "verse", label: "Verse 1", bars: 8 },
+  { type: "chorus", label: "Chorus 1", bars: 8 },
+  { type: "verse", label: "Verse 2", bars: 8 },
+  { type: "chorus", label: "Chorus 2", bars: 8 },
+  { type: "bridge", label: "Bridge", bars: 4 },
+  { type: "chorus", label: "Final Chorus", bars: 8 },
+  { type: "outro", label: "Outro", bars: 4 },
+];
+
+const INSTRUMENT_PRIORITY = [
+  "kick", "hihat", "snare", "bass", "piano", "organ", "pad", "lead",
+  "guitar", "openhat", "perc", "stab", "strings", "horn", "vocal", "crash", "tom",
+];
+
+function priorityInstrumentList(style) {
+  const have = new Set([...style.drums.instruments, ...style.melodic.monoInstruments, ...style.melodic.chordInstruments]);
+  return INSTRUMENT_PRIORITY.filter((i) => have.has(i));
+}
+
+function expandSongSections() {
+  const bars = [];
+  for (const section of SONG_SECTIONS) {
+    for (let i = 0; i < section.bars; i++) {
+      bars.push({ type: section.type, label: section.label, pos: i, len: section.bars });
+    }
+  }
+  return bars;
+}
+
+function layerFractionForBar(barMeta) {
+  const { type, pos, len } = barMeta;
+  const span = Math.max(len - 1, 1);
+  if (type === "intro") return 0.2 + 0.6 * (pos / span);
+  if (type === "verse") return 0.7;
+  if (type === "chorus") return 1;
+  if (type === "bridge") return pos < len / 2 ? 0.25 : 0.55;
+  if (type === "outro") return 0.85 - 0.65 * (pos / span);
+  return 0.7;
+}
+
+function totalSongBars() {
+  return SONG_SECTIONS.reduce((s, sec) => s + sec.bars, 0);
+}
+
+function generateSongVariation(style) {
+  const barMetas = expandSongSections();
+  const bars = barMetas.length;
+  const totalSteps = bars * STEPS_PER_BAR;
+  const barRootDegrees = barMetas.map((_, i) => style.progression[i % style.progression.length]);
+  const priorityList = priorityInstrumentList(style);
+  const totalInstruments = priorityList.length;
+
+  const drumVariant = barMetas.map((b) => (b.pos === b.len - 1 ? "fill" : "main"));
+
+  const drumBars = barMetas.map((_, i) => buildDrumBar(style, drumVariant[i]));
+  const chordBars = barMetas.map((_, i) => buildChordBar(style, drumVariant[i], barRootDegrees[i]));
+
+  const activeSets = barMetas.map((b) => {
+    const count = Math.max(2, Math.round(layerFractionForBar(b) * totalInstruments));
+    return new Set(priorityList.slice(0, count));
+  });
+
+  // Mask out instruments this bar hasn't "entered" yet, and mark a crash
+  // right on the downbeat of every chorus - the classic arrangement hit
+  // that announces a section has kicked into a higher gear.
+  for (let i = 0; i < bars; i++) {
+    for (const inst of style.drums.instruments) {
+      if (!activeSets[i].has(inst)) drumBars[i][inst] = new Array(STEPS_PER_BAR).fill(false);
+    }
+    for (const inst of style.melodic.chordInstruments) {
+      if (!activeSets[i].has(inst)) chordBars[i][inst] = new Array(STEPS_PER_BAR).fill(null);
+    }
+    if (barMetas[i].type === "chorus" && barMetas[i].pos === 0 && drumBars[i].crash !== undefined && activeSets[i].has("crash")) {
+      drumBars[i].crash[0] = true;
+    }
+  }
+
+  const instruments = {};
+  for (const inst of style.drums.instruments) {
+    instruments[inst] = [].concat(...drumBars.map((b) => b[inst] || new Array(STEPS_PER_BAR).fill(false)));
+  }
+  for (const inst of style.melodic.chordInstruments) {
+    instruments[inst] = [].concat(...chordBars.map((b) => b[inst] || new Array(STEPS_PER_BAR).fill(null)));
+  }
+  for (const inst of style.melodic.monoInstruments) {
+    const melody = generateMonoMelody(REGISTER[inst], [], barRootDegrees, style.melody[inst], totalSteps);
+    for (let i = 0; i < bars; i++) {
+      if (activeSets[i].has(inst)) continue;
+      const start = i * STEPS_PER_BAR;
+      for (let s = start; s < start + STEPS_PER_BAR; s++) melody[s] = null;
+    }
+    instruments[inst] = melody;
+  }
+
+  const structure = barMetas.map((b) => b.label);
   return { instruments, structure, barRootDegrees };
 }

@@ -39,9 +39,10 @@ const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, st
 const STYLE_ACCENTS = {
   hiphop: "#ff6b6b", trap: "#a55eea", house: "#26de81", rock: "#fd9644", reggaeton: "#fed330", lofi: "#45aaf2",
   drill: "#c0392b", afrobeats: "#ffa502", dubstep: "#3742fa", rnb: "#ff6b9d",
+  phonk: "#8e44ad", jerseyclub: "#00cec9", dnb: "#e17055", synthwave: "#fd79a8",
 };
 
-const SIDECHAIN_DEFAULT_ON = new Set(["trap", "house", "dubstep", "afrobeats", "drill"]);
+const SIDECHAIN_DEFAULT_ON = new Set(["trap", "house", "dubstep", "afrobeats", "drill", "phonk", "jerseyclub", "dnb", "synthwave"]);
 
 const TRACK_COLOR = {
   kick: "#ff6b6b", snare: "#feca57", hihat: "#48dbfb", openhat: "#0abde3", tom: "#ff9f43",
@@ -55,6 +56,7 @@ let activeStyle = null;
 let currentFlavors = {};
 let currentPattern = null;
 let selectedBars = 4;
+let arrangementMode = "loop";
 let openPianoRollInst = null;
 
 function activeRows() {
@@ -132,11 +134,21 @@ function selectStyle(id) {
 }
 
 function generatePattern() {
-  currentPattern = generateVariation(activeStyle, selectedBars);
+  currentPattern = arrangementMode === "song" ? generateSongVariation(activeStyle) : generateVariation(activeStyle, selectedBars);
   renderSectionRow();
   renderStepGrid();
   if (openPianoRollInst) renderPianoRoll();
   if (engine.isPlaying) engine.updatePattern(currentPattern);
+}
+
+function sectionTypeClass(label) {
+  const l = label.toLowerCase();
+  if (l.includes("chorus")) return "section-chorus";
+  if (l.includes("bridge")) return "section-bridge";
+  if (l.includes("outro")) return "section-outro";
+  if (l.includes("fill")) return "section-fill";
+  if (l.includes("intro")) return "section-intro";
+  return "";
 }
 
 function renderSectionRow() {
@@ -145,12 +157,17 @@ function renderSectionRow() {
   spacer.className = "track-header spacer";
   sectionRow.appendChild(spacer);
 
-  for (const section of currentPattern.structure) {
+  const labels = currentPattern.structure;
+  let i = 0;
+  while (i < labels.length) {
+    let j = i;
+    while (j + 1 < labels.length && labels[j + 1] === labels[i]) j++;
     const cell = document.createElement("div");
-    cell.className = "section-cell section-" + section;
-    cell.textContent = section;
-    cell.style.gridColumn = `span ${STEPS_PER_BAR}`;
+    cell.className = `section-cell ${sectionTypeClass(labels[i])}`.trim();
+    cell.textContent = labels[i];
+    cell.style.gridColumn = `span ${(j - i + 1) * STEPS_PER_BAR}`;
     sectionRow.appendChild(cell);
+    i = j + 1;
   }
 }
 
@@ -174,6 +191,12 @@ function barDividerBackground(bars) {
   return `repeating-linear-gradient(to right, rgba(255,255,255,0.09) 0, rgba(255,255,255,0.09) 1px, transparent 1px, transparent ${barPct}%)`;
 }
 
+function noteNameFor(track, note) {
+  const rootMidi = noteNameToMidi(activeStyle.key);
+  const degree = note.degree !== undefined ? note.degree : note.degrees[0];
+  return degreeToLabel(rootMidi, activeStyle.scale, degree);
+}
+
 function renderNoteBars(lane, track, steps) {
   const arr = currentPattern.instruments[track];
   for (let i = 0; i < steps; i++) {
@@ -185,8 +208,32 @@ function renderNoteBars(lane, track, steps) {
     bar.dataset.track = track;
     bar.style.left = (i / steps) * 100 + "%";
     bar.style.width = (note.len / steps) * 100 + "%";
-    bar.style.background = TRACK_COLOR[track];
+    bar.style.background = `linear-gradient(180deg, ${TRACK_COLOR[track]}, ${TRACK_COLOR[track]}cc)`;
+    bar.title = `${noteNameFor(track, note)} · ${note.len} step${note.len === 1 ? "" : "s"}`;
+    if (note.len / steps > 0.03) {
+      const label = document.createElement("span");
+      label.className = "note-bar-label";
+      label.textContent = noteNameFor(track, note);
+      bar.appendChild(label);
+    }
     lane.appendChild(bar);
+  }
+}
+
+function renderHitMarks(lane, track, steps) {
+  const arr = currentPattern.instruments[track];
+  for (let i = 0; i < steps; i++) {
+    const value = arr[i];
+    if (!value) continue;
+    const mark = document.createElement("div");
+    mark.className = "hit-mark";
+    if (value === "roll") mark.classList.add("roll");
+    mark.dataset.step = i;
+    mark.dataset.track = track;
+    mark.style.left = (i / steps) * 100 + "%";
+    mark.style.width = Math.max(100 / steps, 0.4) + "%";
+    mark.style.background = TRACK_COLOR[track];
+    lane.appendChild(mark);
   }
 }
 
@@ -202,33 +249,27 @@ function renderStepGrid() {
     header.innerHTML = trackHeaderHTML(track);
     stepGrid.appendChild(header);
 
+    const lane = document.createElement("div");
+    lane.dataset.track = track;
+    lane.style.gridColumn = `span ${steps}`;
+    lane.style.backgroundImage = barDividerBackground(selectedBars);
+
     if (DRUM_ORDER.includes(track)) {
-      for (let i = 0; i < steps; i++) {
-        const cell = document.createElement("div");
-        cell.className = "step-cell";
-        cell.dataset.track = track;
-        cell.dataset.step = i;
-        if (i % STEPS_PER_BAR === 0) cell.classList.add("bar-start");
-        if (i % 4 === 0) cell.classList.add("beat-marker");
-        const value = currentPattern.instruments[track][i];
-        if (value) {
-          cell.classList.add("active");
-          cell.style.background = TRACK_COLOR[track];
-          if (value === "roll") cell.classList.add("roll");
-        }
-        stepGrid.appendChild(cell);
-      }
+      lane.className = "rack-lane drum-lane";
+      renderHitMarks(lane, track, steps);
     } else {
-      const lane = document.createElement("div");
-      lane.className = "melodic-lane";
-      lane.dataset.track = track;
-      lane.style.gridColumn = `span ${steps}`;
-      lane.style.backgroundImage = barDividerBackground(selectedBars);
+      lane.className = "rack-lane melodic-lane";
       if (openPianoRollInst === track) lane.classList.add("editing");
       renderNoteBars(lane, track, steps);
-      stepGrid.appendChild(lane);
     }
+    stepGrid.appendChild(lane);
   }
+
+  const playhead = document.createElement("div");
+  playhead.id = "playhead";
+  playhead.className = "playhead";
+  playhead.hidden = true;
+  stepGrid.appendChild(playhead);
 }
 
 function defaultNoteFor(track, step) {
@@ -270,27 +311,27 @@ stepGrid.addEventListener("click", (e) => {
     return;
   }
 
-  const lane = e.target.closest(".melodic-lane");
+  const hitMark = e.target.closest(".hit-mark");
+  if (hitMark) {
+    currentPattern.instruments[hitMark.dataset.track][Number(hitMark.dataset.step)] = false;
+    renderStepGrid();
+    if (engine.isPlaying) engine.updatePattern(currentPattern);
+    return;
+  }
+
+  const lane = e.target.closest(".rack-lane");
   if (lane) {
     const steps = selectedBars * STEPS_PER_BAR;
     const rect = lane.getBoundingClientRect();
     const step = Math.max(0, Math.min(steps - 1, Math.floor(((e.clientX - rect.left) / rect.width) * steps)));
     const track = lane.dataset.track;
     if (!currentPattern.instruments[track][step]) {
-      currentPattern.instruments[track][step] = defaultNoteFor(track, step);
+      currentPattern.instruments[track][step] = DRUM_ORDER.includes(track) ? true : defaultNoteFor(track, step);
       renderStepGrid();
       if (openPianoRollInst === track) renderPianoRoll();
       if (engine.isPlaying) engine.updatePattern(currentPattern);
     }
     return;
-  }
-
-  const cell = e.target.closest(".step-cell");
-  if (cell) {
-    const arr = currentPattern.instruments[cell.dataset.track];
-    arr[Number(cell.dataset.step)] = !arr[Number(cell.dataset.step)];
-    renderStepGrid();
-    if (engine.isPlaying) engine.updatePattern(currentPattern);
   }
 });
 
@@ -319,14 +360,23 @@ function closePianoRoll() {
   pianoRollPanel.hidden = true;
 }
 
-function renderRollNoteBar(lane, step, len, steps, track) {
+const BLACK_KEY_SEMITONES = new Set([1, 3, 6, 8, 10]);
+
+function renderRollNoteBar(lane, step, len, steps, track, label) {
   const bar = document.createElement("div");
   bar.className = "roll-note";
   bar.dataset.step = step;
   bar.dataset.track = track;
   bar.style.left = (step / steps) * 100 + "%";
   bar.style.width = (len / steps) * 100 + "%";
-  bar.style.background = TRACK_COLOR[track];
+  bar.style.background = `linear-gradient(180deg, ${TRACK_COLOR[track]}, ${TRACK_COLOR[track]}cc)`;
+  bar.title = `${label} · ${len} step${len === 1 ? "" : "s"}`;
+  if (len / steps > 0.02) {
+    const text = document.createElement("span");
+    text.className = "note-bar-label";
+    text.textContent = label;
+    bar.appendChild(text);
+  }
   const handle = document.createElement("div");
   handle.className = "resize-handle";
   bar.appendChild(handle);
@@ -350,22 +400,33 @@ function renderPianoRoll() {
   pianoRollGrid.innerHTML = "";
   pianoRollGrid.style.gridTemplateColumns = "110px 1fr";
 
-  for (const rowDegree of rows) {
+  rows.forEach((rowDegree, rowIdx) => {
+    const noteLabel = degreeToLabel(rootMidi, activeStyle.scale, rowDegree);
     const label = document.createElement("div");
     label.className = "roll-label";
-    label.textContent = isMono
-      ? degreeToLabel(rootMidi, activeStyle.scale, rowDegree)
-      : `${romanForDegree(rowDegree - register)} · ${degreeToLabel(rootMidi, activeStyle.scale, rowDegree)}`;
+    label.textContent = isMono ? noteLabel : `${romanForDegree(rowDegree - register)} · ${noteLabel}`;
     if (rowDegree === register) label.classList.add("root-row");
-    pianoRollGrid.appendChild(label);
 
     const lane = document.createElement("div");
     lane.className = "roll-lane";
     lane.dataset.track = track;
     lane.dataset.degree = rowDegree;
     lane.style.backgroundImage = barDividerBackground(selectedBars);
+
+    if (isMono) {
+      const midi = scaleDegreeToMidi(rootMidi, activeStyle.scale, rowDegree);
+      const semitone = ((midi % 12) + 12) % 12;
+      if (BLACK_KEY_SEMITONES.has(semitone)) {
+        label.classList.add("black-key");
+        lane.classList.add("black-key-row");
+      }
+    } else if (rowIdx % 2 === 1) {
+      lane.classList.add("alt-row");
+    }
+
+    pianoRollGrid.appendChild(label);
     pianoRollGrid.appendChild(lane);
-  }
+  });
 
   const arr = currentPattern.instruments[track];
   for (let i = 0; i < steps; i++) {
@@ -375,7 +436,7 @@ function renderPianoRoll() {
     const rowIndex = rows.indexOf(noteDegree);
     if (rowIndex === -1) continue;
     const lane = pianoRollGrid.children[rowIndex * 2 + 1];
-    renderRollNoteBar(lane, i, note.len, steps, track);
+    renderRollNoteBar(lane, i, note.len, steps, track, degreeToLabel(rootMidi, activeStyle.scale, noteDegree));
   }
 }
 
@@ -435,11 +496,52 @@ pianoRollGrid.addEventListener("mousedown", (e) => {
 
 pianoRollClose.addEventListener("click", closePianoRoll);
 
-function highlightStep(step) {
-  const cells = stepGrid.querySelectorAll(".step-cell");
-  for (const cell of cells) {
-    cell.classList.toggle("playing", Number(cell.dataset.step) === step);
+function getActiveNoteAt(track, step) {
+  const arr = currentPattern.instruments[track];
+  if (!arr) return null;
+  if (DRUM_ORDER.includes(track)) {
+    return arr[step] ? { startStep: step, note: arr[step] } : null;
   }
+  const maxLen = 16;
+  for (let s = step; s >= 0 && s > step - maxLen; s--) {
+    const note = arr[s];
+    if (note && s + note.len > step) return { startStep: s, note };
+  }
+  return null;
+}
+
+function updatePlayhead(step, steps) {
+  const playhead = document.getElementById("playhead");
+  if (!playhead) return;
+  const labelWidth = 225;
+  const totalWidth = stepGrid.clientWidth;
+  const trackWidth = Math.max(totalWidth - labelWidth, 1);
+  const stepPx = trackWidth / steps;
+  playhead.style.left = labelWidth + step * stepPx + "px";
+  playhead.hidden = false;
+}
+
+function highlightStep(step) {
+  const steps = selectedBars * STEPS_PER_BAR;
+  stepGrid.querySelectorAll(".now-playing").forEach((el) => el.classList.remove("now-playing"));
+  pianoRollGrid.querySelectorAll(".now-playing, .now-playing-row").forEach((el) => el.classList.remove("now-playing", "now-playing-row"));
+
+  for (const track of activeRows()) {
+    const active = getActiveNoteAt(track, step);
+    if (!active) continue;
+    const el = stepGrid.querySelector(`.rack-lane[data-track="${track}"] [data-step="${active.startStep}"]`);
+    if (el) el.classList.add("now-playing");
+
+    if (openPianoRollInst === track && active.note) {
+      const degree = active.note.degree !== undefined ? active.note.degree : active.note.degrees[0];
+      const rollNote = pianoRollGrid.querySelector(`.roll-note[data-step="${active.startStep}"]`);
+      if (rollNote) rollNote.classList.add("now-playing");
+      const rollLane = pianoRollGrid.querySelector(`.roll-lane[data-degree="${degree}"]`);
+      if (rollLane) rollLane.classList.add("now-playing-row");
+    }
+  }
+
+  updatePlayhead(step, steps);
 }
 
 function togglePlay() {
@@ -448,6 +550,10 @@ function togglePlay() {
     engine.stop();
     playBtn.textContent = "▶ Play";
     playBtn.classList.remove("playing");
+    stepGrid.querySelectorAll(".now-playing").forEach((el) => el.classList.remove("now-playing"));
+    pianoRollGrid.querySelectorAll(".now-playing, .now-playing-row").forEach((el) => el.classList.remove("now-playing", "now-playing-row"));
+    const playhead = document.getElementById("playhead");
+    if (playhead) playhead.hidden = true;
   } else {
     engine.onStep = highlightStep;
     engine.start(currentPattern, activeStyle, currentFlavors, Number(tempoSlider.value));
@@ -509,7 +615,13 @@ keySelect.addEventListener("change", () => {
 
 for (const btn of barsButtons) {
   btn.addEventListener("click", () => {
-    selectedBars = Number(btn.dataset.bars);
+    if (btn.dataset.bars === "song") {
+      arrangementMode = "song";
+      selectedBars = totalSongBars();
+    } else {
+      arrangementMode = "loop";
+      selectedBars = Number(btn.dataset.bars);
+    }
     for (const b of barsButtons) b.classList.toggle("selected", b === btn);
     if (selectedStyleId) generatePattern();
   });
@@ -603,9 +715,10 @@ function generateFromPrompt() {
   engine.updateTempo(Number(tempoSlider.value));
 
   if (mood.long) {
-    selectedBars = 8;
-    for (const b of barsButtons) b.classList.toggle("selected", b.dataset.bars === "8");
-    notes.push("built out an 8-bar arrangement");
+    arrangementMode = "song";
+    selectedBars = totalSongBars();
+    for (const b of barsButtons) b.classList.toggle("selected", b.dataset.bars === "song");
+    notes.push("built out a full-length verse/chorus arrangement");
   }
 
   if (mood.wantsVocal && !activeStyle.melodic.chordInstruments.includes("vocal")) {

@@ -135,6 +135,19 @@ body {
   animation: pulse 0.3s ease;
 }
 
+.transport-btn.toggle.on {
+  background: linear-gradient(90deg, #ff6b6b, #ee5253);
+  border-color: transparent;
+  box-shadow: 0 0 14px -2px #ff6b6b;
+}
+
+.shuffle-status {
+  min-height: 1.1rem;
+  font-size: 0.78rem;
+  color: var(--accent-2);
+  margin: -0.5rem 0 0.9rem;
+}
+
 @keyframes pulse {
   0% { transform: scale(1); }
   50% { transform: scale(1.08); }
@@ -296,9 +309,14 @@ body {
   border-color: #feca57;
 }
 
-.track-vol {
-  width: 46px;
-  min-width: 46px;
+.track-vol,
+.track-rev {
+  width: 38px;
+  min-width: 38px;
+}
+
+.track-rev {
+  accent-color: var(--accent-2);
 }
 
 .step-cell {

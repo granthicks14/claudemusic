@@ -8,6 +8,10 @@ const playBtn = document.getElementById("play-btn");
 const tempoSlider = document.getElementById("tempo-slider");
 const tempoValue = document.getElementById("tempo-value");
 const masterSlider = document.getElementById("master-slider");
+const swingSlider = document.getElementById("swing-slider");
+const swingValue = document.getElementById("swing-value");
+const sidechainBtn = document.getElementById("sidechain-btn");
+const shuffleStatus = document.getElementById("shuffle-status");
 const keySelect = document.getElementById("key-select");
 const barsButtons = document.querySelectorAll("#bars-select button");
 const sectionRow = document.getElementById("section-row");
@@ -30,7 +34,10 @@ const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, st
 
 const STYLE_ACCENTS = {
   hiphop: "#ff6b6b", trap: "#a55eea", house: "#26de81", rock: "#fd9644", reggaeton: "#fed330", lofi: "#45aaf2",
+  drill: "#c0392b", afrobeats: "#ffa502", dubstep: "#3742fa", rnb: "#ff6b9d",
 };
+
+const SIDECHAIN_DEFAULT_ON = new Set(["trap", "house", "dubstep", "afrobeats", "drill"]);
 
 const TRACK_COLOR = {
   kick: "#ff6b6b", snare: "#feca57", hihat: "#48dbfb", openhat: "#0abde3", tom: "#ff9f43",
@@ -99,6 +106,16 @@ function selectStyle(id) {
   tempoSlider.value = baseStyle.tempo.default;
   tempoValue.textContent = baseStyle.tempo.default;
 
+  const swingPct = Math.round(baseStyle.swing * 100);
+  swingSlider.value = swingPct;
+  swingValue.textContent = swingPct;
+  engine.setSwing(baseStyle.swing);
+
+  const sidechainOn = SIDECHAIN_DEFAULT_ON.has(id);
+  engine.setSidechain(sidechainOn);
+  sidechainBtn.classList.toggle("on", sidechainOn);
+
+  shuffleStatus.textContent = "";
   workspace.hidden = false;
   closePianoRoll();
   generatePattern();
@@ -135,12 +152,16 @@ function renderSectionRow() {
 
 function trackHeaderHTML(track) {
   const state = engine.trackState[track];
+  const reverbPct = engine.reverbSends[track]
+    ? Math.round(engine.reverbSends[track].gain.value * 100)
+    : Math.round((DEFAULT_REVERB_SEND[track] || 0) * 100);
   return `
     <span class="track-color" style="background:${TRACK_COLOR[track]}"></span>
     <button class="track-name" data-track="${track}" title="Open piano roll">${TRACK_LABELS[track]}</button>
     <button class="track-btn mute-btn ${state.muted ? "on" : ""}" data-action="mute" data-track="${track}">M</button>
     <button class="track-btn solo-btn ${state.solo ? "on" : ""}" data-action="solo" data-track="${track}">S</button>
-    <input type="range" class="track-vol" data-track="${track}" min="0" max="100" value="${Math.round(state.volume * 100)}">
+    <input type="range" class="track-vol" data-track="${track}" min="0" max="100" value="${Math.round(state.volume * 100)}" title="Volume">
+    <input type="range" class="track-rev" data-track="${track}" min="0" max="100" value="${reverbPct}" title="Reverb send">
   `;
 }
 
@@ -168,8 +189,8 @@ function renderNoteBars(lane, track, steps) {
 function renderStepGrid() {
   stepGrid.innerHTML = "";
   const steps = selectedBars * STEPS_PER_BAR;
-  stepGrid.style.gridTemplateColumns = `190px repeat(${steps}, 1fr)`;
-  sectionRow.style.gridTemplateColumns = `190px repeat(${steps}, 1fr)`;
+  stepGrid.style.gridTemplateColumns = `225px repeat(${steps}, 1fr)`;
+  sectionRow.style.gridTemplateColumns = `225px repeat(${steps}, 1fr)`;
 
   for (const track of activeRows()) {
     const header = document.createElement("div");
@@ -272,6 +293,8 @@ stepGrid.addEventListener("click", (e) => {
 stepGrid.addEventListener("input", (e) => {
   if (e.target.classList.contains("track-vol")) {
     engine.setTrackVolume(e.target.dataset.track, Number(e.target.value) / 100);
+  } else if (e.target.classList.contains("track-rev")) {
+    engine.setReverbSend(e.target.dataset.track, Number(e.target.value) / 100);
   }
 });
 
@@ -430,14 +453,24 @@ function togglePlay() {
 }
 
 function shuffleSounds() {
+  const changed = [];
   for (const inst of activeRows()) {
     const pool = FLAVOR_POOLS[inst];
-    if (pool && pool.length) {
-      currentFlavors[inst] = pool[Math.floor(Math.random() * pool.length)];
-    }
+    if (!pool || pool.length < 1) continue;
+    const current = currentFlavors[inst];
+    const choices = pool.length > 1 ? pool.filter((f) => f !== current) : pool;
+    const next = choices[Math.floor(Math.random() * choices.length)];
+    if (next !== current) changed.push(`${TRACK_LABELS[inst]} → ${next}`);
+    currentFlavors[inst] = next;
   }
+
   shuffleBtn.classList.add("pulse");
   setTimeout(() => shuffleBtn.classList.remove("pulse"), 300);
+  shuffleStatus.textContent = changed.length ? `Shuffled: ${changed.join(", ")}` : "Nothing to shuffle for this style.";
+  clearTimeout(shuffleSounds._timer);
+  shuffleSounds._timer = setTimeout(() => {
+    shuffleStatus.textContent = "";
+  }, 5000);
 }
 
 generateBtn.addEventListener("click", generatePattern);
@@ -447,6 +480,17 @@ playBtn.addEventListener("click", togglePlay);
 tempoSlider.addEventListener("input", () => {
   tempoValue.textContent = tempoSlider.value;
   engine.updateTempo(Number(tempoSlider.value));
+});
+
+swingSlider.addEventListener("input", () => {
+  swingValue.textContent = swingSlider.value;
+  engine.setSwing(Number(swingSlider.value) / 100);
+});
+
+sidechainBtn.addEventListener("click", () => {
+  const enabled = !engine.sidechainEnabled;
+  engine.setSidechain(enabled);
+  sidechainBtn.classList.toggle("on", enabled);
 });
 
 masterSlider.addEventListener("input", () => {

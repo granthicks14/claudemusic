@@ -37,12 +37,21 @@
         </div>
 
         <div class="transport-field">
+          <label for="swing-slider">Swing <span id="swing-value"></span>%</label>
+          <input type="range" id="swing-slider" min="0" max="30" value="10">
+        </div>
+
+        <button id="sidechain-btn" class="transport-btn toggle" title="Duck everything but drums when the kick hits">Sidechain</button>
+
+        <div class="transport-field">
           <label for="master-slider">Master</label>
           <input type="range" id="master-slider" min="0" max="100" value="90">
         </div>
       </div>
 
-      <p class="hint">Click any cell to edit it directly. Click a track name to open its piano roll and place exact notes/chords.</p>
+      <p id="shuffle-status" class="shuffle-status"></p>
+
+      <p class="hint">Click any cell to edit it directly. Click a track name to open its piano roll and place exact notes/chords. Each track's <strong>R</strong> knob controls its reverb send.</p>
 
       <div class="grid-wrap">
         <div id="section-row" class="section-row"></div>

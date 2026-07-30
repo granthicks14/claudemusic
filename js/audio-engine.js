@@ -10,6 +10,13 @@ const BASE_VELOCITY = {
   bass: 0.8, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.6, horn: 0.75,
 };
 
+const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash"];
+
+const DEFAULT_REVERB_SEND = {
+  kick: 0, bass: 0, snare: 0.22, hihat: 0.08, openhat: 0.15, tom: 0.2, perc: 0.15, crash: 0.35,
+  piano: 0.22, lead: 0.28, pad: 0.4, stab: 0.22, guitar: 0.18, strings: 0.35, horn: 0.22,
+};
+
 class BeatEngine {
   constructor() {
     this.ctx = null;
@@ -17,6 +24,7 @@ class BeatEngine {
     this.style = null;
     this.rootMidi = 48;
     this.tempo = 100;
+    this.swing = 0.1;
     this.stepCount = 16;
     this.currentStep = 0;
     this.nextNoteTime = 0;
@@ -28,6 +36,11 @@ class BeatEngine {
     this.ambienceSource = null;
     this.flavors = {};
     this.masterGain = null;
+    this.compressor = null;
+    this.duckBus = null;
+    this.sidechainEnabled = false;
+    this.reverbBus = null;
+    this.reverbSends = {};
     this.trackGains = {};
     this.trackState = {};
     for (const t of ALL_TRACKS) {
@@ -38,14 +51,38 @@ class BeatEngine {
   ensureContext() {
     if (!this.ctx) {
       this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = 0.9;
-      this.masterGain.connect(this.ctx.destination);
+      this.compressor = this.ctx.createDynamicsCompressor();
+      this.compressor.threshold.value = -12;
+      this.compressor.knee.value = 6;
+      this.compressor.ratio.value = 4;
+      this.compressor.attack.value = 0.003;
+      this.compressor.release.value = 0.25;
+      this.masterGain.connect(this.compressor).connect(this.ctx.destination);
+
+      this.duckBus = this.ctx.createGain();
+      this.duckBus.gain.value = 1;
+      this.duckBus.connect(this.masterGain);
+
+      this.reverbBus = this.ctx.createGain();
+      const convolver = this.ctx.createConvolver();
+      convolver.buffer = this.makeImpulseResponse(2.2, 2.5);
+      const reverbReturn = this.ctx.createGain();
+      reverbReturn.gain.value = 0.9;
+      this.reverbBus.connect(convolver).connect(reverbReturn).connect(this.masterGain);
+
       for (const t of ALL_TRACKS) {
         const g = this.ctx.createGain();
         g.gain.value = this.trackState[t].volume;
-        g.connect(this.masterGain);
+        g.connect(DRUM_TRACKS.includes(t) ? this.masterGain : this.duckBus);
         this.trackGains[t] = g;
+
+        const send = this.ctx.createGain();
+        send.gain.value = DEFAULT_REVERB_SEND[t] || 0;
+        g.connect(send).connect(this.reverbBus);
+        this.reverbSends[t] = send;
       }
     }
     if (this.ctx.state === "suspended") {
@@ -53,8 +90,43 @@ class BeatEngine {
     }
   }
 
+  makeImpulseResponse(duration, decay) {
+    const rate = this.ctx.sampleRate;
+    const length = Math.floor(rate * duration);
+    const impulse = this.ctx.createBuffer(2, length, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = impulse.getChannelData(ch);
+      for (let i = 0; i < length; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+      }
+    }
+    return impulse;
+  }
+
   dest(inst) {
     return this.trackGains[inst] || this.masterGain;
+  }
+
+  setReverbSend(inst, value) {
+    if (this.reverbSends[inst]) this.reverbSends[inst].gain.value = value;
+  }
+
+  setSidechain(enabled) {
+    this.sidechainEnabled = enabled;
+    if (this.duckBus) this.duckBus.gain.value = 1;
+  }
+
+  triggerSidechainDuck(time) {
+    if (!this.sidechainEnabled || !this.duckBus) return;
+    const g = this.duckBus.gain;
+    g.cancelScheduledValues(time);
+    g.setValueAtTime(1, time);
+    g.linearRampToValueAtTime(0.28, time + 0.008);
+    g.setTargetAtTime(1, time + 0.03, 0.12);
+  }
+
+  setSwing(value) {
+    this.swing = value;
   }
 
   recomputeGains() {
@@ -123,6 +195,7 @@ class BeatEngine {
     };
     const p = presets[flavor] || presets.boombap;
     const jitter = 0.92 + Math.random() * 0.16;
+    this.triggerSidechainDuck(time);
 
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -345,6 +418,60 @@ class BeatEngine {
       gain.gain.setValueAtTime(vel, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + Math.min(durationSeconds, 0.3));
       osc.connect(filter).connect(gain).connect(this.dest("bass"));
+    } else if (flavor === "drillslide") {
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq * 2.4, time);
+      osc.frequency.exponentialRampToValueAtTime(freq, time + 0.045);
+      gain.gain.setValueAtTime(vel, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + durationSeconds);
+      osc.connect(gain).connect(this.dest("bass"));
+    } else if (flavor === "logdrum") {
+      const click = ctx.createBufferSource();
+      click.buffer = this.makeNoiseBuffer(0.05);
+      const clickFilter = ctx.createBiquadFilter();
+      clickFilter.type = "highpass";
+      clickFilter.frequency.value = 2000;
+      const clickGain = ctx.createGain();
+      clickGain.gain.setValueAtTime(vel * 0.5, time);
+      clickGain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+      click.connect(clickFilter).connect(clickGain).connect(this.dest("bass"));
+      click.start(time);
+      click.stop(time + 0.05);
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq * 2.5, time);
+      osc.frequency.exponentialRampToValueAtTime(freq, time + 0.09);
+      const bodyDur = Math.max(durationSeconds, 0.3);
+      gain.gain.setValueAtTime(vel, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + bodyDur);
+      osc.connect(gain).connect(this.dest("bass"));
+    } else if (flavor === "wobble") {
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freq, time);
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.Q.value = 9;
+      filter.frequency.setValueAtTime(450, time);
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = Math.max(2, Math.min(8, 4 / durationSeconds));
+      const lfoGain = ctx.createGain();
+      lfoGain.gain.value = 850;
+      lfo.connect(lfoGain).connect(filter.frequency);
+      gain.gain.setValueAtTime(vel * 0.85, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + durationSeconds);
+      osc.connect(filter).connect(gain).connect(this.dest("bass"));
+
+      const sub = ctx.createOscillator();
+      sub.type = "sine";
+      sub.frequency.setValueAtTime(freq, time);
+      const subGain = ctx.createGain();
+      subGain.gain.setValueAtTime(vel * 0.5, time);
+      subGain.gain.exponentialRampToValueAtTime(0.001, time + durationSeconds);
+      sub.connect(subGain).connect(this.dest("bass"));
+      sub.start(time);
+      sub.stop(time + durationSeconds + 0.05);
+      lfo.start(time);
+      lfo.stop(time + durationSeconds + 0.05);
     } else {
       osc.type = "sine";
       osc.frequency.setValueAtTime(freq, time);
@@ -724,7 +851,7 @@ class BeatEngine {
 
       let duration = this.stepDuration();
       if (stepToSchedule % 2 === 1) {
-        duration += this.style.swing * this.stepDuration();
+        duration += this.swing * this.stepDuration();
       }
 
       this.nextNoteTime += duration;

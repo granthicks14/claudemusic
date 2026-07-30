@@ -102,6 +102,7 @@ function selectStyle(id) {
   for (const card of styleSelect.children) {
     card.classList.toggle("selected", card.dataset.styleId === id);
   }
+  workspace.style.setProperty("--style-accent", STYLE_ACCENTS[id]);
 
   engine.ensureContext();
   engine.setMasterVolume(Number(masterSlider.value) / 100);
@@ -554,12 +555,66 @@ function togglePlay() {
     pianoRollGrid.querySelectorAll(".now-playing, .now-playing-row").forEach((el) => el.classList.remove("now-playing", "now-playing-row"));
     const playhead = document.getElementById("playhead");
     if (playhead) playhead.hidden = true;
+    stopVisualizer();
   } else {
     engine.onStep = highlightStep;
     engine.start(currentPattern, activeStyle, currentFlavors, Number(tempoSlider.value));
     playBtn.textContent = "■ Stop";
     playBtn.classList.add("playing");
+    startVisualizer();
   }
+}
+
+// ---- Live audio visualizer ----
+
+const visualizerCanvas = document.getElementById("visualizer");
+const visualizerCtx = visualizerCanvas.getContext("2d");
+let visualizerRAF = null;
+
+function drawVisualizer() {
+  visualizerRAF = requestAnimationFrame(drawVisualizer);
+  if (!engine.analyser) return;
+
+  const data = new Uint8Array(engine.analyser.frequencyBinCount);
+  engine.analyser.getByteFrequencyData(data);
+
+  const w = visualizerCanvas.width;
+  const h = visualizerCanvas.height;
+  visualizerCtx.clearRect(0, 0, w, h);
+
+  const barCount = 64;
+  const barGap = 2;
+  const barWidth = w / barCount - barGap;
+  const gradient = visualizerCtx.createLinearGradient(0, h, 0, 0);
+  gradient.addColorStop(0, "#a55eea");
+  gradient.addColorStop(0.6, "#00d2d3");
+  gradient.addColorStop(1, "#ff9ff3");
+  visualizerCtx.fillStyle = gradient;
+
+  for (let i = 0; i < barCount; i++) {
+    const dataIndex = Math.floor((i / barCount) * data.length * 0.65);
+    const value = data[dataIndex] / 255;
+    const barHeight = Math.max(2, value * h);
+    const x = i * (barWidth + barGap);
+    visualizerCtx.fillRect(x, h - barHeight, barWidth, barHeight);
+  }
+}
+
+function startVisualizer() {
+  if (visualizerRAF) return;
+  const displayWidth = visualizerCanvas.clientWidth;
+  if (displayWidth && visualizerCanvas.width !== displayWidth) {
+    visualizerCanvas.width = displayWidth;
+  }
+  drawVisualizer();
+}
+
+function stopVisualizer() {
+  if (visualizerRAF) {
+    cancelAnimationFrame(visualizerRAF);
+    visualizerRAF = null;
+  }
+  visualizerCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
 }
 
 function shuffleSounds() {

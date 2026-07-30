@@ -63,6 +63,10 @@ class BeatEngine {
       this.compressor.ratio.value = 4;
       this.compressor.attack.value = 0.003;
       this.compressor.release.value = 0.25;
+      this.analyser = this.ctx.createAnalyser();
+      this.analyser.fftSize = 256;
+      this.analyser.smoothingTimeConstant = 0.8;
+      this.compressor.connect(this.analyser);
       this.masterGain.connect(this.compressor).connect(this.ctx.destination);
 
       this.duckBus = this.ctx.createGain();
@@ -108,6 +112,22 @@ class BeatEngine {
 
   dest(inst) {
     return this.trackGains[inst] || this.masterGain;
+  }
+
+  // A stack of detuned oscillators around a center frequency - the standard
+  // "unison/supersaw" trick for a thick, wide synth tone instead of one
+  // thin oscillator. voices 5-8 with a modest spread is the usual sweet spot.
+  addUnisonVoices(freq, voices, spreadCents, type, destNode, time, stopTime) {
+    const ctx = this.ctx;
+    for (let i = 0; i < voices; i++) {
+      const spread = voices === 1 ? 0 : (i / (voices - 1) - 0.5) * 2 * spreadCents;
+      const osc = ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq * Math.pow(2, spread / 1200), time);
+      osc.connect(destNode);
+      osc.start(time);
+      osc.stop(stopTime);
+    }
   }
 
   setReverbSend(inst, value) {
@@ -195,6 +215,7 @@ class BeatEngine {
       lofi: { startFreq: 100, endFreq: 45, decay: 0.3 },
       deep: { startFreq: 80, endFreq: 30, decay: 0.55 },
       snappy: { startFreq: 160, endFreq: 70, decay: 0.15 },
+      click: { startFreq: 200, endFreq: 90, decay: 0.12 },
     };
     const p = presets[flavor] || presets.boombap;
     const jitter = 0.92 + Math.random() * 0.16;
@@ -221,6 +242,20 @@ class BeatEngine {
       osc2.start(time);
       osc2.stop(time + 0.12);
     }
+
+    if (flavor === "click") {
+      const click = ctx.createBufferSource();
+      click.buffer = this.makeNoiseBuffer(0.02);
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 4000;
+      const clickGain = ctx.createGain();
+      clickGain.gain.setValueAtTime(vel * 0.5, time);
+      clickGain.gain.exponentialRampToValueAtTime(0.001, time + 0.015);
+      click.connect(hp).connect(clickGain).connect(this.dest("kick"));
+      click.start(time);
+      click.stop(time + 0.02);
+    }
   }
 
   playSnare(time, vel, flavor) {
@@ -231,6 +266,7 @@ class BeatEngine {
       fat: { noiseHp: 500, noiseDecay: 0.2, toneFreq: 150, toneDecay: 0.15 },
       rimshot: { noiseHp: 2500, noiseDecay: 0.06, toneFreq: 420, toneDecay: 0.05 },
       trapsnap: { noiseHp: 3500, noiseDecay: 0.09, toneFreq: 300, toneDecay: 0.06 },
+      brush: { noiseHp: 2000, noiseDecay: 0.4, toneFreq: 0, toneDecay: 0 },
     };
     const p = presets[flavor] || presets.crisp;
 
@@ -284,6 +320,7 @@ class BeatEngine {
       dark: { hp: 6000, lp: 11000 },
       vinyl: { hp: 5000, lp: 8500 },
       metallic: { hp: 8500, lp: null, peak: 9000 },
+      analog: { hp: 6500, lp: 13000, peak: 7000 },
     };
     const p = presets[flavor] || presets.bright;
     const decay = open ? 0.32 + Math.random() * 0.1 : 0.05 + Math.random() * 0.02;
@@ -375,6 +412,18 @@ class BeatEngine {
       osc.connect(gain).connect(this.dest("perc"));
       osc.start(time);
       osc.stop(time + 0.16);
+      return;
+    }
+    if (flavor === "clave") {
+      const osc = ctx.createOscillator();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(2500, time);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.6, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+      osc.connect(gain).connect(this.dest("perc"));
+      osc.start(time);
+      osc.stop(time + 0.06);
       return;
     }
     const noise = ctx.createBufferSource();
@@ -575,6 +624,29 @@ class BeatEngine {
       return;
     }
 
+    if (flavor === "jazz") {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, time);
+      const osc2 = ctx.createOscillator();
+      osc2.type = "triangle";
+      osc2.frequency.setValueAtTime(freq * 1.002, time);
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.value = 1500;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.85, time + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      osc.connect(filter).connect(gain).connect(dest);
+      osc2.connect(filter);
+      osc.start(time);
+      osc2.start(time);
+      osc.stop(time + dur + 0.1);
+      osc2.stop(time + dur + 0.1);
+      return;
+    }
+
     if (flavor === "acoustic") {
       const filter = ctx.createBiquadFilter();
       filter.type = "lowpass";
@@ -615,7 +687,7 @@ class BeatEngine {
     const dest = this.dest("strings");
     const attack = flavor === "staccato" ? 0.02 : 0.15;
     const dur = flavor === "staccato" ? Math.min(durationSeconds, 0.35) : Math.max(durationSeconds, 0.5);
-    const detunes = flavor === "orchestral" ? [0, 0.008, -0.008, 0.014] : [0, 0.005, -0.005];
+    const detunes = flavor === "orchestral" ? [0, 0.008, -0.008, 0.014] : flavor === "synth" ? [0, 0.012, -0.012, 0.022, -0.022] : [0, 0.005, -0.005];
 
     const lfo = ctx.createOscillator();
     lfo.frequency.value = 5.5;
@@ -652,8 +724,8 @@ class BeatEngine {
     osc.frequency.setValueAtTime(freq, time);
     const bp = ctx.createBiquadFilter();
     bp.type = "bandpass";
-    bp.frequency.value = flavor === "soft" ? 1200 : flavor === "muted" ? 900 : 1800;
-    bp.Q.value = flavor === "muted" ? 3 : 1.2;
+    bp.frequency.value = flavor === "soft" ? 1200 : flavor === "muted" ? 900 : flavor === "sax" ? 1400 : 1800;
+    bp.Q.value = flavor === "muted" ? 3 : flavor === "sax" ? 4.5 : 1.2;
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, time);
     gain.gain.linearRampToValueAtTime(vel, time + 0.015);
@@ -666,15 +738,15 @@ class BeatEngine {
   playOrganVoice(time, freq, durationSeconds, vel, flavor) {
     const ctx = this.ctx;
     const dest = this.dest("organ");
-    const dur = Math.max(durationSeconds, 0.3);
-    const attack = 0.015;
+    const attack = flavor === "church" ? 0.09 : 0.015;
+    const dur = flavor === "church" ? Math.max(durationSeconds, 1.4) : Math.max(durationSeconds, 0.3);
 
     // Drawbar-organ approximation: stack sine partials at the classic
     // fundamental / octave / octave+fifth ratios and sum them.
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, time);
     gain.gain.linearRampToValueAtTime(vel, time + attack);
-    gain.gain.setValueAtTime(vel, time + Math.max(attack, dur - 0.08));
+    gain.gain.setValueAtTime(vel, time + Math.max(attack, dur - 0.15));
     gain.gain.linearRampToValueAtTime(0.0001, time + dur);
 
     let node = gain;
@@ -722,7 +794,7 @@ class BeatEngine {
     // Formant synthesis: a harmonically-rich source through a few parallel
     // bandpass filters tuned to vowel formant frequencies approximates a
     // sung vowel far better than a single filtered oscillator.
-    const formants = flavor === "ahh" ? [700, 1220, 2600] : [300, 870, 2240];
+    const formants = flavor === "ahh" ? [700, 1220, 2600] : flavor === "ay" ? [530, 1840, 2480] : [300, 870, 2240];
 
     const osc = ctx.createOscillator();
     osc.type = "sawtooth";
@@ -778,6 +850,28 @@ class BeatEngine {
       osc.connect(filter).connect(gain).connect(dest);
       osc.start(time);
       osc.stop(time + Math.max(dur, 0.4) + 0.05);
+      return;
+    }
+
+    if (flavor === "celesta") {
+      const osc1 = ctx.createOscillator();
+      osc1.type = "sine";
+      osc1.frequency.setValueAtTime(freq * 2, time);
+      const osc2 = ctx.createOscillator();
+      osc2.type = "sine";
+      osc2.frequency.setValueAtTime(freq * 4.02, time);
+      const gain1 = ctx.createGain();
+      gain1.gain.setValueAtTime(vel, time);
+      gain1.gain.exponentialRampToValueAtTime(0.001, time + Math.min(dur, 0.8));
+      const gain2 = ctx.createGain();
+      gain2.gain.setValueAtTime(vel * 0.25, time);
+      gain2.gain.exponentialRampToValueAtTime(0.001, time + Math.min(dur, 0.3));
+      osc1.connect(gain1).connect(dest);
+      osc2.connect(gain2).connect(dest);
+      osc1.start(time);
+      osc2.start(time);
+      osc1.stop(time + Math.min(dur, 0.8) + 0.1);
+      osc2.stop(time + Math.min(dur, 0.3) + 0.1);
       return;
     }
 
@@ -886,6 +980,71 @@ class BeatEngine {
       return;
     }
 
+    if (flavor === "supersaw") {
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(5000, time);
+      filter.frequency.exponentialRampToValueAtTime(900, time + dur);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.55, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      filter.connect(gain).connect(dest);
+      this.addUnisonVoices(freq, 7, 16, "sawtooth", filter, time, time + dur + 0.05);
+      return;
+    }
+
+    if (flavor === "pluck") {
+      const osc = ctx.createOscillator();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(freq, time);
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(4500, time);
+      filter.frequency.exponentialRampToValueAtTime(500, time + 0.18);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + Math.min(dur, 0.22));
+      osc.connect(filter).connect(gain).connect(dest);
+      osc.start(time);
+      osc.stop(time + Math.min(dur, 0.22) + 0.05);
+      return;
+    }
+
+    if (flavor === "sine") {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, time);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.9, time + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      osc.connect(gain).connect(dest);
+      osc.start(time);
+      osc.stop(time + dur + 0.05);
+      return;
+    }
+
+    if (flavor === "chip") {
+      const osc = ctx.createOscillator();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(freq, time);
+      const vibrato = ctx.createOscillator();
+      vibrato.frequency.value = 9;
+      const vibratoGain = ctx.createGain();
+      vibratoGain.gain.value = freq * 0.015;
+      vibrato.connect(vibratoGain).connect(osc.frequency);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.7, time);
+      gain.gain.setValueAtTime(vel * 0.7, time + Math.max(0, dur - 0.04));
+      gain.gain.linearRampToValueAtTime(0.0001, time + dur);
+      osc.connect(gain).connect(dest);
+      osc.start(time);
+      osc.stop(time + dur + 0.05);
+      vibrato.start(time);
+      vibrato.stop(time + dur + 0.05);
+      return;
+    }
+
     const osc = ctx.createOscillator();
     osc.type = flavor === "square" ? "square" : "sawtooth";
     osc.frequency.setValueAtTime(freq, time);
@@ -906,6 +1065,23 @@ class BeatEngine {
     const dest = this.dest("pad");
     const attack = 0.25;
     const dur = Math.max(durationSeconds, 0.6);
+
+    if (flavor === "glass") {
+      for (const ratio of [1, 2, 4.02]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq * ratio, time);
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.0001, time);
+        gain.gain.linearRampToValueAtTime((vel * (ratio === 1 ? 0.7 : 0.2)) / 1, time + attack);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+        osc.connect(gain).connect(dest);
+        osc.start(time);
+        osc.stop(time + dur + 0.1);
+      }
+      return;
+    }
+
     const detunes = flavor === "ensemble" ? [0, 0.006, -0.006] : flavor === "airy" ? [0] : [0, 0.004];
     const type = flavor === "airy" ? "sine" : "sawtooth";
 
@@ -933,6 +1109,23 @@ class BeatEngine {
 
     if (flavor === "bell-chord") {
       this.playLeadVoiceTo(time, freq, dur, vel, "bell", dest);
+      return;
+    }
+    if (flavor === "brass-chord") {
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freq, time);
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 1600;
+      bp.Q.value = 1.5;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel, time + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      osc.connect(bp).connect(gain).connect(dest);
+      osc.start(time);
+      osc.stop(time + dur + 0.05);
       return;
     }
     const osc = ctx.createOscillator();

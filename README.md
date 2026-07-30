@@ -62,21 +62,28 @@ Fourteen styles, each modeled on real production conventions researched for this
 - **Drum & Bass** *(new)* — fast syncopated breakbeat-style drums at ~172 BPM and a growling Reese bass (a stack of four detuned sawtooths beating against each other — the real technique behind the classic DnB bass sound).
 - **Synthwave** *(new)* — 80s gated drums, an analog synth bass and soaring lead, a lush arpeggiated pad/stab bed.
 
-## Real melodies, not random notes
+## Real melodies, not random notes — and no more stuck-on-one-pitch lead
 
 Bass, lead, and guitar are generated the way hit songs actually build a hook, based on melody-writing research:
 
 - **A small, reused pitch pool.** Most pop hooks use only 3–4 distinct notes, not a fresh pitch every time — so each motif draws from a constrained pool of chord/passing tones instead of sampling freely.
 - **An arc contour.** Melodies read as "a tune" when they leap up and step back down rather than wander; each phrase is shaped into that rise-then-fall arc.
-- **Question and answer.** Phrases come in pairs — the first "asks," and every second repeat "answers" by resolving its final note back to the tonic, the call-and-response structure behind most memorable hooks.
+- **Question and answer, with real contrast.** Phrases come in pairs — the first "asks," and every second repeat "answers," resolving its final note back to the tonic. Half the time the answer also drops a full octave below the question first, the way real call-and-response melodies contrast register, not just pitch content.
+- **Register varies every generation.** This was the direct fix for the lead melody always landing in the same high octave: each "Generate Beat" now randomly shifts the whole melody up an octave, down an octave, or leaves it as-is, so the same genre doesn't sound pitched identically every time.
 - **Repetition with variation.** The motif is stated once, then repeated across the arrangement with transposition, inversion, or truncation, so it reads as a recognizable, evolving theme instead of independent random notes.
+
+## Sound kits: way more tone variety per instrument
+
+Researched real synth sound-design technique (unison/detune stacking - "supersaw," the standard trick for a thick, wide synth voice) and applied it, then went through every instrument and added at least one genuinely distinct new voice so Shuffle Sounds has real variety to pull from instead of picking between near-identical options:
+
+- **Lead** grew from 4 voices to 8: added **Supersaw** (7 detuned sawtooths stacked together, the classic trance/EDM lead technique), **Pluck** (a snappy short arp voice), **Sine** (a clean, mellow tone as a deliberate contrast to the brighter options), and **Chip** (a vibrato-laden chiptune square wave).
+- **Piano** gained **Celesta** (a bright, bell-like tuned-percussion voice). **Guitar** gained **Jazz** (a mellow hollow-body tone). **Pad** gained **Glass** (a bright bell-partial pad). **Strings** gained **Synth Strings** (a wide 5-voice unison "string machine" sound). **Stab** gained **Brass Chord**. **Horn** gained **Sax** (a more reedy, resonant filter). **Organ** gained **Church** (a slower, longer-sustaining voice). **Vocal** gained a third vowel, **Ay**.
+- **Drums** gained new kit pieces too: kick **Click** (a sharp minimal-techno transient), snare **Brush** (soft and long), hi-hat **Analog** (a warmer vintage drum-machine tone), and percussion **Clave**.
 
 ## New instruments: pianos, guitars, organ, and a synthesized vocal chop
 
-- **Piano** now has six voices: electric, pluck, grand, Rhodes, Wurlitzer (bright and reedy), and upright (soft, dark, acoustic).
-- **Guitar** has five: clean, power (with a real distortion circuit), muted, nylon, and acoustic (a bright detuned steel-string pluck).
-- **Organ** *(new instrument)* — a Hammond-style drawbar stack (sine partials at the classic fundamental/octave/octave+fifth ratios), with a driven "gospel" voice that adds overdrive and Leslie-style tremolo. Added where it's genuinely idiomatic: gospel-sample hip-hop, Fela Kuti-style Afrobeat, and classic Rhodes+organ R&B/soul.
-- **Vocal** *(new instrument)* — since real vocal samples aren't available in a dependency-free browser app, this is built with **formant synthesis**: a sawtooth source through three parallel bandpass filters tuned to vowel formant frequencies (an "ooh" and an "ahh" preset), the same technique speech synthesizers use to fake a sung vowel. Present by default on the genres where vocal chops are a genuine signature sound (house, trap, reggaeton, dubstep), and addable to any other genre via the prompt box.
+- **Organ** — a Hammond-style drawbar stack (sine partials at the classic fundamental/octave/octave+fifth ratios), with a driven "gospel" voice that adds overdrive and Leslie-style tremolo. Added where it's genuinely idiomatic: gospel-sample hip-hop, Fela Kuti-style Afrobeat, and classic Rhodes+organ R&B/soul.
+- **Vocal** — since real vocal samples aren't available in a dependency-free browser app, this is built with **formant synthesis**: a sawtooth source through three parallel bandpass filters tuned to vowel formant frequencies (three vowel presets now: "ooh," "ahh," "ay"), the same technique speech synthesizers use to fake a sung vowel. Present by default on the genres where vocal chops are a genuine signature sound (house, trap, reggaeton, dubstep, phonk, Jersey Club), and addable to any other genre via the prompt box.
 
 ## Mixing: how producers actually make a beat sound good
 
@@ -107,6 +114,10 @@ Bass, lead, guitar, piano, organ, pad, stab, strings, horn, and vocal are stored
 - **Generate Beat** — builds a fresh loop or full song from scratch, depending on the selected length.
 
 Every hit also gets small randomized pitch/decay/timing/velocity variation at playback, so nothing ever sounds mechanically identical twice.
+
+## A live audio visualizer, and a look tied to the genre you pick
+
+A real frequency visualizer (Web Audio's `AnalyserNode`, tapped straight off the master bus after the compressor) animates while a beat plays — no fake/decorative animation, it's reading the actual output. The workspace panel's border and glow also pick up the selected genre's accent color instead of staying one fixed color for every style, so the whole page feels like it belongs to the beat you're making.
 
 ## A note on the vocal instrument
 

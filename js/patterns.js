@@ -3,20 +3,20 @@ const STEPS_PER_BAR = 16;
 const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14 };
 
 const FLAVOR_POOLS = {
-  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy"],
-  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap"],
-  hihat: ["bright", "dark", "vinyl", "metallic"],
-  perc: ["shaker", "conga", "cowbell"],
+  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click"],
+  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush"],
+  hihat: ["bright", "dark", "vinyl", "metallic", "analog"],
+  perc: ["shaker", "conga", "cowbell", "clave"],
   bass: ["warm", "synth", "808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese"],
-  piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright"],
-  lead: ["square", "saw", "bell", "flute"],
-  pad: ["warm", "ensemble", "airy"],
-  stab: ["pluck-chord", "square-chord", "bell-chord"],
-  guitar: ["clean", "power", "muted", "nylon", "acoustic"],
-  strings: ["soul", "orchestral", "staccato"],
-  horn: ["brass", "soft", "muted"],
-  organ: ["drawbar", "gospel"],
-  vocal: ["ooh", "ahh"],
+  piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta"],
+  lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip"],
+  pad: ["warm", "ensemble", "airy", "glass"],
+  stab: ["pluck-chord", "square-chord", "bell-chord", "brass-chord"],
+  guitar: ["clean", "power", "muted", "nylon", "acoustic", "jazz"],
+  strings: ["soul", "orchestral", "staccato", "synth"],
+  horn: ["brass", "soft", "muted", "sax"],
+  organ: ["drawbar", "gospel", "church"],
+  vocal: ["ooh", "ahh", "ay"],
 };
 
 function M(degreeOffset, len) {
@@ -101,7 +101,17 @@ function thinRange(arr, start, end, keepProbability) {
   }
 }
 
+// Real melodies don't sit in the exact same register every time, and a
+// call-and-response pair usually contrasts by dropping the "answer" an
+// octave (both are standard melody-writing techniques). registerJitter
+// picks a whole octave up/down/same once per generation so repeated
+// "Generate Beat" clicks land the melody somewhere different, instead of
+// the same high pitch every time; the per-phrase octave drop below gives
+// the call/response pairing an audible register contrast too.
 function generateMonoMelody(register, structure, barRootDegrees, params, totalSteps) {
+  const registerJitter = pickWeighted([[-7, 1], [0, 3], [7, 1]]);
+  const effectiveRegister = register + registerJitter;
+
   const arr = new Array(totalSteps).fill(null);
   const motifLen = params.motifBars * STEPS_PER_BAR;
   const motif = generateMotif(motifLen, params);
@@ -114,10 +124,14 @@ function generateMonoMelody(register, structure, barRootDegrees, params, totalSt
       const modes = ["transposeUp", "transposeDown", "invert", "truncate"];
       motifToUse = transformMotif(motif, modes[Math.floor(Math.random() * modes.length)]);
     }
-    // Question-and-answer phrasing: every other repeat is the "answer" and
-    // resolves its final note back to the tonic, the classic call-response
-    // pairing that makes a phrase feel finished rather than just looping.
+    // Question-and-answer phrasing: every other repeat is the "answer,"
+    // sometimes dropped an octave for contrast, and always resolves its
+    // final note back to the tonic - the classic call-response pairing
+    // that makes a phrase feel finished rather than just looping.
     if (chunkIndex % 2 === 1) {
+      if (Math.random() < 0.5) {
+        motifToUse = motifToUse.map((e) => (e.degreeOffset === null ? e : { ...e, degreeOffset: e.degreeOffset - 7 }));
+      }
       for (let i = motifToUse.length - 1; i >= 0; i--) {
         if (motifToUse[i].degreeOffset !== null) {
           motifToUse = motifToUse.map((e, idx) => (idx === i ? { ...e, degreeOffset: 0 } : e));
@@ -132,7 +146,7 @@ function generateMonoMelody(register, structure, barRootDegrees, params, totalSt
       const barIdx = Math.floor(stepPos / STEPS_PER_BAR);
       const barRoot = barRootDegrees[barIdx];
       const dur = Math.min(ev.duration, totalSteps - stepPos);
-      arr[stepPos] = { degree: barRoot + register + ev.degreeOffset, len: dur };
+      arr[stepPos] = { degree: barRoot + effectiveRegister + ev.degreeOffset, len: dur };
     }
     chunkStart += motifLen;
     chunkIndex++;

@@ -43,16 +43,16 @@ const chordChips = document.getElementById("chord-chips");
 const TRACK_HEADER_WIDTH = 356;
 
 const DRUM_ORDER = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "fx"];
-const MELODIC_ORDER = ["bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "marimba", "arp"];
-const MONO_INSTRUMENTS = ["bass", "lead", "guitar", "kalimba", "marimba", "arp"];
+const MELODIC_ORDER = ["bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "marimba", "arp", "autolead", "sax"];
+const MONO_INSTRUMENTS = ["bass", "lead", "guitar", "kalimba", "marimba", "arp", "autolead", "sax"];
 
 const TRACK_LABELS = {
   kick: "Kick", snare: "Snare", hihat: "Hi-Hat", openhat: "Open Hat", tom: "Tom", perc: "Perc", crash: "Crash", fx: "FX Riser",
   bass: "Bass", piano: "Piano", lead: "Melody", pad: "Pad", stab: "Stab", guitar: "Guitar", strings: "Strings", horn: "Horn",
-  organ: "Organ", vocal: "Vocal", kalimba: "Kalimba", marimba: "Marimba", arp: "Arp",
+  organ: "Organ", vocal: "Vocal", kalimba: "Kalimba", marimba: "Marimba", arp: "Arp", autolead: "Auto Lead", sax: "Sax",
 };
 
-const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, strings: 4, horn: 1, organ: 4, vocal: 1, kalimba: 1, marimba: 1, arp: 1 };
+const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, strings: 4, horn: 1, organ: 4, vocal: 1, kalimba: 1, marimba: 1, arp: 1, autolead: 3, sax: 2 };
 
 // Flavors are otherwise only ever set by a genre's defaults or by the
 // random shuffle - there was no way to deliberately reach for, say, "I
@@ -63,7 +63,7 @@ const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, st
 const FLAVOR_LABELS = {
   "909": "TR-909", "909snare": "TR-909", linn: "LinnDrum", "707": "TR-707", "606": "TR-606", dmx: "DMX",
   timpani: "Timpani", clarinet: "Clarinet", frenchhorn: "French Horn", oboe: "Oboe", cr78: "CR-78",
-  simmons: "Simmons SDS-V", "808": "808",
+  simmons: "Simmons SDS-V", "808": "808", sp1200: "SP-1200", talkingdrum: "Talking Drum", moog: "Moog",
 };
 function flavorLabel(key) {
   if (FLAVOR_LABELS[key]) return FLAVOR_LABELS[key];
@@ -82,7 +82,7 @@ const TRACK_COLOR = {
   kick: "#ff6b6b", snare: "#feca57", hihat: "#48dbfb", openhat: "#0abde3", tom: "#ff9f43",
   perc: "#1dd1a1", crash: "#c8d6e5", fx: "#c8d6e5", bass: "#a55eea", piano: "#00d2d3", lead: "#ff9ff3", pad: "#54a0ff",
   stab: "#f368e0", guitar: "#ff6348", strings: "#7bed9f", horn: "#eccc68", organ: "#e58e26", vocal: "#ff7f9f", kalimba: "#fdcb6e",
-  marimba: "#55efc4", arp: "#74b9ff",
+  marimba: "#55efc4", arp: "#74b9ff", autolead: "#ff5e78", sax: "#ffb142",
 };
 
 let selectedStyleId = null;

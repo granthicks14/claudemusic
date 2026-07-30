@@ -1,15 +1,15 @@
-const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "marimba", "arp", "fx"];
+const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "marimba", "arp", "autolead", "sax", "fx"];
 
 const DEFAULT_TRACK_VOLUME = {
   kick: 1, snare: 0.9, hihat: 0.6, openhat: 0.6, tom: 0.85, perc: 0.55, crash: 0.8,
   bass: 0.9, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.55, horn: 0.7,
-  organ: 0.6, vocal: 0.65, kalimba: 0.7, marimba: 0.65, arp: 0.55, fx: 0.6,
+  organ: 0.6, vocal: 0.65, kalimba: 0.7, marimba: 0.65, arp: 0.55, autolead: 0.75, sax: 0.7, fx: 0.6,
 };
 
 const BASE_VELOCITY = {
   kick: 1, snare: 0.9, hihat: 0.7, openhat: 0.7, tom: 0.85, perc: 0.6, crash: 0.9,
   bass: 0.8, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.6, horn: 0.75,
-  organ: 0.65, vocal: 0.7, kalimba: 0.75, marimba: 0.7, arp: 0.65, fx: 0.8,
+  organ: 0.65, vocal: 0.7, kalimba: 0.75, marimba: 0.7, arp: 0.65, autolead: 0.8, sax: 0.75, fx: 0.8,
 };
 
 const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "fx"];
@@ -17,7 +17,7 @@ const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash"
 const DEFAULT_REVERB_SEND = {
   kick: 0, bass: 0, snare: 0.22, hihat: 0.08, openhat: 0.15, tom: 0.2, perc: 0.15, crash: 0.35,
   piano: 0.22, lead: 0.28, pad: 0.4, stab: 0.22, guitar: 0.18, strings: 0.35, horn: 0.22,
-  organ: 0.28, vocal: 0.32, kalimba: 0.25, marimba: 0.28, arp: 0.3, fx: 0.45,
+  organ: 0.28, vocal: 0.32, kalimba: 0.25, marimba: 0.28, arp: 0.3, autolead: 0.24, sax: 0.3, fx: 0.45,
 };
 
 class BeatEngine {
@@ -311,6 +311,13 @@ class BeatEngine {
       "707": { startFreq: 155, endFreq: 68, decay: 0.19 },
       "606": { startFreq: 190, endFreq: 95, decay: 0.1 },
       dmx: { startFreq: 135, endFreq: 62, decay: 0.16 },
+      // The E-mu SP-1200 (1987) - arguably the single most important
+      // machine in hip-hop history, the sampler golden-era boom bap
+      // (Pete Rock, DJ Premier, Marley Marl) was built on. Its low, fixed
+      // sample rate and 12-bit converters are exactly what a real
+      // bit-crush WaveShaper models below - this preset just sets a punchy
+      // boom-bap-appropriate body for that processing to color.
+      sp1200: { startFreq: 128, endFreq: 50, decay: 0.28 },
     };
     const p = presets[flavor] || presets.boombap;
     const jitter = 0.92 + Math.random() * 0.16;
@@ -332,6 +339,17 @@ class BeatEngine {
       const shaper = ctx.createWaveShaper();
       shaper.curve = this.makeDistortionCurve(flavor === "gritty" ? 22 : 6);
       osc.connect(shaper).connect(gain).connect(this.dest("kick"));
+    } else if (flavor === "sp1200") {
+      // The bit-crush curve, plus a lowpass sitting roughly at the
+      // SP-1200's real ~26kHz sample rate's Nyquist ceiling - the actual
+      // "sampler crunch" is this band-limiting plus quantization together,
+      // not either alone.
+      const crush = ctx.createWaveShaper();
+      crush.curve = this.makeBitcrushCurve(38);
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 9000;
+      osc.connect(crush).connect(lp).connect(gain).connect(this.dest("kick"));
     } else {
       osc.connect(gain).connect(this.dest("kick"));
     }
@@ -458,6 +476,11 @@ class BeatEngine {
       // metallic ring by having more upper-mid bite and less low tone.
       "707": { noiseHp: 2600, noiseDecay: 0.13, toneFreq: 240, toneDecay: 0.08 },
       dmx: { noiseHp: 3000, noiseDecay: 0.1, toneFreq: 340, toneDecay: 0.07 },
+      // The E-mu SP-1200's snare sample, low sample rate and all - a
+      // fairly full-bodied noise burst (real 80s/90s samples weren't thin)
+      // with the bit-crush/band-limit processing below doing the real work
+      // of making it read as "vintage sampler" rather than clean synthesis.
+      sp1200: { noiseHp: 1000, noiseDecay: 0.21, toneFreq: 175, toneDecay: 0.15 },
     };
     const p = presets[flavor] || presets.crisp;
 
@@ -487,7 +510,16 @@ class BeatEngine {
     const noiseGain = ctx.createGain();
     noiseGain.gain.setValueAtTime(vel, time);
     noiseGain.gain.exponentialRampToValueAtTime(0.01, time + p.noiseDecay);
-    noise.connect(filter).connect(noiseGain).connect(this.dest("snare"));
+    if (flavor === "sp1200") {
+      const crush = ctx.createWaveShaper();
+      crush.curve = this.makeBitcrushCurve(30);
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 9000;
+      noise.connect(filter).connect(crush).connect(lp).connect(noiseGain).connect(this.dest("snare"));
+    } else {
+      noise.connect(filter).connect(noiseGain).connect(this.dest("snare"));
+    }
     noise.start(time);
     noise.stop(time + p.noiseDecay);
 
@@ -773,6 +805,41 @@ class BeatEngine {
       osc.connect(bp).connect(gain).connect(this.dest("perc"));
       osc.start(time);
       osc.stop(time + 0.1);
+      return;
+    }
+    if (flavor === "talkingdrum") {
+      // A West African talking drum's whole character comes from the
+      // player squeezing the leather tension cords under their arm right
+      // after striking it, bending the pitch upward mid-note to mimic
+      // speech inflection - that's a real, deliberate pitch-bend
+      // technique, not a decay artifact the way every other tuned
+      // percussion voice's downward glide is. Modeled as a bend sharply
+      // UP after the strike, then settling - the "doi-oi-oing" of a real
+      // squeeze.
+      const strike = ctx.createBufferSource();
+      strike.buffer = this.makeNoiseBuffer(0.02);
+      const strikeFilter = ctx.createBiquadFilter();
+      strikeFilter.type = "bandpass";
+      strikeFilter.frequency.value = 900;
+      const strikeGain = ctx.createGain();
+      strikeGain.gain.setValueAtTime(vel * 0.35, time);
+      strikeGain.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
+      strike.connect(strikeFilter).connect(strikeGain).connect(this.dest("perc"));
+      strike.start(time);
+      strike.stop(time + 0.025);
+
+      const osc = ctx.createOscillator();
+      osc.type = "triangle";
+      const freq = 180 + Math.random() * 35;
+      osc.frequency.setValueAtTime(freq, time);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.65, time + 0.12);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.2, time + 0.32);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.8, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.36);
+      osc.connect(gain).connect(this.dest("perc"));
+      osc.start(time);
+      osc.stop(time + 0.4);
       return;
     }
     const noise = ctx.createBufferSource();
@@ -1120,6 +1187,34 @@ class BeatEngine {
 
       this.pluckString(time, freq, durationSeconds, vel * 0.85, this.dest("bass"), { damp: 0.42, feedback: 0.965, pluckNoise: 0.015, brightness: 0.7, sustain: 0.45 });
       return;
+    } else if (flavor === "moog") {
+      // A classic Minimoog-style bass patch. Web Audio has no true ladder-
+      // filter model, but the thing that actually makes a Moog bass sound
+      // fat and alive rather than static is the filter *envelope* - the
+      // cutoff sweeping down from bright and open at the attack to a dark
+      // sustain is the "pluck" - so a high-Q biquad lowpass with that
+      // sweep gets close, backed by a sub oscillator an octave down for
+      // the real low-end weight a single filtered saw can't deliver alone.
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freq, time);
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.Q.value = 8;
+      filter.frequency.setValueAtTime(Math.min(3200, freq * 10), time);
+      filter.frequency.exponentialRampToValueAtTime(Math.max(200, freq * 1.6), time + 0.18);
+      gain.gain.setValueAtTime(vel * 0.85, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + durationSeconds);
+      osc.connect(filter).connect(gain).connect(this.dest("bass"));
+
+      const sub = ctx.createOscillator();
+      sub.type = "sine";
+      sub.frequency.setValueAtTime(freq / 2, time);
+      const subGain = ctx.createGain();
+      subGain.gain.setValueAtTime(vel * 0.5, time);
+      subGain.gain.exponentialRampToValueAtTime(0.001, time + durationSeconds);
+      sub.connect(subGain).connect(this.dest("bass"));
+      sub.start(time);
+      sub.stop(time + durationSeconds + 0.05);
     } else {
       osc.type = "sine";
       osc.frequency.setValueAtTime(freq, time);
@@ -1140,6 +1235,24 @@ class BeatEngine {
     for (let i = 0; i < samples; i++) {
       const x = (i * 2) / samples - 1;
       curve[i] = ((3 + k) * x * 20 * (Math.PI / 180)) / (Math.PI + k * Math.abs(x));
+    }
+    return curve;
+  }
+
+  // A genuine bit-depth-reduction transfer curve (quantizing the signal to
+  // a small number of discrete steps) rather than a filter/saturation
+  // trick - a WaveShaperNode applies its curve per-sample, which is
+  // exactly what amplitude quantization is. Used well above what a literal
+  // 12-bit calculation would need to actually be audible: modern "vintage
+  // sampler" emulation almost always pushes the crunch further than the
+  // original hardware's real spec, because that exaggerated crunch is what
+  // reads as "that sound" after decades of homage production leaning on it.
+  makeBitcrushCurve(levels) {
+    const samples = 256;
+    const curve = new Float32Array(samples);
+    for (let i = 0; i < samples; i++) {
+      const x = (i * 2) / samples - 1;
+      curve[i] = Math.round(x * levels) / levels;
     }
     return curve;
   }
@@ -1748,6 +1861,105 @@ class BeatEngine {
       osc.start(time);
       osc.stop(time + dur + 0.1);
     }
+  }
+
+  // A real mono melodic hook instrument for the "Auto-Tune hook" modern
+  // rap/trap production leans on (Future, early Kanye "808s & Heartbreak",
+  // Travis Scott), distinct from the existing "vocal" chord instrument's
+  // sung-vowel chops. The thing that actually reads as "hard-tuned" rather
+  // than "sung" is an absence: a real voice always has some natural pitch
+  // wobble and glide, and hard pitch-correction strips that out entirely,
+  // leaving a flat, static, faintly robotic tone - so unlike every other
+  // vocal-ish voice in this engine, this one deliberately has NO vibrato
+  // LFO at all. What replaces it is a tight unison detune (the doubled/
+  // stacked-vocal layering hard-tune hooks are almost always mixed with)
+  // and a fast, percussive attack so it hits like a hook, not a hum.
+  playAutoLeadVoice(time, freq, durationSeconds, vel, flavor) {
+    const ctx = this.ctx;
+    const dest = this.dest("autolead");
+    const dur = Math.min(durationSeconds, 0.55);
+
+    const formants = flavor === "moody" ? [420, 1000, 2350] : [650, 1500, 2900];
+    const levels = [1, 0.5, 0.28];
+
+    const envelope = ctx.createGain();
+    envelope.gain.setValueAtTime(0.0001, time);
+    envelope.gain.linearRampToValueAtTime(vel, time + 0.008);
+    envelope.gain.setValueAtTime(vel, time + Math.max(0.008, dur - 0.09));
+    envelope.gain.exponentialRampToValueAtTime(0.001, time + dur);
+    envelope.connect(dest);
+
+    for (const detune of [-0.007, 0.007]) {
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freq * (1 + detune), time);
+      formants.forEach((freqCenter, i) => {
+        const bp = ctx.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = freqCenter;
+        bp.Q.value = flavor === "moody" ? 9 : 14;
+        const g = ctx.createGain();
+        g.gain.value = (levels[i] / 2) * (flavor === "moody" ? 0.85 : 1);
+        osc.connect(bp).connect(g).connect(envelope);
+      });
+      osc.start(time);
+      osc.stop(time + dur + 0.05);
+    }
+  }
+
+  // A real mono solo-line instrument, not a chord-stab like the existing
+  // Horn - saxophone melodies are played one note at a time, which is a
+  // genuinely different musical role from a horn section hitting stabs.
+  // Acoustically a sax's conical bore (versus the clarinet's cylindrical
+  // bore) does NOT cancel out even harmonics, so it gets a full-spectrum
+  // sawtooth like the brass flavors rather than the clarinet's square wave
+  // - the things that actually make it read as "sax" instead of "trumpet"
+  // are a continuous breath-noise layer under the tone (a reed hisses the
+  // whole note, not just at the attack), a resonant body formant around
+  // 950Hz, and a real player's idiomatic pitch scoop up into a note.
+  playSaxVoice(time, freq, durationSeconds, vel, flavor) {
+    const ctx = this.ctx;
+    const dest = this.dest("sax");
+    const breathy = flavor === "breathy";
+    const dur = Math.min(durationSeconds, breathy ? 0.65 : 0.55);
+    const attack = breathy ? 0.03 : 0.018;
+
+    const osc = ctx.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(freq * 0.89, time);
+    osc.frequency.exponentialRampToValueAtTime(freq, time + 0.05);
+
+    const formant = ctx.createBiquadFilter();
+    formant.type = "peaking";
+    formant.frequency.value = 950;
+    formant.Q.value = 2.2;
+    formant.gain.value = 8;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = breathy ? 2600 : 3400;
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(vel * 0.85, time + attack);
+    gain.gain.setValueAtTime(vel * 0.85, time + Math.max(attack, dur - 0.1));
+    gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+    osc.connect(formant).connect(lp).connect(gain).connect(dest);
+    osc.start(time);
+    osc.stop(time + dur + 0.05);
+
+    const breath = ctx.createBufferSource();
+    breath.buffer = this.makeNoiseBuffer(dur + 0.05);
+    const breathFilter = ctx.createBiquadFilter();
+    breathFilter.type = "bandpass";
+    breathFilter.frequency.value = 2200;
+    breathFilter.Q.value = 0.8;
+    const breathGain = ctx.createGain();
+    breathGain.gain.setValueAtTime(0.0001, time);
+    breathGain.gain.linearRampToValueAtTime(vel * (breathy ? 0.22 : 0.11), time + attack + 0.01);
+    breathGain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+    breath.connect(breathFilter).connect(breathGain).connect(dest);
+    breath.start(time);
+    breath.stop(time + dur + 0.05);
   }
 
   playMarimbaVoice(time, freq, durationSeconds, vel, flavor) {
@@ -2497,6 +2709,8 @@ class BeatEngine {
         else if (inst === "kalimba") this.playKalimbaVoice(t, freq, noteDur, vel, flavors.kalimba);
         else if (inst === "marimba") this.playMarimbaVoice(t, freq, noteDur, vel, flavors.marimba);
         else if (inst === "arp") this.playArpVoice(t, freq, noteDur, vel, flavors.arp);
+        else if (inst === "autolead") this.playAutoLeadVoice(t, freq, noteDur, vel, flavors.autolead);
+        else if (inst === "sax") this.playSaxVoice(t, freq, noteDur, vel, flavors.sax);
       }
     }
   }

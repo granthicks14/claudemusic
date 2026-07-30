@@ -1,14 +1,14 @@
 const STEPS_PER_BAR = 16;
 
-const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14, arp: 18 };
+const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14, arp: 18, autolead: 14, sax: 14 };
 
 const FLAVOR_POOLS = {
-  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "909", "linn", "707", "606", "dmx"],
-  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn", "707", "dmx"],
+  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "909", "linn", "707", "606", "dmx", "sp1200"],
+  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn", "707", "dmx", "sp1200"],
   hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909", "707", "606"],
-  perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78"],
+  perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78", "talkingdrum"],
   tom: ["acoustic", "simmons"],
-  bass: ["warm", "synth", "808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright"],
+  bass: ["warm", "synth", "808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog"],
   piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord"],
   lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm"],
   pad: ["warm", "ensemble", "airy", "glass", "choir", "dark"],
@@ -21,6 +21,15 @@ const FLAVOR_POOLS = {
   kalimba: ["kalimba", "musicbox", "steeldrum"],
   marimba: ["marimba", "vibraphone"],
   arp: ["arp", "pulse"],
+  // A real mono hook instrument for the "Auto-Tune hook" modern rap/trap
+  // production leans on - distinct from the existing "vocal" chordal
+  // vowel-chop instrument (see playAutoLeadVoice for why: no vibrato at
+  // all, which is what actually reads as hard-pitch-corrected rather than
+  // sung).
+  autolead: ["hard", "moody"],
+  // A real mono solo-line instrument - saxophone melodies are played one
+  // note at a time, a different musical role from Horn's chord stabs.
+  sax: ["smooth", "breathy"],
   fx: ["riser", "siren", "impact"],
 };
 
@@ -32,12 +41,12 @@ const FLAVOR_POOLS = {
 // applied to a shuffle, so "Generate Beat" lands on a beat that sounds like
 // one production instead of several unrelated instruments stacked together.
 const FLAVOR_TAGS = {
-  kick: { boombap: "warm", "808": "dark", fourfloor: "bright", acoustic: "warm", lofi: "warm", deep: "dark", snappy: "bright", click: "bright", punch: "bright", subkick: "dark", gritty: "dark", roomy: "warm", "909": "bright", linn: "warm", "707": "bright", "606": "dark", dmx: "dark" },
-  snare: { crisp: "bright", clap: "bright", fat: "warm", rimshot: "bright", trapsnap: "bright", brush: "warm", gated: "dark", acoustic: "warm", ghost: "dark", layered: "dark", "909snare": "bright", linn: "warm", "707": "bright", dmx: "dark" },
+  kick: { boombap: "warm", "808": "dark", fourfloor: "bright", acoustic: "warm", lofi: "warm", deep: "dark", snappy: "bright", click: "bright", punch: "bright", subkick: "dark", gritty: "dark", roomy: "warm", "909": "bright", linn: "warm", "707": "bright", "606": "dark", dmx: "dark", sp1200: "warm" },
+  snare: { crisp: "bright", clap: "bright", fat: "warm", rimshot: "bright", trapsnap: "bright", brush: "warm", gated: "dark", acoustic: "warm", ghost: "dark", layered: "dark", "909snare": "bright", linn: "warm", "707": "bright", dmx: "dark", sp1200: "warm" },
   hihat: { bright: "bright", dark: "dark", vinyl: "warm", metallic: "bright", analog: "warm", tape: "warm", sizzle: "bright", lofi808: "dark", "909": "bright", "707": "bright", "606": "dark" },
-  perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright", timpani: "dark", cr78: "warm" },
+  perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright", timpani: "dark", cr78: "warm", talkingdrum: "warm" },
   tom: { acoustic: "warm", simmons: "bright" },
-  bass: { warm: "warm", synth: "bright", "808": "dark", hard808: "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm" },
+  bass: { warm: "warm", synth: "bright", "808": "dark", hard808: "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm", moog: "warm" },
   piano: { electric: "bright", pluck: "bright", grand: "warm", rhodes: "warm", wurlitzer: "warm", upright: "warm", celesta: "bright", toy: "bright", harpsichord: "bright" },
   lead: { square: "bright", saw: "bright", bell: "bright", flute: "warm", supersaw: "bright", pluck: "bright", sine: "warm", chip: "bright", brasslead: "warm", fm: "bright" },
   pad: { warm: "warm", ensemble: "warm", airy: "bright", glass: "bright", choir: "warm", dark: "dark" },
@@ -50,6 +59,8 @@ const FLAVOR_TAGS = {
   kalimba: { kalimba: "warm", musicbox: "bright", steeldrum: "bright" },
   marimba: { marimba: "warm", vibraphone: "bright" },
   arp: { arp: "bright", pulse: "warm" },
+  autolead: { hard: "bright", moody: "dark" },
+  sax: { smooth: "warm", breathy: "dark" },
   fx: { riser: "bright", siren: "dark", impact: "dark" },
 };
 
@@ -202,7 +213,10 @@ const STYLES = {
     key: "C2",
     scale: "minor",
     progressions: [[0, 3, 4, 3], [0, 5, 3, 4], [0, 6, 3, 4], [0, 3, 6, 2]],
-    defaultFlavors: { kick: "boombap", snare: "crisp", hihat: "dark", perc: "shaker", bass: "warm", piano: "electric", lead: "flute", strings: "soul", stab: "pluck-chord", organ: "gospel", horn: "muted" },
+    // The E-mu SP-1200's bit-crushed kick/snare - the actual sampler
+    // golden-era boom bap was built on - now the default for the genre
+    // its research writeup was literally named after.
+    defaultFlavors: { kick: "sp1200", snare: "sp1200", hihat: "dark", perc: "shaker", bass: "warm", piano: "electric", lead: "flute", strings: "soul", stab: "pluck-chord", organ: "gospel", horn: "muted" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc"],
       main: {
@@ -348,7 +362,10 @@ const STYLES = {
     key: "C2",
     scale: "dorian",
     progressions: [[0, 3, 4, 0], [0, 3], [0, 6, 3, 0], [0, 4, 3, 0]],
-    defaultFlavors: { kick: "909", snare: "909snare", hihat: "909", perc: "conga", bass: "synth", piano: "pluck", pad: "ensemble", lead: "saw", stab: "square-chord", vocal: "ahh", fx: "riser" },
+    // A Moog-style filter-swept bass instead of a flat, static-cutoff
+    // synth bass - deep/classic house basslines lean on exactly this kind
+    // of analog ladder-filter movement for their warmth.
+    defaultFlavors: { kick: "909", snare: "909snare", hihat: "909", perc: "conga", bass: "moog", piano: "pluck", pad: "ensemble", lead: "saw", stab: "square-chord", vocal: "ahh", fx: "riser" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc", "crash", "fx"],
       main: {
@@ -474,7 +491,11 @@ const STYLES = {
     key: "A1",
     scale: "minor",
     progressions: [[0, 3], [0, 4], [0, 5], [0, 3, 4, 0]],
-    defaultFlavors: { kick: "snappy", snare: "rimshot", hihat: "bright", perc: "conga", bass: "warm", lead: "saw", horn: "brass", stab: "pluck-chord", vocal: "ooh", tom: "acoustic" },
+    // "pluck" over a plain saw for the lead hook - real reggaeton synth
+    // hooks are almost always short and staccato/plucky (they have to cut
+    // through the dembow pattern's own busy syncopation), not a sustained
+    // saw tone.
+    defaultFlavors: { kick: "snappy", snare: "rimshot", hihat: "bright", perc: "conga", bass: "warm", lead: "pluck", horn: "brass", stab: "pluck-chord", vocal: "ooh", tom: "acoustic" },
     drums: {
       instruments: ["kick", "snare", "hihat", "tom", "perc", "crash"],
       main: {
@@ -808,14 +829,17 @@ const STYLES = {
 
   rnb: {
     name: "R&B / Soul",
-    description: "Laid-back live-feel groove, lush 7th-chord Rhodes, a smooth vocal-style top line.",
+    description: "Laid-back live-feel groove, lush 7th-chord Rhodes, a smooth solo saxophone top line.",
     tempo: { min: 68, max: 88, default: 76 },
     swing: 0.13,
     humanize: { timingMs: 8, velocityJitter: 0.16 },
     key: "F2",
     scale: "major",
     progressions: [[0, 5, 1, 4], [0, 3, 5, 4], [0, 2, 3, 4], [5, 3, 0, 4]],
-    defaultFlavors: { kick: "acoustic", snare: "fat", hihat: "dark", perc: "shaker", bass: "pluck", piano: "rhodes", pad: "choir", lead: "flute", strings: "orchestral", organ: "drawbar", horn: "section" },
+    // A real mono solo-line saxophone instead of a generic flute lead - a
+    // sax solo is about as canonical a "smooth vocal-style top line" as
+    // soul/R&B production actually has.
+    defaultFlavors: { kick: "acoustic", snare: "fat", hihat: "dark", perc: "shaker", bass: "pluck", piano: "rhodes", pad: "choir", sax: "smooth", strings: "orchestral", organ: "drawbar", horn: "section" },
     drums: {
       instruments: ["kick", "snare", "hihat", "perc"],
       main: {
@@ -847,10 +871,14 @@ const STYLES = {
         optionalProbability: 0.3,
       }],
     },
-    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "pad", "strings", "organ", "horn"] },
+    melodic: { monoInstruments: ["bass", "sax"], chordInstruments: ["piano", "pad", "strings", "organ", "horn"] },
     melody: {
       bass: { motifBars: 2, noteLengths: [[4,3],[3,2],[6,2]], restProbability: 0.3, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.3 },
-      lead: { motifBars: 2, noteLengths: [[4,2],[6,3],[8,2],[3,1]], restProbability: 0.45, chordToneProbability: 0.7, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.4 },
+      // A soloist breathes and phrases in long lines rather than firing
+      // off short notes - more rest, longer note lengths, and less
+      // constant variation than a typical mono lead config, so it reads
+      // as one expressive solo idea instead of a busy instrumental run.
+      sax: { motifBars: 2, noteLengths: [[4,3],[6,3],[8,2]], restProbability: 0.5, chordToneProbability: 0.75, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.35 },
     },
     chords: {
       piano: {
@@ -1132,9 +1160,14 @@ const STYLES = {
 
   rap: {
     name: "Rap",
-    description: "Hard-hitting distorted 808, aggressive hi-hat rolls, a driven master bus, an Auto-Tune-style hook and kalimba melody.",
+    description: "Hard-hitting distorted 808, aggressive hi-hat rolls, a driven master bus, a hard-edged Auto-Tune hook.",
     tempo: { min: 132, max: 152, default: 142 },
-    swing: 0.15,
+    // Tightened from 0.15 (Hip-Hop's loose boom-bap swing) down close to
+    // Trap's near-straight feel - a loose, laid-back swing reads as
+    // groovy/relaxed, which works against "hard-hitting" no matter how
+    // distorted the drums are. Modern hard trap/rage records are almost
+    // always tightly quantized, not swung.
+    swing: 0.06,
     humanize: { timingMs: 3, velocityJitter: 0.13 },
     key: "C2",
     scale: "minor",
@@ -1145,7 +1178,7 @@ const STYLES = {
     // actually mixed, not just "louder."
     grit: 0.3,
     progressions: [[0, 5, 3, 4], [0, 3, 4, 0], [0, 4], [0, 6, 3, 4]],
-    defaultFlavors: { kick: "gritty", snare: "trapsnap", hihat: "metallic", bass: "hard808", kalimba: "kalimba", vocal: "ahh", stab: "bell-chord", fx: "siren" },
+    defaultFlavors: { kick: "gritty", snare: "trapsnap", hihat: "metallic", bass: "hard808", autolead: "hard", vocal: "ahh", stab: "bell-chord", fx: "siren" },
     drums: {
       // Modeled on the Kanye West "808s & Heartbreak" legacy (TR-808,
       // minor-key minimalism, Auto-Tuned melodic hooks) and Lil Baby-style
@@ -1188,10 +1221,15 @@ const STYLES = {
         hihatRollProbability: 0.5,
       }],
     },
-    melodic: { monoInstruments: ["bass", "kalimba"], chordInstruments: ["vocal", "stab"] },
+    melodic: { monoInstruments: ["bass", "autolead"], chordInstruments: ["vocal", "stab"] },
     melody: {
       bass: { motifBars: 1, noteLengths: [[3,3],[4,2],[6,1]], restProbability: 0.3, chordToneProbability: 0.9, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1],[3,1]], variationProbability: 0.2 },
-      kalimba: { motifBars: 1, noteLengths: [[1,3],[2,3],[3,1]], restProbability: 0.2, chordToneProbability: 0.8, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.12 },
+      // A real hook breathes - it's a sung phrase, not an instrumental
+      // run - so this leans on more space and longer notes than a
+      // typical mono lead config, and stays close to its core idea
+      // instead of constantly varying, the way a rap hook is repeated
+      // almost like a mantra rather than reinvented every bar.
+      autolead: { motifBars: 2, noteLengths: [[3,3],[4,3],[6,1]], restProbability: 0.45, chordToneProbability: 0.85, chordTonePool: [[0,4],[4,2],[7,1]], passingTonePool: [[-1,1],[2,1]], variationProbability: 0.15 },
     },
     chords: {
       vocal: {
@@ -1445,15 +1483,15 @@ const SONG_SECTIONS = [
 ];
 
 const INSTRUMENT_PRIORITY = [
-  "kick", "hihat", "snare", "bass", "piano", "organ", "pad", "lead", "kalimba", "marimba",
-  "guitar", "arp", "openhat", "perc", "stab", "strings", "horn", "vocal", "crash", "tom", "fx",
+  "kick", "hihat", "snare", "bass", "piano", "organ", "pad", "lead", "autolead", "kalimba", "marimba",
+  "guitar", "arp", "openhat", "perc", "stab", "strings", "horn", "sax", "vocal", "crash", "tom", "fx",
 ];
 
 // Volume automation: rather than leaving a track's fader flat for the
 // whole song, atmospheric/feature instruments swell into choruses, dip
 // for the bridge breakdown, and fade in/out over the intro and outro -
 // the same "automate a level over the arrangement" move a real mix uses.
-const AUTOMATION_INSTRUMENTS = ["pad", "strings", "organ", "lead", "vocal", "kalimba", "marimba", "arp"];
+const AUTOMATION_INSTRUMENTS = ["pad", "strings", "organ", "lead", "vocal", "kalimba", "marimba", "arp", "autolead", "sax"];
 
 // intensity scales how far a track pulls back in quiet sections - 1 is
 // the full atmospheric swing (down to ~30% in an intro/bridge), while a

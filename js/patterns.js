@@ -509,7 +509,7 @@ const STYLES = {
     pockets: { snare: 8, hihat: 5 },
     key: "C2",
     scale: "minor",
-    progressions: [[0, 3, 4, 3], [0, 5, 3, 4], [0, 6, 3, 4], [0, 3, 6, 2]],
+    progressions: [[0,3,4,3],[0,5,3,4],[0,6,3,4],[0,3,6,2],[0,5,2,6],[0,3,6,5],[0,6,5,6]],
     // The E-mu SP-1200's bit-crushed kick/snare - the actual sampler
     // golden-era boom bap was built on - now the default for the genre
     // its research writeup was literally named after.
@@ -594,7 +594,7 @@ const STYLES = {
     humanize: { timingMs: 2, velocityJitter: 0.12 },
     key: "C2",
     scale: "minor",
-    progressions: [[0, 5], [0, 3], [0, 4], [0, 5, 3, 4]],
+    progressions: [[0,5],[0,3],[0,4],[0,5,3,4],[0,6,5,6],[0,5,2,6]],
     // "true808" - the sliding, warm-saturated modern-rap 808 (see
     // playBass) - is the bass sound today's trap actually runs on.
     defaultFlavors: { kick: "808", snare: "clap", hihat: "bright", bass: "true808", lead: "bell", stab: "bell-chord", vocal: "ooh", fx: "riser" },
@@ -660,7 +660,7 @@ const STYLES = {
     humanize: { timingMs: 2, velocityJitter: 0.08 },
     key: "C2",
     scale: "dorian",
-    progressions: [[0, 3, 4, 0], [0, 3], [0, 6, 3, 0], [0, 4, 3, 0]],
+    progressions: [[0,3,4,0],[0,3],[0,6,3,0],[0,4,3,0],[0,3,6,3],[0,1,3,0]],
     // A Moog-style filter-swept bass instead of a flat, static-cutoff
     // synth bass - deep/classic house basslines lean on exactly this kind
     // of analog ladder-filter movement for their warmth.
@@ -733,7 +733,7 @@ const STYLES = {
     humanize: { timingMs: 12, velocityJitter: 0.25 },
     key: "E2",
     scale: "major",
-    progressions: [[0, 4, 5, 3], [0, 3, 4, 0], [5, 3, 0, 4], [0, 5, 3, 4]],
+    progressions: [[0,4,5,3],[0,3,4,0],[5,3,0,4],[0,5,3,4],[0,3,4,3],[0,4,3,4],[0,5,2,3]],
     defaultFlavors: { kick: "acoustic", snare: "acoustic", hihat: "bright", bass: "pluck", guitar: "power", perc: "timpani", tom: "acoustic" },
     drums: {
       // "perc" is a sparse orchestral timpani hit, not a percussion groove -
@@ -792,7 +792,7 @@ const STYLES = {
     humanize: { timingMs: 5, velocityJitter: 0.15 },
     key: "A1",
     scale: "minor",
-    progressions: [[0, 3], [0, 4], [0, 5], [0, 3, 4, 0]],
+    progressions: [[0,3],[0,4],[0,5],[0,3,4,0],[0,5,2,6],[0,6,5,4]],
     // "pluck" over a plain saw for the lead hook - real reggaeton synth
     // hooks are almost always short and staccato/plucky (they have to cut
     // through the dembow pattern's own busy syncopation), not a sustained
@@ -862,7 +862,7 @@ const STYLES = {
     pockets: { snare: 12, hihat: 8, bass: -2 },
     key: "D2",
     scale: "dorian",
-    progressions: [[0, 3, 4, 0], [0, 2, 3, 0], [0, 4, 3, 0], [0, 3]],
+    progressions: [[0,3,4,0],[0,2,3,0],[0,4,3,0],[0,3],[0,1,4,0],[3,2,1,0]],
     ambience: "vinyl",
     // Mellotron strings for the default kit - a tape-warbled, band-limited
     // string machine is about as on-brand as lo-fi texture gets, far more
@@ -947,7 +947,7 @@ const STYLES = {
     humanize: { timingMs: 2, velocityJitter: 0.12 },
     key: "C2",
     scale: "phrygian",
-    progressions: [[0, 3], [0, 1, 0], [0, 1, 3, 0], [0, 3, 1, 0]],
+    progressions: [[0,3],[0,1,0],[0,1,3,0],[0,3,1,0],[0,6,5,4],[0,1,5,4]],
     defaultFlavors: { kick: "808", snare: "trapsnap", hihat: "dark", bass: "drillslide", piano: "electric", stab: "pluck-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash"],
@@ -1008,7 +1008,7 @@ const STYLES = {
     humanize: { timingMs: 5, velocityJitter: 0.15 },
     key: "C2",
     scale: "major",
-    progressions: [[0, 3, 4, 0], [0, 4, 5, 3], [0, 5, 3, 4], [0, 1, 3, 4]],
+    progressions: [[0,3,4,0],[0,4,5,3],[0,5,3,4],[0,1,3,4],[0,4,5,4],[3,4,0,0]],
     defaultFlavors: { kick: "acoustic", snare: "clap", hihat: "bright", perc: "shaker", bass: "logdrum", guitar: "nylon", pad: "warm", stab: "pluck-chord", organ: "drawbar", marimba: "marimba", horn: "brass" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc"],
@@ -1084,7 +1084,7 @@ const STYLES = {
     humanize: { timingMs: 2, velocityJitter: 0.1 },
     key: "E1",
     scale: "minor",
-    progressions: [[0, 4], [0, 3], [0, 5], [0, 6, 3, 4]],
+    progressions: [[0,4],[0,3],[0,5],[0,6,3,4],[0,6,5,6],[0,5,6,0]],
     defaultFlavors: { kick: "gritty", snare: "fat", hihat: "metallic", bass: "wobble", stab: "square-chord", vocal: "ahh", fx: "impact" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash", "fx"],
@@ -1143,7 +1143,7 @@ const STYLES = {
     humanize: { timingMs: 8, velocityJitter: 0.16 },
     key: "F2",
     scale: "major",
-    progressions: [[0, 5, 1, 4], [0, 3, 5, 4], [0, 2, 3, 4], [5, 3, 0, 4]],
+    progressions: [[0,5,1,4],[0,3,5,4],[0,2,3,4],[5,3,0,4],[1,4,0,0],[3,2,1,0],[0,1,4,0]],
     // A real mono solo-line saxophone instead of a generic flute lead - a
     // sax solo is about as canonical a "smooth vocal-style top line" as
     // soul/R&B production actually has.
@@ -1228,7 +1228,7 @@ const STYLES = {
     humanize: { timingMs: 3, velocityJitter: 0.14 },
     key: "C2",
     scale: "minor",
-    progressions: [[0, 4], [0, 3], [0, 5], [0, 6, 3, 4]],
+    progressions: [[0,4],[0,3],[0,5],[0,6,3,4],[0,6,5,4],[0,5,6,4]],
     defaultFlavors: { kick: "gritty", snare: "trapsnap", hihat: "metallic", perc: "cowbell", bass: "distorted", lead: "bell", vocal: "ahh", stab: "bell-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc", "crash"],
@@ -1294,7 +1294,7 @@ const STYLES = {
     humanize: { timingMs: 2, velocityJitter: 0.1 },
     key: "C2",
     scale: "minor",
-    progressions: [[0, 3], [0, 5], [0, 4], [0, 5, 3, 4]],
+    progressions: [[0,3],[0,5],[0,4],[0,5,3,4],[0,5,2,6],[0,6,5,6]],
     defaultFlavors: { kick: "snappy", snare: "clap", hihat: "bright", bass: "sub", vocal: "ooh", stab: "square-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat"],
@@ -1353,7 +1353,7 @@ const STYLES = {
     humanize: { timingMs: 3, velocityJitter: 0.15 },
     key: "E1",
     scale: "minor",
-    progressions: [[0, 3, 4, 0], [0, 5, 3, 4], [0, 4], [0, 6, 3, 4]],
+    progressions: [[0,3,4,0],[0,5,3,4],[0,4],[0,6,3,4],[0,5,2,6],[0,6,5,6]],
     defaultFlavors: { kick: "acoustic", snare: "crisp", hihat: "bright", bass: "reese", pad: "airy", stab: "square-chord", arp: "pulse" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash"],
@@ -1413,7 +1413,7 @@ const STYLES = {
     humanize: { timingMs: 4, velocityJitter: 0.12 },
     key: "A1",
     scale: "minor",
-    progressions: [[0, 5, 3, 4], [0, 3, 4, 0], [0, 6, 3, 4], [0, 3]],
+    progressions: [[0,5,3,4],[0,3,4,0],[0,6,3,4],[0,3],[0,5,2,6],[0,6,5,6],[5,3,0,6]],
     // A Juno-106 chorus pad instead of a plain "warm" patch - that lush,
     // BBD-chorused analog pad is about as quintessentially 80s-synthwave
     // a texture as exists.
@@ -1488,7 +1488,7 @@ const STYLES = {
     // records (Travis Scott/Future/Playboi Carti-adjacent production) are
     // actually mixed, not just "louder."
     grit: 0.3,
-    progressions: [[0, 5, 3, 4], [0, 3, 4, 0], [0, 4], [0, 6, 3, 4]],
+    progressions: [[0,5,3,4],[0,3,4,0],[0,4],[0,6,3,4],[0,6,5,6],[0,5,2,6]],
     defaultFlavors: { kick: "gritty", snare: "trapsnap", hihat: "metallic", bass: "hard808", autolead: "hard", vocal: "ahh", stab: "bell-chord", fx: "siren" },
     drums: {
       // Modeled on the Kanye West "808s & Heartbreak" legacy (TR-808,
@@ -1568,7 +1568,7 @@ const STYLES = {
     humanize: { timingMs: 6, velocityJitter: 0.15 },
     key: "C2",
     scale: "minor",
-    progressions: [[0, 3, 4, 0], [0, 5, 3, 4], [0, 3], [0, 4, 3, 0]],
+    progressions: [[0,3,4,0],[0,5,3,4],[0,3],[0,4,3,0],[0,5,2,6],[3,6,0,0]],
     defaultFlavors: { kick: "deep", snare: "rimshot", hihat: "dark", perc: "shaker", bass: "logdrum", piano: "rhodes", pad: "warm", vocal: "ooh", stab: "organ-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc"],
@@ -1645,7 +1645,7 @@ const STYLES = {
     humanize: { timingMs: 5, velocityJitter: 0.18 },
     key: "G2",
     scale: "dorian",
-    progressions: [[0, 3, 4, 0], [0, 2, 3, 4], [0, 4], [0, 3]],
+    progressions: [[0,3,4,0],[0,2,3,4],[0,4],[0,3],[0,1,4,0],[0,6,3,0]],
     defaultFlavors: { kick: "punch", snare: "crisp", hihat: "bright", perc: "shaker", bass: "sub", lead: "pluck", organ: "combo", vocal: "ay", stab: "organ-chord" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc"],
@@ -1717,7 +1717,7 @@ const STYLES = {
     humanize: { timingMs: 2, velocityJitter: 0.08 },
     key: "A1",
     scale: "minor",
-    progressions: [[0], [0, 3], [0, 1], [0, 4]],
+    progressions: [[0],[0,3],[0,1],[0,4],[0,5],[0,6]],
     defaultFlavors: { kick: "909", snare: "909snare", hihat: "909", perc: "clave", bass: "303", pad: "dark", stab: "square-chord", arp: "pulse", fx: "riser" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc", "crash", "fx"],
@@ -1786,7 +1786,7 @@ const STYLES = {
     pockets: { snare: 16, hihat: 10, kick: 4, bass: -3 },
     key: "F2",
     scale: "major",
-    progressions: [[0, 2, 5, 4], [3, 2, 0, 4], [0, 5, 1, 4], [2, 5, 0, 3]],
+    progressions: [[0,2,5,4],[3,2,0,4],[0,5,1,4],[2,5,0,3],[1,4,0,3],[3,2,1,0],[5,1,4,0]],
     // Cross-stick, not a full snare: neo-soul's backbeat is almost always
     // the stick laid across the head tapping the rim - the dry woody
     // "tock" that leaves room for the Rhodes and keeps the pocket soft.
@@ -1912,7 +1912,7 @@ function voiceLeadDegrees(degrees, prevLowest) {
 }
 
 function resolveChordBarTrack(instKey, cfg, barRootDegree, opts = {}) {
-  const { registerOffset = 0, voicingBonus = 0, splitMotion = null, anticipate = false, prevLowest = null } = opts;
+  const { registerOffset = 0, voicingBonus = 0, splitMotion = null, anticipate = false, prevLowest = null, sus = false } = opts;
   const raw = rollNoteTrack(cfg.core, cfg.optional, cfg.optionalProbability);
   const register = REGISTER[instKey] + registerOffset;
   let running = prevLowest;
@@ -1920,7 +1920,12 @@ function resolveChordBarTrack(instKey, cfg, barRootDegree, opts = {}) {
     if (!spec) return null;
     const root = barRootDegree + register + spec.degreeOffset;
     const size = Math.max(2, spec.size + voicingBonus);
-    const led = voiceLeadDegrees(chordDegrees(root, size), running);
+    let degs = chordDegrees(root, size);
+    // A suspended chord replaces the third with the fourth, withholding
+    // the major/minor quality - the open, unresolved sound house and
+    // techno lean on.
+    if (sus) degs = degs.map((d, i) => (i === 1 ? d + 1 : d));
+    const led = voiceLeadDegrees(degs, running);
     running = led[0];
     return { degrees: led, len: spec.len };
   });
@@ -1957,6 +1962,33 @@ function resolveChordBarTrack(instKey, cfg, barRootDegree, opts = {}) {
   return resolved;
 }
 
+// ---- Chord colour ----
+// Every chord in the app resolved to a plain stack of thirds from the
+// scale, which produces correct but generic triads. Real genres have
+// characteristic chord *qualities*, and that colour is a large part of
+// what identifies a style: neo-soul and jazz-leaning R&B are built on
+// 7ths and 9ths (plain triads sound wrong there), house and techno lean
+// on suspended voicings that withhold the third, and rock/trap
+// deliberately stay bare so the harmony doesn't get in the way.
+// voicingBonus adds stacked thirds (3 -> 7th -> 9th); sus replaces the
+// third with the fourth, removing the major/minor quality entirely.
+const CHORD_COLOR = {
+  neosoul:  { extend: [[0, 1], [1, 3], [2, 3]], sus: 0.05 },
+  rnb:      { extend: [[0, 2], [1, 3], [2, 1]], sus: 0.05 },
+  lofi:     { extend: [[0, 2], [1, 3], [2, 1]], sus: 0.08 },
+  jazzish:  { extend: [[0, 1], [1, 3], [2, 2]], sus: 0.05 },
+  house:    { extend: [[0, 3], [1, 2]], sus: 0.22 },
+  ukgarage: { extend: [[0, 3], [1, 2]], sus: 0.2 },
+  techno:   { extend: [[0, 4], [1, 1]], sus: 0.3 },
+  amapiano: { extend: [[0, 2], [1, 3], [2, 1]], sus: 0.1 },
+  synthwave:{ extend: [[0, 3], [1, 2]], sus: 0.15 },
+  hiphop:   { extend: [[0, 3], [1, 2]], sus: 0.05 },
+  afrobeats:{ extend: [[0, 3], [1, 2]], sus: 0.08 },
+  drill:    { extend: [[0, 4], [1, 1]], sus: 0.04 },
+  dnb:      { extend: [[0, 3], [1, 2]], sus: 0.12 },
+};
+const DEFAULT_CHORD_COLOR = { extend: [[0, 5], [1, 1]], sus: 0.03 };
+
 function pickChordVariety(style) {
   const variety = {};
   for (const inst of style.melodic.chordInstruments || []) {
@@ -1967,7 +1999,8 @@ function pickChordVariety(style) {
     const lowHomed = REGISTER[inst] <= 7;
     variety[inst] = {
       registerOffset: lowHomed ? pickWeighted([[0, 3], [7, 1]]) : pickWeighted([[-7, 1], [0, 3], [7, 1]]),
-      voicingBonus: pickWeighted([[0, 3], [1, 2], [2, 1]]),
+      voicingBonus: pickWeighted((CHORD_COLOR[style.id] || DEFAULT_CHORD_COLOR).extend),
+      sus: Math.random() < (CHORD_COLOR[style.id] || DEFAULT_CHORD_COLOR).sus,
       splitMotion: Math.random() < 0.45 ? pickWeighted([[4, 1], [-3, 1], [3, 1], [-4, 1]]) : null,
       anticipate: Math.random() < 0.22,
     };
@@ -2100,9 +2133,67 @@ function buildChordBar(style, variant, barRootDegree, chordVariety, prevLowest =
 // forever - only the melody notes and instrument timbres ever varied. Both
 // now pick randomly from a small pool of genuinely different, genre-
 // appropriate options every time a beat is generated.
+// ---- Progression quality, from functional harmony ----
+// Not all chord successions are equally strong, and the reasons are
+// well established rather than matters of taste:
+//
+// - ROOT MOTION. Descending-fifth motion (vi->ii->V->I, the circle of
+//   fifths) is the strongest progression in tonal music; descending
+//   thirds and ascending steps are next; ascending fifths are the
+//   weakest and can sound like the harmony is sliding backwards.
+// - FUNCTION. Western harmony moves Tonic -> Predominant -> Dominant ->
+//   Tonic. A progression that walks that arc feels purposeful; one that
+//   wanders between functions feels aimless.
+// - CADENCE. Ending on the dominant leaves the loop hanging and pulling
+//   back to the top, which is exactly what a repeating loop wants.
+const FUNCTION_MAJOR = ["T", "PD", "T", "PD", "D", "T", "D"];
+const FUNCTION_MINOR = ["T", "D", "T", "PD", "D", "PD", "D"];
+
+function rootMotionScore(from, to) {
+  const step = ((to - from) % 7 + 7) % 7;
+  if (step === 3) return 1.0;   // down a fifth (up a fourth) - strongest
+  if (step === 5) return 0.75;  // down a third
+  if (step === 1) return 0.7;   // up a step
+  if (step === 6) return 0.6;   // down a step
+  if (step === 2) return 0.5;   // up a third
+  if (step === 4) return 0.3;   // up a fifth - weakest
+  return 0.35;                  // static
+}
+
+function scoreProgression(prog, scaleName) {
+  if (!prog || prog.length < 2) return 0.5;
+  const fn = scaleName === "major" ? FUNCTION_MAJOR : FUNCTION_MINOR;
+  let motion = 0;
+  for (let i = 0; i < prog.length; i++) {
+    motion += rootMotionScore(prog[i], prog[(i + 1) % prog.length]);
+  }
+  motion /= prog.length;
+
+  // Reward a real functional arc appearing somewhere in the loop.
+  let arc = 0;
+  for (let i = 0; i < prog.length - 1; i++) {
+    const a = fn[((prog[i] % 7) + 7) % 7];
+    const b = fn[((prog[i + 1] % 7) + 7) % 7];
+    if (a === "T" && b === "PD") arc += 0.3;
+    if (a === "PD" && b === "D") arc += 0.45;
+    if (a === "D" && b === "T") arc += 0.4;
+  }
+  arc = Math.min(1, arc);
+
+  // A loop that starts on the tonic states its key immediately.
+  const tonicStart = prog[0] % 7 === 0 ? 0.2 : 0;
+  return motion * 0.5 + arc * 0.3 + tonicStart;
+}
+
+// Progressions are still chosen at random - variety matters - but the
+// draw is weighted toward the stronger ones, so a generation is more
+// likely to land on harmony that actually goes somewhere while every
+// authored option stays reachable.
 function pickProgression(style) {
   const options = style.progressions || [style.progression];
-  return options[Math.floor(Math.random() * options.length)];
+  if (options.length === 1) return options[0];
+  const weighted = options.map((p) => [p, 0.25 + scoreProgression(p, style.scale)]);
+  return pickWeighted(weighted);
 }
 
 function pickDrumMain(style) {

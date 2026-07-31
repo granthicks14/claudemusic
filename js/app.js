@@ -1056,15 +1056,221 @@ let reelPulse = 0;
 const reelActiveInstruments = new Set();
 const REEL_DOT_INSTRUMENTS = ["kick", "snare", "hihat", "bass", "lead", "piano", "guitar", "vocal"];
 
+// ---- Falling-note view for the exported video ----
+// A radial visualiser reacts to audio but shows nothing about the music
+// itself. What makes a beat video watchable is SEEING the notes arrive -
+// the "falling notes" format (piano-roll scrolling into a strike line)
+// is the single most-watched way music is visualised online, because the
+// viewer can anticipate each hit a moment before they hear it. That
+// anticipation is the whole appeal, so the note field is now the
+// centrepiece of the frame rather than a decoration.
+// Short lane codes - full instrument names collide once a genre has ten
+// tracks across a 1080px-wide frame.
+const REEL_LANE_LABEL = {
+  kick: "KICK", snare: "SNR", hihat: "HAT", openhat: "OPEN", tom: "TOM", perc: "PERC",
+  crash: "CRSH", fx: "FX", bass: "BASS", piano: "PIANO", lead: "LEAD", pad: "PAD",
+  stab: "STAB", guitar: "GTR", strings: "STR", horn: "HORN", organ: "ORG", vocal: "VOX",
+  kalimba: "KLMB", marimba: "MRMB", arp: "ARP", autolead: "AUTO", sax: "SAX",
+};
+
+let reelLanes = [];
+let reelStepStartMs = 0;
+let reelStepMs = 125;
+let reelHitFlash = {};
+
+function buildReelLanes() {
+  reelLanes = [];
+  if (!currentPattern || !activeStyle) return;
+  const order = [
+    ...DRUM_ORDER.filter((i) => activeStyle.drums.instruments.includes(i)),
+    ...MELODIC_ORDER.filter((i) => activeStyle.melodic.monoInstruments.includes(i) || activeStyle.melodic.chordInstruments.includes(i)),
+  ];
+  for (const inst of order) {
+    const arr = currentPattern.instruments[inst];
+    if (!arr || !arr.some(Boolean)) continue;
+    // Melodic lanes place each note horizontally by pitch within the
+    // lane, so the viewer can read the shape of the line, not just its
+    // rhythm.
+    let lo = Infinity, hi = -Infinity;
+    for (const n of arr) {
+      if (!n || n === true || n === "roll" || n === "ghost") continue;
+      const d = n.degree !== undefined ? n.degree : (n.degrees ? n.degrees[0] : null);
+      if (d === null) continue;
+      lo = Math.min(lo, d); hi = Math.max(hi, d);
+    }
+    reelLanes.push({
+      inst,
+      melodic: lo !== Infinity,
+      lo: lo === Infinity ? 0 : lo,
+      hi: hi === -Infinity ? 1 : Math.max(hi, lo + 1),
+      color: TRACK_COLOR[inst] || "#a55eea",
+    });
+  }
+}
+
 function reelStepHook(step) {
   const pattern = currentPattern;
   if (!pattern) return;
+  reelStepStartMs = performance.now();
+  reelStepMs = (60 / Number(tempoSlider.value) / 4) * 1000;
   if (pattern.instruments.kick && pattern.instruments.kick[step]) reelPulse = 1;
   reelActiveInstruments.clear();
   for (const inst of REEL_DOT_INSTRUMENTS) {
     const track = pattern.instruments[inst];
     if (track && track[step]) reelActiveInstruments.add(inst);
   }
+  // Flash any lane whose note lands on this step - the moment of impact.
+  for (const lane of reelLanes) {
+    const v = pattern.instruments[lane.inst] && pattern.instruments[lane.inst][step];
+    if (v) reelHitFlash[lane.inst] = 1;
+  }
+}
+
+// The chord sounding right now, named - so a viewer can actually follow
+// the harmony rather than just watching shapes move.
+function reelChordName(step) {
+  if (!currentPattern || !activeStyle) return "";
+  const bar = Math.floor(step / STEPS_PER_BAR);
+  const roots = currentPattern.barRootDegrees || [];
+  if (!roots.length) return "";
+  const rootDeg = roots[bar % roots.length];
+  const ctx2 = contextForStep(step);
+  const name = degreeToLabel(ctx2.rootMidi, ctx2.scale, rootDeg).replace(/-?\d+$/, "");
+  const scale = Array.isArray(ctx2.scale) ? ctx2.scale : SCALES[ctx2.scale];
+  // Third above the root tells us whether this chord is major or minor.
+  const third = scaleDegreeToMidi(ctx2.rootMidi, ctx2.scale, rootDeg + 2) - scaleDegreeToMidi(ctx2.rootMidi, ctx2.scale, rootDeg);
+  return name + (third <= 3 ? "m" : "");
+}
+
+function drawReelNotes(ctx, w, h, step, accent) {
+  if (!reelLanes.length || !currentPattern) return;
+  const top = h * 0.305;
+  const strikeY = h * 0.80;
+  const field = strikeY - top;
+  const LOOKAHEAD = 16; // one full bar visible above the strike line
+  const total = currentPattern.instruments[reelLanes[0].inst].length;
+
+  // Smooth sub-step scrolling so notes glide instead of snapping.
+  const frac = Math.max(0, Math.min(1, (performance.now() - reelStepStartMs) / reelStepMs));
+  const nowPos = step + frac;
+
+  const padX = w * 0.06;
+  const laneW = (w - padX * 2) / reelLanes.length;
+
+  // Lane backgrounds
+  reelLanes.forEach((lane, i) => {
+    ctx.fillStyle = i % 2 ? "#ffffff08" : "#ffffff04";
+    ctx.fillRect(padX + i * laneW, top, laneW, field);
+  });
+
+  // Beat grid scrolling with the notes - gives the eye a pulse to track.
+  for (let k = -1; k < LOOKAHEAD + 4; k++) {
+    const s2 = Math.floor(nowPos) + k;
+    if (((s2 % 4) + 4) % 4 !== 0) continue;
+    const y = strikeY - ((s2 - nowPos) / LOOKAHEAD) * field;
+    if (y < top || y > strikeY) continue;
+    ctx.strokeStyle = s2 % 16 === 0 ? "#ffffff28" : "#ffffff10";
+    ctx.lineWidth = s2 % 16 === 0 ? 2 : 1;
+    ctx.beginPath();
+    ctx.moveTo(padX, y);
+    ctx.lineTo(w - padX, y);
+    ctx.stroke();
+  }
+
+  // Falling notes
+  reelLanes.forEach((lane, i) => {
+    const arr = currentPattern.instruments[lane.inst];
+    const laneX = padX + i * laneW;
+    for (let k = -2; k < LOOKAHEAD + 2; k++) {
+      const s2 = Math.floor(nowPos) + k;
+      // The pattern loops, so lookahead has to wrap with it - otherwise
+      // the view empties out right before the loop turns over.
+      const idx = ((s2 % total) + total) % total;
+      const v = arr[idx];
+      if (!v) continue;
+      const len = v.len || 1;
+      const yEnd = strikeY - ((s2 - nowPos) / LOOKAHEAD) * field;
+      const yStart = strikeY - ((s2 + len - nowPos) / LOOKAHEAD) * field;
+      const barH = Math.max(h * 0.006, yEnd - yStart);
+      const yTop = yEnd - barH;
+      if (yEnd < top - 20 || yTop > strikeY + 20) continue;
+
+      // Pitch position within the lane for melodic parts.
+      let bx = laneX + laneW * 0.15;
+      let bw = laneW * 0.7;
+      if (lane.melodic) {
+        const d = v.degree !== undefined ? v.degree : (v.degrees ? v.degrees[0] : lane.lo);
+        const t = (d - lane.lo) / Math.max(1, lane.hi - lane.lo);
+        bw = laneW * 0.5;
+        bx = laneX + laneW * 0.08 + t * (laneW * 0.84 - bw);
+      }
+
+      const clippedTop = Math.max(yTop, top);
+      const clippedH = Math.min(yEnd, strikeY + 6) - clippedTop;
+      if (clippedH <= 0) continue;
+
+      // Notes brighten as they approach the strike line.
+      const prox = 1 - Math.max(0, Math.min(1, (strikeY - yEnd) / field));
+      ctx.globalAlpha = 0.35 + prox * 0.65;
+      ctx.fillStyle = lane.color;
+      if (prox > 0.9) {
+        ctx.shadowColor = lane.color;
+        ctx.shadowBlur = 18;
+      }
+      if (ctx.roundRect) {
+        ctx.beginPath();
+        ctx.roundRect(bx, clippedTop, bw, clippedH, Math.min(6, bw / 2));
+        ctx.fill();
+      } else {
+        ctx.fillRect(bx, clippedTop, bw, clippedH);
+      }
+      ctx.shadowBlur = 0;
+      ctx.globalAlpha = 1;
+    }
+  });
+
+  // The strike line, plus a burst on every lane that just fired.
+  ctx.strokeStyle = "#ffffff";
+  ctx.globalAlpha = 0.85;
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(padX, strikeY);
+  ctx.lineTo(w - padX, strikeY);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  reelLanes.forEach((lane, i) => {
+    const f = reelHitFlash[lane.inst] || 0;
+    if (f <= 0.02) return;
+    const laneX = padX + i * laneW;
+    const g = ctx.createLinearGradient(0, strikeY - field * 0.16 * f, 0, strikeY);
+    g.addColorStop(0, lane.color + "00");
+    g.addColorStop(1, lane.color + "cc");
+    ctx.globalAlpha = f;
+    ctx.fillStyle = g;
+    ctx.fillRect(laneX, strikeY - field * 0.16 * f, laneW, field * 0.16 * f);
+    // Impact glow on the line itself
+    ctx.fillStyle = lane.color;
+    ctx.shadowColor = lane.color;
+    ctx.shadowBlur = 26 * f;
+    ctx.fillRect(laneX + laneW * 0.06, strikeY - 3, laneW * 0.88, 6);
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
+  });
+
+  // Lane labels under the strike line
+  ctx.textAlign = "center";
+  const labelSize = Math.max(h * 0.008, Math.min(h * 0.014, laneW * 0.26));
+  ctx.font = `700 ${Math.round(labelSize)}px sans-serif`;
+  if (laneW > w * 0.045) {
+    reelLanes.forEach((lane, i) => {
+      const f = reelHitFlash[lane.inst] || 0;
+      ctx.fillStyle = f > 0.1 ? lane.color : "#ffffff45";
+      ctx.fillText(REEL_LANE_LABEL[lane.inst] || lane.inst.slice(0, 4).toUpperCase(), padX + i * laneW + laneW / 2, strikeY + h * 0.026);
+    });
+  }
+
+  for (const k of Object.keys(reelHitFlash)) reelHitFlash[k] *= 0.82;
 }
 
 function reelSectionLabel(step) {
@@ -1081,7 +1287,7 @@ function drawReelFrame(ctx, elapsedSec, durationSec, step) {
   const h = reelCanvas.height;
   const accent = STYLE_ACCENTS[selectedStyleId] || "#a55eea";
   const cx = w / 2;
-  const cy = h * 0.46;
+  const cy = h * 0.155;
 
   reelPulse *= 0.9;
 
@@ -1102,19 +1308,19 @@ function drawReelFrame(ctx, elapsedSec, durationSec, step) {
     const data = new Uint8Array(engine.analyser.frequencyBinCount);
     engine.analyser.getByteFrequencyData(data);
     const bars = 72;
-    const innerR = h * 0.13 * (1 + 0.12 * reelPulse);
+    const innerR = h * 0.062 * (1 + 0.12 * reelPulse);
     for (let i = 0; i < bars; i++) {
       const angle = (i / bars) * Math.PI * 2 - Math.PI / 2;
       const dataIndex = Math.floor((i / bars) * data.length * 0.75);
       const value = data[dataIndex] / 255;
-      const len = h * 0.02 + value * h * 0.12;
+      const len = h * 0.009 + value * h * 0.05;
       const x1 = cx + Math.cos(angle) * innerR;
       const y1 = cy + Math.sin(angle) * innerR;
       const x2 = cx + Math.cos(angle) * (innerR + len);
       const y2 = cy + Math.sin(angle) * (innerR + len);
       ctx.strokeStyle = accent;
       ctx.globalAlpha = 0.55 + value * 0.45;
-      ctx.lineWidth = w * 0.007;
+      ctx.lineWidth = w * 0.005;
       ctx.lineCap = "round";
       ctx.beginPath();
       ctx.moveTo(x1, y1);
@@ -1135,14 +1341,15 @@ function drawReelFrame(ctx, elapsedSec, durationSec, step) {
   const style = STYLES[selectedStyleId];
   ctx.textAlign = "center";
   ctx.fillStyle = "#ffffff";
-  ctx.font = `700 ${Math.round(h * 0.044)}px sans-serif`;
-  ctx.fillText(style ? style.name : "Beat Studio", cx, h * 0.2);
+  ctx.font = `700 ${Math.round(h * 0.038)}px sans-serif`;
+  ctx.fillText(style ? style.name : "Beat Studio", cx, h * 0.245);
 
   ctx.font = `400 ${Math.round(h * 0.02)}px sans-serif`;
   ctx.fillStyle = "#c9c9d8";
   const tempo = Math.round(Number(tempoSlider.value));
   const keyLabel = keySelect.value + (keySelect.dataset.octave || "");
-  ctx.fillText(`${tempo} BPM  ·  ${keyLabel}`, cx, h * 0.235);
+  const chordNow = step !== undefined ? reelChordName(step) : "";
+  ctx.fillText(`${tempo} BPM  ·  ${keyLabel}${chordNow ? "  ·  " + chordNow : ""}`, cx, h * 0.275);
 
   // Section badge (Full Song mode only) - a small pill showing Intro /
   // Verse / Chorus / Bridge / Outro so the video actually narrates where
@@ -1154,7 +1361,7 @@ function drawReelFrame(ctx, elapsedSec, durationSec, step) {
     const textW = ctx.measureText(section.toUpperCase()).width;
     const pillW = textW + padX * 2;
     const pillH = h * 0.032;
-    const pillY = h * 0.265;
+    const pillY = h * 0.845;
     ctx.fillStyle = accent + "30";
     ctx.strokeStyle = accent;
     ctx.lineWidth = 2;
@@ -1172,31 +1379,19 @@ function drawReelFrame(ctx, elapsedSec, durationSec, step) {
     ctx.fillText(section.toUpperCase(), cx, pillY + pillH * 0.72);
   }
 
-  // Instrument-activity dots - a row of colored dots that light up on
-  // whichever instruments are actually sounding this exact step, so the
-  // video visibly reflects the real arrangement, not just generic bars.
-  const dotY = h * 0.7;
-  const activeList = REEL_DOT_INSTRUMENTS.filter((inst) => activeStyle && (activeStyle.drums.instruments.includes(inst) || activeStyle.melodic.monoInstruments.includes(inst) || activeStyle.melodic.chordInstruments.includes(inst)));
-  const dotGap = w * 0.09;
-  const dotStartX = cx - ((activeList.length - 1) * dotGap) / 2;
-  activeList.forEach((inst, i) => {
-    const x = dotStartX + i * dotGap;
-    const on = reelActiveInstruments.has(inst);
-    const r = on ? h * 0.011 : h * 0.007;
-    ctx.beginPath();
-    ctx.arc(x, dotY, r, 0, Math.PI * 2);
-    ctx.fillStyle = on ? (TRACK_COLOR[inst] || accent) : "#ffffff25";
-    ctx.fill();
-    if (on) {
-      ctx.strokeStyle = TRACK_COLOR[inst] || accent;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
-  });
+  drawReelNotes(ctx, w, h, step === undefined ? 0 : step, accent);
 
-  ctx.font = `700 ${Math.round(h * 0.023)}px sans-serif`;
+  if (chordNow) {
+    ctx.font = `800 ${Math.round(h * 0.052)}px sans-serif`;
+    ctx.fillStyle = "#ffffff";
+    ctx.globalAlpha = 0.93;
+    ctx.fillText(chordNow, cx, h * 0.915);
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.font = `700 ${Math.round(h * 0.02)}px sans-serif`;
   ctx.fillStyle = accent;
-  ctx.fillText("BEAT STUDIO", cx, h * 0.92);
+  ctx.fillText("BEAT STUDIO", cx, h * 0.952);
 
   const barY = h * 0.965;
   const barW = w * 0.7;
@@ -1249,6 +1444,8 @@ async function exportReel() {
   if (engine.isPlaying) engine.stop();
   reelPulse = 0;
   reelActiveInstruments.clear();
+  reelHitFlash = {};
+  buildReelLanes();
   let reelCurrentStep = 0;
   engine.onStep = (step) => {
     highlightStep(step);

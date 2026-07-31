@@ -245,6 +245,43 @@ A few smaller genre-authenticity refinements from the same pass:
 - **Juno-106 pad** — the Roland Juno-106's signature isn't really its oscillator (a plain analog saw); it's the built-in BBD (bucket-brigade device) chorus circuit almost every classic Juno pad patch was run through, which is what actually gives it that lush, wide, shimmering character. Modeled as the real DSP a chorus circuit uses — a short delay line whose delay time is itself slowly modulated by an LFO, mixed back in with the dry signal — rather than just another detuned oscillator faking "width." New Pad flavor, and Synthwave's new default.
 - **Vocoder** — a real vocoder imposes a filter bank derived from a spoken "modulator" signal onto a synthesized carrier tone; without an actual speech input to analyze, the classic *synthesized* vocoder hit (Herbie Hancock, Zapp, Daft Punk-adjacent) is approximated with a buzzy square-wave carrier — harmonically richer and more mechanical than the vocal instrument's sawtooth — through a coarser bank of more, narrower fixed-frequency bands, and, like Auto Lead, deliberately no vibrato at all. New Vocal flavor.
 
+## Chord progressions, chosen by functional harmony
+
+Progressions were a flat pool per genre, drawn from uniformly. But not all chord successions are equally strong, and the reasons are well established rather than matters of taste — so the pools got bigger *and* the draw got smarter.
+
+**The pools grew from 76 to 119 progressions**, adding the named progressions real music is built from: the **axis** family (I–V–vi–IV and its rotations, the most-used progression in modern pop), **50s doo-wop** (I–vi–IV–V), the **Andalusian cadence** (i–VII–VI–V, the flamenco descent), **ii–V–I** and its extensions for the jazz-leaning genres, the **backdoor cadence** (♭VII–I), circle-of-fifths walks, and the Dorian **i–IV** modal vamp that defines deep house and much of lo-fi.
+
+Selection is now weighted by three properties from functional harmony:
+
+- **Root motion.** Descending-fifth motion (vi→ii→V→I) is the strongest progression in tonal music; descending thirds and ascending steps come next; ascending fifths are weakest and can sound like the harmony is sliding backwards.
+- **Function.** Western harmony moves Tonic → Predominant → Dominant → Tonic. A progression that walks that arc feels purposeful; one that wanders between functions feels aimless.
+- **Stating the key.** A loop that begins on the tonic establishes where home is immediately.
+
+Crucially the draw stays *random*, just weighted — every authored progression remains reachable, so variety is preserved while generations land more often on harmony that actually goes somewhere.
+
+## Chords that sound like their genre
+
+Every chord used to resolve to a plain stack of thirds — correct, but generic. Real genres have characteristic chord *qualities*, and that colour is a large part of what identifies a style. Each genre now has a chord-colour profile:
+
+- **Neo-Soul and R&B** are built on 7ths, 9ths, and 11ths — plain triads genuinely sound wrong there. Neo-Soul now voices 5–6 note chords the majority of the time.
+- **House, Techno, and UK Garage** lean on **suspended** voicings, which replace the third with the fourth and withhold the major/minor quality entirely — that open, unresolved sound is a genre signature.
+- **Rock, Trap, and Drill** stay deliberately bare, so the harmony doesn't get in the way of the riff or the 808.
+
+## The reel now shows the notes
+
+A radial visualiser reacts to audio but says nothing about the music. What makes a beat video watchable is *seeing the notes arrive* — the falling-note format is the most-watched way music is visualised online precisely because the viewer can anticipate each hit a moment before hearing it. That anticipation is the entire appeal, so the note field is now the centrepiece of the frame rather than a decoration.
+
+- **A lane per instrument**, coloured to match the editor, with notes falling toward a strike line.
+- **Melodic lanes place each note horizontally by pitch**, so the viewer reads the *shape* of the line, not just its rhythm.
+- **Notes brighten as they approach the strike line**, and each lane fires a coloured burst at the moment of impact.
+- **A scrolling beat grid** (brighter on the bar line) gives the eye a pulse to track.
+- **The current chord is named on screen** — large, under the note field — so a viewer can follow the harmony. Major/minor quality is detected from the actual third above the root, so a Dorian tonic correctly reads as minor.
+- **Smooth sub-step scrolling** so notes glide rather than snapping between steps.
+
+The activity-dot row was removed: the lanes now show everything it did, more clearly.
+
+*(Bug found while building this: the lookahead didn't wrap with the loop, so the upper half of the note field emptied out right before the pattern turned over — exactly when a viewer most wants to see what's coming. The lookahead now wraps around the loop.)*
+
 ## Why the guitar sounded wrong: there was no speaker
 
 The guitar had a physical string model, real strumming, and double-tracking — and still sounded bad, because the most important component of an electric guitar's sound was missing entirely: **the speaker cabinet.**

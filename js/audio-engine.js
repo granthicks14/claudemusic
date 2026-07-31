@@ -1785,6 +1785,87 @@ class BeatEngine {
     });
   }
 
+  // A GUITAR SPEAKER CABINET. This was the single biggest thing missing
+  // from the guitar sound, and it is not a subtle refinement: a real
+  // guitar speaker produces essentially nothing below ~80Hz or above
+  // ~5kHz, and that steep top-end rolloff is precisely what makes a
+  // distorted guitar sound like a guitar instead of like fizzy noise.
+  // Feeding raw distortion straight to the output - which is what was
+  // happening - keeps all the harsh harmonics above 5kHz that a real rig
+  // physically cannot reproduce. Two cascaded lowpasses approximate the
+  // steep acoustic rolloff, a presence peak gives the upper-mid bite
+  // every speaker has, and a low-mid bump stands in for cabinet
+  // resonance.
+  makeGuitarCab(dest, opts = {}) {
+    const { bright = 1, body = 1, presence = 5 } = opts;
+    const ctx = this.ctx;
+    const hp = ctx.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 85;
+    hp.Q.value = 0.7;
+    const bodyF = ctx.createBiquadFilter();
+    bodyF.type = "peaking";
+    bodyF.frequency.value = 180;
+    bodyF.Q.value = 1.1;
+    bodyF.gain.value = 4 * body;
+    const pres = ctx.createBiquadFilter();
+    pres.type = "peaking";
+    pres.frequency.value = 2600;
+    pres.Q.value = 1.1;
+    pres.gain.value = presence;
+    const lp1 = ctx.createBiquadFilter();
+    lp1.type = "lowpass";
+    lp1.frequency.value = 5000 * bright;
+    lp1.Q.value = 0.9;
+    const lp2 = ctx.createBiquadFilter();
+    lp2.type = "lowpass";
+    lp2.frequency.value = 6400 * bright;
+    lp2.Q.value = 0.6;
+    hp.connect(bodyF).connect(pres).connect(lp1).connect(lp2).connect(dest);
+    return hp;
+  }
+
+  // An acoustic guitar's tone is dominated by its body: the Helmholtz air
+  // resonance around 100Hz and the top-plate resonance around 200Hz are
+  // most of what separates a real acoustic from a bare plucked string.
+  makeAcousticBody(dest) {
+    const ctx = this.ctx;
+    const air = ctx.createBiquadFilter();
+    air.type = "peaking";
+    air.frequency.value = 104;
+    air.Q.value = 2.2;
+    air.gain.value = 6;
+    const top = ctx.createBiquadFilter();
+    top.type = "peaking";
+    top.frequency.value = 205;
+    top.Q.value = 1.8;
+    top.gain.value = 4;
+    const sheen = ctx.createBiquadFilter();
+    sheen.type = "highshelf";
+    sheen.frequency.value = 4000;
+    sheen.gain.value = 3;
+    air.connect(top).connect(sheen).connect(dest);
+    return air;
+  }
+
+  // Pick noise: the plectrum scraping the wound string before the note
+  // speaks. Short, bright, and present on every real picked note.
+  addPickNoise(time, vel, dest, amount = 1) {
+    const ctx = this.ctx;
+    const n = ctx.createBufferSource();
+    n.buffer = this.makeNoiseBuffer(0.012);
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = 2800;
+    bp.Q.value = 0.8;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vel * 0.16 * amount, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + 0.012);
+    n.connect(bp).connect(g).connect(dest);
+    n.start(time);
+    n.stop(time + 0.016);
+  }
+
   playGuitarVoice(time, freq, durationSeconds, vel, flavor, destOverride) {
     const ctx = this.ctx;
     const dest = destOverride || this.dest("guitar");
@@ -1793,48 +1874,75 @@ class BeatEngine {
     const dur = Math.min(durationSeconds, flavor === "muted" ? 0.18 : 2.2);
 
     if (flavor === "power") {
-      // A real power chord is a plucked root+fifth pair run into an
-      // overdriven amp, not a bare distorted oscillator - plucking two
-      // physically-modeled strings into a shared distortion stage gets
-      // the percussive pick attack that a power chord actually has.
+      // A real high-gain rig is a chain, and the order matters:
+      //   string -> tight-EQ -> distortion -> speaker cabinet
+      // The pre-distortion highpass is standard high-gain practice: low
+      // frequencies hitting a distortion stage intermodulate into mud, so
+      // engineers tighten the low end BEFORE the gain, not after. The cab
+      // then removes the harsh fizz above 5kHz that a speaker physically
+      // cannot reproduce.
+      const cab = this.makeGuitarCab(dest, { bright: 1, body: 1, presence: 6 });
+      const post = ctx.createGain();
+      post.gain.value = 0.5;
+      post.connect(cab);
       const shaper = ctx.createWaveShaper();
       shaper.curve = this.makeDistortionCurve(30);
-      const filter = ctx.createBiquadFilter();
-      filter.type = "lowpass";
-      filter.frequency.value = 3400;
-      const post = ctx.createGain();
-      post.gain.value = 0.8;
-      shaper.connect(filter).connect(post).connect(dest);
-      this.pluckString(time, freq, dur, vel, shaper, { damp: 0.28, feedback: 0.985, pluckNoise: 0.01, brightness: 1.1, sustain: 0.9 });
-      this.pluckString(time, freq * 1.5, dur, vel * 0.75, shaper, { damp: 0.28, feedback: 0.985, pluckNoise: 0.01, brightness: 1.1, sustain: 0.9 });
+      shaper.connect(post);
+      const tight = ctx.createBiquadFilter();
+      tight.type = "highpass";
+      tight.frequency.value = 150;
+      tight.Q.value = 0.7;
+      tight.connect(shaper);
+      this.addPickNoise(time, vel, cab, 1.2);
+      this.pluckString(time, freq, dur, vel, tight, { damp: 0.28, feedback: 0.985, pluckNoise: 0.01, brightness: 1.1, sustain: 0.9 });
+      this.pluckString(time, freq * 1.5, dur, vel * 0.75, tight, { damp: 0.28, feedback: 0.985, pluckNoise: 0.01, brightness: 1.1, sustain: 0.9 });
       return;
     }
 
     if (flavor === "jazz") {
       // Dark, round, heavily-damped string - the hollow-body archtop tone.
-      this.pluckString(time, freq, dur, vel * 0.9, dest, { damp: 0.45, feedback: 0.99, pluckNoise: 0.012, brightness: 0.5, sustain: 1.2, outputLowpass: 2200 });
+      const jazzCab = this.makeGuitarCab(dest, { bright: 0.55, body: 1.4, presence: 1 });
+      this.pluckString(time, freq, dur, vel * 0.9, jazzCab, { damp: 0.45, feedback: 0.99, pluckNoise: 0.012, brightness: 0.5, sustain: 1.2, outputLowpass: 2200 });
       return;
     }
 
     if (flavor === "acoustic") {
-      // Brighter, more percussive pick attack than nylon - a steel-string
-      // strum, with a light second string for a natural doubled-string body.
-      this.pluckString(time, freq, dur, vel, dest, { damp: 0.18, feedback: 0.99, pluckNoise: 0.012, brightness: 1.1, sustain: 1.3 });
-      this.pluckString(time, freq * 1.004, dur, vel * 0.4, dest, { damp: 0.18, feedback: 0.99, pluckNoise: 0.012, brightness: 1.1, sustain: 1.3 });
+      // Steel-string through a real body resonance, plus pick noise and a
+      // slightly detuned second string for the natural doubling of a
+      // strummed acoustic.
+      const body = this.makeAcousticBody(dest);
+      this.addPickNoise(time, vel, body, 1.1);
+      this.pluckString(time, freq, dur, vel, body, { damp: 0.18, feedback: 0.99, pluckNoise: 0.012, brightness: 1.1, sustain: 1.3 });
+      this.pluckString(time, freq * 1.004, dur, vel * 0.4, body, { damp: 0.18, feedback: 0.99, pluckNoise: 0.012, brightness: 1.1, sustain: 1.3 });
       return;
     }
 
     if (flavor === "muted") {
-      // Palm-muted: heavily damped, very short decay - a percussive thud
-      // more than a ringing note.
-      this.pluckString(time, freq, Math.min(dur, 0.16), vel, dest, { damp: 0.4, feedback: 0.93, pluckNoise: 0.014, brightness: 0.8, sustain: 0.16 });
+      // Palm muting damps the string with the picking hand: a percussive
+      // thud with a hard attack and almost no ring. Runs through the same
+      // amp and cab as the power chord, because it is the same rig.
+      const cab = this.makeGuitarCab(dest, { bright: 0.85, body: 1.2, presence: 4 });
+      const post = ctx.createGain();
+      post.gain.value = 0.6;
+      post.connect(cab);
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = this.makeDistortionCurve(22);
+      shaper.connect(post);
+      const tight = ctx.createBiquadFilter();
+      tight.type = "highpass";
+      tight.frequency.value = 140;
+      tight.connect(shaper);
+      this.addPickNoise(time, vel, cab, 1.4);
+      this.pluckString(time, freq, Math.min(dur, 0.16), vel, tight, { damp: 0.4, feedback: 0.93, pluckNoise: 0.014, brightness: 0.8, sustain: 0.16 });
       return;
     }
 
     if (flavor === "nylon") {
-      // Warm, mellow, long-ringing classical-guitar pluck - a soft
-      // fingerstyle attack instead of a bright pick.
-      this.pluckString(time, freq, dur, vel, dest, { damp: 0.32, feedback: 0.992, pluckNoise: 0.02, brightness: 0.65, sustain: 1.4 });
+      // Classical guitar: fingerstyle, so no pick noise at all - the
+      // flesh-on-string attack is soft and that absence is audible. Same
+      // body resonance, warmer and rounder.
+      const body = this.makeAcousticBody(dest);
+      this.pluckString(time, freq, dur, vel, body, { damp: 0.32, feedback: 0.992, pluckNoise: 0.02, brightness: 0.65, sustain: 1.4 });
       return;
     }
 
@@ -1866,14 +1974,20 @@ class BeatEngine {
       // modeled string - the shimmering chorus-like ring of a real
       // 12-string comes from actual doubled strings beating together,
       // not a single oscillator with a chorus effect bolted on.
+      const body12 = this.makeAcousticBody(dest);
+      this.addPickNoise(time, vel, body12, 1.2);
       for (const [ratio, level] of [[1, 1], [1.003, 1], [2, 0.35], [2.006, 0.35]]) {
-        this.pluckString(time, freq * ratio, dur, vel * level, dest, { damp: 0.12, feedback: 0.988, pluckNoise: 0.008, brightness: 1.2, sustain: 1.2 });
+        this.pluckString(time, freq * ratio, dur, vel * level, body12, { damp: 0.12, feedback: 0.988, pluckNoise: 0.008, brightness: 1.2, sustain: 1.2 });
       }
       return;
     }
 
-    // Clean electric: bright, crisp pick attack, long ring.
-    this.pluckString(time, freq, dur, vel, dest, { damp: 0.08, feedback: 0.99, pluckNoise: 0.006, brightness: 1.3, sustain: 1.0 });
+    // Clean electric is still an amplifier and speaker - a clean tone
+    // played direct with no cab sounds thin and clinical, which is why
+    // even "clean" guitar tracks are mic'd cabs.
+    const cleanCab = this.makeGuitarCab(dest, { bright: 1.25, body: 0.7, presence: 3 });
+    this.addPickNoise(time, vel, cleanCab, 0.9);
+    this.pluckString(time, freq, dur, vel, cleanCab, { damp: 0.08, feedback: 0.99, pluckNoise: 0.006, brightness: 1.3, sustain: 1.0 });
   }
 
   playStringsVoice(time, freq, durationSeconds, vel, flavor) {
@@ -3407,6 +3521,26 @@ class BeatEngine {
           else if (inst === "vocal") this.playVocalVoice(t, freq, noteDur, vel, flavors.vocal);
         }
       } else if (val.degree !== undefined) {
+        // Any melodic part can now carry a harmony stack (see
+        // HARMONY_SHAPES in patterns.js) - a strummed guitar triad, a
+        // harmonised lead in 3rds, a sax section, a bass octave. Voices
+        // above the root are played a little softer so the melody note
+        // still leads rather than being buried in its own harmony.
+        if (val.harmony && val.harmony.length > 1 && inst !== "guitar") {
+          const hv = this.jitterVel(BASE_VELOCITY[inst] * (1 + (this.metricAccent(step) - 1) * 0.5)) * autoMul;
+          val.harmony.forEach((off, hi) => {
+            const hf = this.freqForDegree(val.degree + off, step);
+            const lvl = hv * (hi === 0 ? 1 : 0.55);
+            if (inst === "bass") this.playBass(t, hf, noteDur, lvl, flavors.bass);
+            else if (inst === "lead") this.playLeadVoice(t, hf, noteDur, lvl, flavors.lead);
+            else if (inst === "kalimba") this.playKalimbaVoice(t, hf, noteDur, lvl, flavors.kalimba);
+            else if (inst === "marimba") this.playMarimbaVoice(t, hf, noteDur, lvl, flavors.marimba);
+            else if (inst === "arp") this.playArpVoice(t, hf, noteDur, lvl, flavors.arp);
+            else if (inst === "autolead") this.playAutoLeadVoice(t, hf, noteDur, lvl, flavors.autolead);
+            else if (inst === "sax") this.playSaxVoice(t, hf, noteDur, lvl, flavors.sax);
+          });
+          continue;
+        }
         const freq = this.freqForDegree(val.degree, step);
         const vel = this.jitterVel(BASE_VELOCITY[inst] * (1 + (this.metricAccent(step) - 1) * 0.5)) * autoMul;
         if (inst === "bass") this.playBass(t, freq, noteDur, vel, flavors.bass);
@@ -3417,7 +3551,8 @@ class BeatEngine {
           // flavors (clean/jazz/nylon) stay single-line, the way picked
           // highlife lines and jazz solos actually are.
           if (GUITAR_STRUM_FLAVORS.has(flavors.guitar)) {
-            const chordFreqs = [val.degree, val.degree + 2, val.degree + 4].map((d) => this.freqForDegree(d, step));
+            const shape = val.harmony && val.harmony.length > 1 ? val.harmony : [0, 2, 4];
+            const chordFreqs = shape.map((o) => this.freqForDegree(val.degree + o, step));
             if (GUITAR_DOUBLE_FLAVORS.has(flavors.guitar)) this.playGuitarDoubled(t, chordFreqs, noteDur, vel, flavors.guitar);
             else this.playGuitarChord(t, chordFreqs, noteDur, vel, flavors.guitar);
           } else {

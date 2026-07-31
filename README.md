@@ -245,6 +245,30 @@ A few smaller genre-authenticity refinements from the same pass:
 - **Juno-106 pad** — the Roland Juno-106's signature isn't really its oscillator (a plain analog saw); it's the built-in BBD (bucket-brigade device) chorus circuit almost every classic Juno pad patch was run through, which is what actually gives it that lush, wide, shimmering character. Modeled as the real DSP a chorus circuit uses — a short delay line whose delay time is itself slowly modulated by an LFO, mixed back in with the dry signal — rather than just another detuned oscillator faking "width." New Pad flavor, and Synthwave's new default.
 - **Vocoder** — a real vocoder imposes a filter bank derived from a spoken "modulator" signal onto a synthesized carrier tone; without an actual speech input to analyze, the classic *synthesized* vocoder hit (Herbie Hancock, Zapp, Daft Punk-adjacent) is approximated with a buzzy square-wave carrier — harmonically richer and more mechanical than the vocal instrument's sawtooth — through a coarser bank of more, narrower fixed-frequency bands, and, like Auto Lead, deliberately no vibrato at all. New Vocal flavor.
 
+## Why the guitar sounded wrong: there was no speaker
+
+The guitar had a physical string model, real strumming, and double-tracking — and still sounded bad, because the most important component of an electric guitar's sound was missing entirely: **the speaker cabinet.**
+
+A real guitar speaker produces essentially nothing below ~80 Hz or above ~5 kHz, and that steep top-end rolloff is precisely what makes a distorted guitar sound like a guitar rather than like fizzing noise. Distortion generates enormous amounts of harsh high-frequency content; a physical speaker simply cannot reproduce it, so on every record you have ever heard, it is gone. Sending raw distortion straight to the output — which is what was happening — keeps all of it.
+
+The guitar now runs a real signal chain, in the order a real rig does:
+
+**string → tightening EQ → distortion → speaker cabinet**
+
+- **The pre-distortion highpass** is standard high-gain practice: low frequencies hitting a distortion stage intermodulate into mud, so engineers tighten the low end *before* the gain, never after.
+- **The cabinet** is two cascaded lowpasses (approximating the steep acoustic rolloff), a presence peak at 2.6 kHz for the upper-mid bite every speaker has, a low-mid bump for cabinet resonance, and a highpass to remove sub content a 12" driver can't move.
+- **Acoustic and nylon guitars get a body instead** — the Helmholtz air resonance near 104 Hz and the top-plate resonance near 205 Hz, which is most of what separates a real acoustic from a bare plucked string.
+- **Pick noise** — the plectrum scraping the wound string before the note speaks — is on every picked flavor, and deliberately absent from nylon, which is played fingerstyle.
+- **Clean electric still goes through a cab**, because a clean tone played direct sounds thin and clinical; even clean guitar tracks are mic'd cabs.
+
+## Every instrument can play chords now
+
+The engine used to split instruments into two fixed camps: chordal parts that always played block chords, and melodic parts that could only ever play one note at a time. Real arrangements don't work that way — a rhythm guitar strums full triads, a lead is harmonised in 3rds, a sax section plays block harmony, a bassist jumps octaves.
+
+Any melodic line can now carry a stack of scale-degree offsets alongside its root note, so the same motif logic produces a single line or a chord depending on what the part calls for. Voicings available: triad, seventh, third, sixth, fifth, octave.
+
+Crucially, **harmony is applied to structural notes rather than to every passing sixteenth**, which is how players actually voice things: you strum the chord on the strong beat and single-note the runs in between. Short passing notes stay single so a run doesn't turn into chord soup. Each part's setting matches how it's really played — Rock guitar strums triads 85% of the time, Neo-Soul guitar comps 7th chords, Afrobeats highlife guitar stays mostly single-note, Synthwave leads harmonise in 3rds, Rap's Auto-Tune hook stacks harmony the way stacked vocals do, and House/Techno basslines jump octaves occasionally.
+
 ## Every beat is composed, not just rolled
 
 The most important change in the whole project. Generating one random pattern and shipping it means the program never actually *tries* to make a good beat — it accepts whatever the dice produced. Real producers write several versions of an idea and keep the one that works, so that's what happens now: **each request composes nine complete candidate beats, judges each against real musical criteria, and returns the strongest.**

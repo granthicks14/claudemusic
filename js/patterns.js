@@ -312,6 +312,40 @@ function foldIntoSpan(offset, halfSpan) {
   return o;
 }
 
+// ---- Chords on every instrument, not just the "chord" instruments ----
+// The engine used to split instruments into two fixed camps: chordal
+// parts that always played block chords, and melodic parts that could
+// only ever play one note at a time. Real arrangements don't work that
+// way - a rhythm guitar strums full triads, a lead is harmonised in
+// 3rds and 6ths, a sax section plays block harmony, a mallet part plays
+// dyads. Any melodic line can now carry a stack of scale-degree offsets
+// alongside its root note, so the same motif logic produces either a
+// single line or a chord depending on what the part calls for.
+//
+// Harmony is applied to *sustained/structural* notes rather than to
+// every passing 16th, which is how real players voice it: you strum the
+// chord on the strong beat and single-note the runs in between.
+const HARMONY_SHAPES = {
+  triad: [0, 2, 4],
+  seventh: [0, 2, 4, 6],
+  third: [0, 2],
+  sixth: [0, -3],
+  octave: [0, 7],
+  fifth: [0, 4],
+};
+
+function harmonyForNote(cfg, stepInBar, noteLen) {
+  if (!cfg) return null;
+  const shape = HARMONY_SHAPES[cfg.shape];
+  if (!shape) return null;
+  // Strong beats and longer notes get the full voicing; short passing
+  // notes stay single so runs don't turn into chord soup.
+  const strong = stepInBar % 4 === 0;
+  const longEnough = noteLen >= (cfg.minLen || 2);
+  const chance = (cfg.probability || 0) * (strong ? 1 : 0.35) * (longEnough ? 1 : 0.3);
+  return Math.random() < chance ? shape : null;
+}
+
 function generateMonoMelody(register, structure, barRootDegrees, params, totalSteps, registerJitter = 0, isBass = false) {
   const effectiveRegister = register + registerJitter;
 
@@ -374,7 +408,10 @@ function generateMonoMelody(register, structure, barRootDegrees, params, totalSt
       const barRoot = barRootDegrees[barIdx];
       const dur = Math.min(ev.duration, totalSteps - stepPos);
       const folded = foldIntoSpan(ev.degreeOffset, halfSpan);
-      arr[stepPos] = { degree: barRoot + effectiveRegister + phraseOctave + folded, len: dur };
+      const note = { degree: barRoot + effectiveRegister + phraseOctave + folded, len: dur };
+      const shape = harmonyForNote(params.harmony, stepPos % STEPS_PER_BAR, dur);
+      if (shape) note.harmony = shape;
+      arr[stepPos] = note;
     }
     chunkStart += motifLen;
     chunkIndex++;
@@ -435,7 +472,10 @@ function applyChorusHook(melody, inst, style, barMetas, barRootDegrees) {
       }
       const dur = Math.min(ev.duration, hookLen - hookStep, melody.length - globalStep);
       const folded = foldIntoSpan(ev.degreeOffset, inst === "bass" ? 5 : 4);
-      melody[globalStep] = { degree: barRoot + effectiveRegister + folded, len: dur };
+      const hookNote = { degree: barRoot + effectiveRegister + folded, len: dur };
+      const hookShape = harmonyForNote(params.harmony, globalStep % STEPS_PER_BAR, dur);
+      if (hookShape) hookNote.harmony = hookShape;
+      melody[globalStep] = hookNote;
     }
   }
 }
@@ -512,7 +552,7 @@ const STYLES = {
     melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "strings", "organ", "stab", "horn"] },
     melody: {
       bass: { motifBars: 2, noteLengths: [[4,3],[6,2],[8,1]], restProbability: 0.25, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[-1,1],[1,1],[3,1]], variationProbability: 0.3 },
-      lead: { motifBars: 2, noteLengths: [[4,2],[6,2],[8,1],[3,1]], restProbability: 0.4, chordToneProbability: 0.65, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1],[6,1]], variationProbability: 0.5 },
+      lead: { motifBars: 2, noteLengths: [[4,2],[6,2],[8,1],[3,1]], restProbability: 0.4, chordToneProbability: 0.65, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1],[6,1]], variationProbability: 0.5 , harmony: { shape: "third", probability: 0.3, minLen: 3 } },
     },
     chords: {
       piano: {
@@ -596,7 +636,7 @@ const STYLES = {
     melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["stab", "vocal"] },
     melody: {
       bass: { motifBars: 1, noteLengths: [[3,2],[4,3],[2,1]], restProbability: 0.3, chordToneProbability: 0.9, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1],[3,1]], variationProbability: 0.3 },
-      lead: { motifBars: 1, noteLengths: [[2,3],[3,2],[4,1]], restProbability: 0.55, chordToneProbability: 0.6, chordTonePool: [[0,2],[2,2],[4,2]], passingTonePool: [[-1,1],[1,1],[6,1]], variationProbability: 0.4 },
+      lead: { motifBars: 1, noteLengths: [[2,3],[3,2],[4,1]], restProbability: 0.55, chordToneProbability: 0.6, chordTonePool: [[0,2],[2,2],[4,2]], passingTonePool: [[-1,1],[1,1],[6,1]], variationProbability: 0.4 , harmony: { shape: "fifth", probability: 0.3, minLen: 2 } },
     },
     chords: {
       stab: {
@@ -658,8 +698,8 @@ const STYLES = {
     },
     melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["piano", "pad", "stab", "vocal"] },
     melody: {
-      bass: { motifBars: 1, noteLengths: [[2,4],[4,2]], restProbability: 0.15, chordToneProbability: 0.85, chordTonePool: [[0,4],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.15 },
-      lead: { motifBars: 1, noteLengths: [[2,5],[1,2]], restProbability: 0.1, chordToneProbability: 0.9, chordTonePool: [[0,3],[2,2],[4,2],[7,2]], passingTonePool: [[1,1],[6,1]], variationProbability: 0.2 },
+      bass: { motifBars: 1, noteLengths: [[2,4],[4,2]], restProbability: 0.15, chordToneProbability: 0.85, chordTonePool: [[0,4],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.15 , harmony: { shape: "octave", probability: 0.22, minLen: 2 } },
+      lead: { motifBars: 1, noteLengths: [[2,5],[1,2]], restProbability: 0.1, chordToneProbability: 0.9, chordTonePool: [[0,3],[2,2],[4,2],[7,2]], passingTonePool: [[1,1],[6,1]], variationProbability: 0.2 , harmony: { shape: "triad", probability: 0.35, minLen: 2 } },
     },
     chords: {
       piano: {
@@ -739,7 +779,7 @@ const STYLES = {
     melodic: { monoInstruments: ["bass", "guitar"], chordInstruments: [] },
     melody: {
       bass: { motifBars: 2, noteLengths: [[2,4],[4,2]], restProbability: 0.2, chordToneProbability: 0.9, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.3 },
-      guitar: { motifBars: 2, noteLengths: [[2,4],[4,2],[1,2]], restProbability: 0.25, chordToneProbability: 0.75, chordTonePool: [[0,4],[4,3],[7,2]], passingTonePool: [[1,1],[3,1],[-1,1],[6,1]], variationProbability: 0.4 },
+      guitar: { motifBars: 2, noteLengths: [[2,4],[4,2],[1,2]], restProbability: 0.25, chordToneProbability: 0.75, chordTonePool: [[0,4],[4,3],[7,2]], passingTonePool: [[1,1],[3,1],[-1,1],[6,1]], variationProbability: 0.4 , harmony: { shape: "triad", probability: 0.85, minLen: 1 } },
     },
     chords: {},
   },
@@ -792,7 +832,7 @@ const STYLES = {
     melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["horn", "stab", "vocal"] },
     melody: {
       bass: { motifBars: 1, noteLengths: [[2,3],[3,2],[4,1]], restProbability: 0.3, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2]], passingTonePool: [[-2,1],[4,1]], variationProbability: 0.25 },
-      lead: { motifBars: 1, noteLengths: [[2,3],[3,2]], restProbability: 0.4, chordToneProbability: 0.65, chordTonePool: [[0,2],[2,2],[4,2]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.35 },
+      lead: { motifBars: 1, noteLengths: [[2,3],[3,2]], restProbability: 0.4, chordToneProbability: 0.65, chordTonePool: [[0,2],[2,2],[4,2]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.35 , harmony: { shape: "third", probability: 0.3, minLen: 2 } },
     },
     chords: {
       horn: {
@@ -864,8 +904,8 @@ const STYLES = {
     melodic: { monoInstruments: ["bass", "lead", "marimba"], chordInstruments: ["piano", "pad", "strings", "stab", "horn"] },
     melody: {
       bass: { motifBars: 2, noteLengths: [[4,3],[6,2],[8,1]], restProbability: 0.35, chordToneProbability: 0.8, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.35 },
-      lead: { motifBars: 2, noteLengths: [[4,2],[6,2],[8,2],[3,1]], restProbability: 0.5, chordToneProbability: 0.7, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-2,1]], variationProbability: 0.45 },
-      marimba: { motifBars: 2, noteLengths: [[4,2],[6,2],[8,1]], restProbability: 0.62, chordToneProbability: 0.75, chordTonePool: [[0,3],[4,2],[7,1]], passingTonePool: [[2,1],[-2,1]], variationProbability: 0.3 },
+      lead: { motifBars: 2, noteLengths: [[4,2],[6,2],[8,2],[3,1]], restProbability: 0.5, chordToneProbability: 0.7, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-2,1]], variationProbability: 0.45 , harmony: { shape: "third", probability: 0.35, minLen: 3 } },
+      marimba: { motifBars: 2, noteLengths: [[4,2],[6,2],[8,1]], restProbability: 0.62, chordToneProbability: 0.75, chordTonePool: [[0,3],[4,2],[7,1]], passingTonePool: [[2,1],[-2,1]], variationProbability: 0.3 , harmony: { shape: "third", probability: 0.4, minLen: 2 } },
     },
     chords: {
       piano: {
@@ -1006,8 +1046,8 @@ const STYLES = {
     melodic: { monoInstruments: ["bass", "guitar", "marimba"], chordInstruments: ["pad", "organ", "stab", "horn"] },
     melody: {
       bass: { motifBars: 1, noteLengths: [[4,3],[3,2],[6,1]], restProbability: 0.25, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.25 },
-      guitar: { motifBars: 2, noteLengths: [[2,4],[1,3],[4,1]], restProbability: 0.3, chordToneProbability: 0.7, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[6,1]], variationProbability: 0.4 },
-      marimba: { motifBars: 1, noteLengths: [[1,3],[2,3],[3,1]], restProbability: 0.4, chordToneProbability: 0.8, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.3 },
+      guitar: { motifBars: 2, noteLengths: [[2,4],[1,3],[4,1]], restProbability: 0.3, chordToneProbability: 0.7, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[6,1]], variationProbability: 0.4 , harmony: { shape: "third", probability: 0.3, minLen: 2 } },
+      marimba: { motifBars: 1, noteLengths: [[1,3],[2,3],[3,1]], restProbability: 0.4, chordToneProbability: 0.8, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.3 , harmony: { shape: "third", probability: 0.3, minLen: 2 } },
     },
     chords: {
       pad: {
@@ -1146,7 +1186,7 @@ const STYLES = {
       // off short notes - more rest, longer note lengths, and less
       // constant variation than a typical mono lead config, so it reads
       // as one expressive solo idea instead of a busy instrumental run.
-      sax: { motifBars: 2, noteLengths: [[4,3],[6,3],[8,2]], restProbability: 0.5, chordToneProbability: 0.75, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.35 },
+      sax: { motifBars: 2, noteLengths: [[4,3],[6,3],[8,2]], restProbability: 0.5, chordToneProbability: 0.75, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.35 , harmony: { shape: "third", probability: 0.45, minLen: 3 } },
     },
     chords: {
       piano: {
@@ -1230,7 +1270,7 @@ const STYLES = {
     melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["vocal", "stab"] },
     melody: {
       bass: { motifBars: 1, noteLengths: [[3,2],[4,3],[2,1]], restProbability: 0.3, chordToneProbability: 0.9, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1],[3,1]], variationProbability: 0.25 },
-      lead: { motifBars: 1, noteLengths: [[2,3],[3,2],[6,1]], restProbability: 0.5, chordToneProbability: 0.6, chordTonePool: [[0,2],[2,2],[4,2]], passingTonePool: [[-1,1],[1,1],[6,1]], variationProbability: 0.4 },
+      lead: { motifBars: 1, noteLengths: [[2,3],[3,2],[6,1]], restProbability: 0.5, chordToneProbability: 0.6, chordTonePool: [[0,2],[2,2],[4,2]], passingTonePool: [[-1,1],[1,1],[6,1]], variationProbability: 0.4 , harmony: { shape: "fifth", probability: 0.35, minLen: 2 } },
     },
     chords: {
       vocal: {
@@ -1348,7 +1388,7 @@ const STYLES = {
     },
     melodic: { monoInstruments: ["bass", "arp"], chordInstruments: ["pad", "stab"] },
     melody: {
-      bass: { motifBars: 1, noteLengths: [[4,3],[8,2],[16,1]], restProbability: 0.25, chordToneProbability: 0.85, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1],[3,1]], variationProbability: 0.25 },
+      bass: { motifBars: 1, noteLengths: [[4,3],[8,2],[16,1]], restProbability: 0.25, chordToneProbability: 0.85, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1],[3,1]], variationProbability: 0.25 , harmony: { shape: "octave", probability: 0.18, minLen: 4 } },
       arp: { motifBars: 1, noteLengths: [[1,6],[2,2]], restProbability: 0.4, chordToneProbability: 0.9, chordTonePool: [[0,3],[2,2],[4,2],[7,2]], passingTonePool: [[1,1]], variationProbability: 0.15 },
     },
     chords: {
@@ -1412,7 +1452,7 @@ const STYLES = {
     melodic: { monoInstruments: ["bass", "lead", "arp"], chordInstruments: ["pad", "stab"] },
     melody: {
       bass: { motifBars: 2, noteLengths: [[4,3],[8,2]], restProbability: 0.2, chordToneProbability: 0.9, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.25 },
-      lead: { motifBars: 2, noteLengths: [[4,2],[6,3],[8,2]], restProbability: 0.3, chordToneProbability: 0.75, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.35 },
+      lead: { motifBars: 2, noteLengths: [[4,2],[6,3],[8,2]], restProbability: 0.3, chordToneProbability: 0.75, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.35 , harmony: { shape: "third", probability: 0.5, minLen: 2 } },
       arp: { motifBars: 1, noteLengths: [[1,6],[2,2]], restProbability: 0.05, chordToneProbability: 0.95, chordTonePool: [[0,3],[2,2],[4,2],[7,2]], passingTonePool: [[1,1]], variationProbability: 0.1 },
     },
     chords: {
@@ -1500,7 +1540,7 @@ const STYLES = {
       // typical mono lead config, and stays close to its core idea
       // instead of constantly varying, the way a rap hook is repeated
       // almost like a mantra rather than reinvented every bar.
-      autolead: { motifBars: 2, noteLengths: [[3,3],[4,3],[6,1]], restProbability: 0.45, chordToneProbability: 0.85, chordTonePool: [[0,4],[4,2],[7,1]], passingTonePool: [[-1,1],[2,1]], variationProbability: 0.15 },
+      autolead: { motifBars: 2, noteLengths: [[3,3],[4,3],[6,1]], restProbability: 0.45, chordToneProbability: 0.85, chordTonePool: [[0,4],[4,2],[7,1]], passingTonePool: [[-1,1],[2,1]], variationProbability: 0.15 , harmony: { shape: "third", probability: 0.45, minLen: 2 } },
     },
     chords: {
       vocal: {
@@ -1644,7 +1684,7 @@ const STYLES = {
     melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["organ", "vocal", "stab"] },
     melody: {
       bass: { motifBars: 1, noteLengths: [[2,2],[3,3],[4,2]], restProbability: 0.35, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[-2,1],[2,1]], variationProbability: 0.3 },
-      lead: { motifBars: 1, noteLengths: [[1,2],[2,3],[3,1]], restProbability: 0.5, chordToneProbability: 0.7, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1]], variationProbability: 0.4 },
+      lead: { motifBars: 1, noteLengths: [[1,2],[2,3],[3,1]], restProbability: 0.5, chordToneProbability: 0.7, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1]], variationProbability: 0.4 , harmony: { shape: "third", probability: 0.3, minLen: 2 } },
     },
     chords: {
       organ: {
@@ -1713,7 +1753,7 @@ const STYLES = {
     melody: {
       // A driving 16th-note acid line - short repeated notes with small
       // moves, built for the 303's squelch to do the talking.
-      bass: { motifBars: 1, noteLengths: [[1,3],[2,4]], restProbability: 0.25, chordToneProbability: 0.9, chordTonePool: [[0,5],[7,2]], passingTonePool: [[-2,1],[1,1]], variationProbability: 0.25 },
+      bass: { motifBars: 1, noteLengths: [[1,3],[2,4]], restProbability: 0.25, chordToneProbability: 0.9, chordTonePool: [[0,5],[7,2]], passingTonePool: [[-2,1],[1,1]], variationProbability: 0.25 , harmony: { shape: "octave", probability: 0.2, minLen: 2 } },
       arp: { motifBars: 1, noteLengths: [[1,6],[2,2]], restProbability: 0.35, chordToneProbability: 0.9, chordTonePool: [[0,3],[2,2],[4,2],[7,2]], passingTonePool: [[1,1]], variationProbability: 0.15 },
     },
     chords: {
@@ -1784,7 +1824,7 @@ const STYLES = {
     melodic: { monoInstruments: ["bass", "guitar"], chordInstruments: ["piano", "pad", "organ", "vocal"] },
     melody: {
       bass: { motifBars: 2, noteLengths: [[3,2],[4,3],[6,2]], restProbability: 0.35, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.3 },
-      guitar: { motifBars: 2, noteLengths: [[2,3],[3,2],[4,2]], restProbability: 0.45, chordToneProbability: 0.7, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.4 },
+      guitar: { motifBars: 2, noteLengths: [[2,3],[3,2],[4,2]], restProbability: 0.45, chordToneProbability: 0.7, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.4 , harmony: { shape: "seventh", probability: 0.55, minLen: 2 } },
     },
     chords: {
       // Size-5 voicings = stacked-thirds 9th chords, the neo-soul harmony
@@ -2712,7 +2752,93 @@ function scoreVariation(style, v) {
     if (c > 0) score += 2;
   }
 
+  // 10. THE CHORDAL PARTS MUST AGREE WITH THE PROGRESSION. Scoring only
+  // the melody left the actual harmony unjudged - a comping part landing
+  // on the wrong chord is far more damaging than a melody note doing it,
+  // because the chord *is* the harmony rather than a line over it.
+  let chTot = 0, chGood = 0;
+  for (const i of chordal) {
+    const arr = inst[i] || [];
+    for (let s2 = 0; s2 < arr.length; s2++) {
+      const n = arr[s2];
+      if (!n || !n.degrees) continue;
+      const bar = Math.floor(s2 / STEPS_PER_BAR);
+      const root = v.barRootDegrees[bar] || 0;
+      for (const d of n.degrees) { chTot++; if (isChordTone(d - root)) chGood++; }
+    }
+  }
+  if (chTot) score += 16 * (chGood / chTot);
+
+  // 11. LOW-END MUD. More than one voice sounding simultaneously down in
+  // the bass register is the most common way an arrangement turns to
+  // soup - real engineers keep exactly one instrument in that octave.
+  let mudSteps = 0, lowSteps = 0;
+  const allMelodic = [...mono, ...chordal];
+  const stepCount = (inst[Object.keys(inst)[0]] || []).length;
+  for (let s2 = 0; s2 < stepCount; s2++) {
+    let lows = 0;
+    for (const i of allMelodic) {
+      const n = (inst[i] || [])[s2];
+      if (!n) continue;
+      const lo = n.degrees ? Math.min(...n.degrees) : n.degree;
+      if (lo <= 7) lows++;
+    }
+    if (lows > 0) lowSteps++;
+    if (lows > 1) mudSteps++;
+  }
+  if (lowSteps) score += 12 * (1 - mudSteps / lowSteps);
+
+  // 12. HARMONY SHOULD BE VOICED, NOT CONSTANT. Some chord-voiced notes
+  // give an arrangement body; every note voiced as a chord is a wall.
+  let voiced = 0, monoNotes = 0;
+  for (const i of mono) {
+    for (const n of inst[i] || []) {
+      if (!n) continue;
+      monoNotes++;
+      if (n.harmony) voiced++;
+    }
+  }
+  if (monoNotes) {
+    const ratio = voiced / monoNotes;
+    score += 8 * Math.max(0, 1 - Math.abs(ratio - 0.3) / 0.45);
+  }
+
   return score;
+}
+
+// ---- Refinement: rework one part at a time, keep what helps ----
+// Choosing the best of several complete candidates is only half of how
+// music actually gets made. The other half is iteration: a producer
+// keeps the take, then reworks the bassline, then the hook, auditioning
+// each change against everything else already in place. This does the
+// same - it re-composes a single instrument's part several times and
+// keeps the version that makes the WHOLE arrangement score best, then
+// moves to the next instrument. Because every trial is judged in
+// context, parts end up fitting each other rather than merely being
+// individually acceptable.
+function refineVariation(style, v, barRootDegrees, totalSteps, passes = 2) {
+  const mono = (style.melodic.monoInstruments || []).filter((i) => style.melody[i]);
+  if (!mono.length) return v;
+  let bestScore = scoreVariation(style, v);
+  const registerPlan = planRegisterJitters(mono);
+
+  for (let pass = 0; pass < passes; pass++) {
+    for (const inst of mono) {
+      const original = v.instruments[inst];
+      let bestPart = original;
+      for (let attempt = 0; attempt < 4; attempt++) {
+        const candidate = generateMonoMelody(
+          REGISTER[inst], v.structure, barRootDegrees, style.melody[inst],
+          totalSteps, registerPlan[inst], inst === "bass"
+        );
+        v.instruments[inst] = candidate;
+        const sc = scoreVariation(style, v);
+        if (sc > bestScore) { bestScore = sc; bestPart = candidate; }
+      }
+      v.instruments[inst] = bestPart;
+    }
+  }
+  return v;
 }
 
 // Candidate counts are tuned so selection is meaningful without making
@@ -2720,20 +2846,20 @@ function scoreVariation(style, v) {
 // well inside a single frame.
 function generateVariation(rawStyle, bars) {
   let best = null, bestScore = -Infinity;
-  for (let i = 0; i < 9; i++) {
+  for (let i = 0; i < 12; i++) {
     const cand = generateVariationOnce(rawStyle, bars);
     const sc = scoreVariation(rawStyle, cand);
     if (sc > bestScore) { bestScore = sc; best = cand; }
   }
-  return best;
+  return refineVariation(rawStyle, best, best.barRootDegrees, bars * STEPS_PER_BAR, 2);
 }
 
 function generateSongVariation(rawStyle) {
   let best = null, bestScore = -Infinity;
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 6; i++) {
     const cand = generateSongVariationOnce(rawStyle);
     const sc = scoreVariation(rawStyle, cand);
     if (sc > bestScore) { bestScore = sc; best = cand; }
   }
-  return best;
+  return refineVariation(rawStyle, best, best.barRootDegrees, best.structure.length * STEPS_PER_BAR, 1);
 }

@@ -102,7 +102,7 @@ This is genuinely conditional, not decoration: a genre like Drill or Lo-Fi that'
 
 ## Genres
 
-Fifteen styles, each modeled on real production conventions researched for this build, with instrumentation chosen to actually fit the genre (no synth stabs on a rock track, no four-on-the-floor kick pretending to be a dembow):
+Nineteen styles, each modeled on real production conventions researched for this build, with instrumentation chosen to actually fit the genre (no synth stabs on a rock track, no four-on-the-floor kick pretending to be a dembow):
 
 - **Hip-Hop** — boom bap kick/snare, ~58%-swing hi-hats, a soulful sustained melody and pitched string stabs (Kanye-style soul-sample chord loops).
 - **Trap** — sparse kick, sliding 808, rolling hi-hats, a spacious bell hook (Metro Boomin-style restraint).
@@ -119,6 +119,10 @@ Fifteen styles, each modeled on real production conventions researched for this 
 - **Drum & Bass** *(new)* — fast syncopated breakbeat-style drums at ~172 BPM and a growling Reese bass (a stack of four detuned sawtooths beating against each other — the real technique behind the classic DnB bass sound).
 - **Synthwave** *(new)* — 80s gated drums, an analog synth bass and a brass-lead hook (a resonant bandpass-emphasized saw, the 80s synth-brass-stab timbre synthwave leans on), a lush arpeggiated pad/stab bed.
 - **Rap** — researched from Kanye West and Lil Baby's *808s & Heartbreak*-era minimalism, plus a second pass researching current hard-trap/rage production (Travis Scott, Future, Playboi Carti-adjacent) to make it hit harder: a genuinely distorted 808 (parallel distortion — a clean sub layer for low-end power plus a heavily saturated layer blended on top purely for harmonic bite, so it stays powerful instead of just getting louder), a saturated kick, hi-hat rolls that fire far more often and on more subdivisions than before, a tight near-straight swing instead of a loose boom-bap feel, and a touch of master-bus saturation (see below) — with a real Auto-Tune-style hook instrument (see below) carrying the melody instead of a mismatched kalimba.
+- **Amapiano** *(new)* — South Africa's house offshoot, distinct from Afrobeats: slower and sparser, with the **log drum carrying the groove as a melodic bass instrument** rather than the kick, jazzy Rhodes chords, and lots of air — the clean, soulful "private school" lane.
+- **UK Garage** *(new)* — the 2-step signature is a *missing* drum: **no kick on beat 3**, which is exactly what gives garage its skippy, off-balance bounce, plus the heaviest shuffle in the app (22%), chopped pitched vocal stabs, and a warm sub.
+- **Techno** *(new)* — deliberately distinct from House: darker, harder, more hypnotic and minimal, with **near-static harmony** (some progressions are a single held root — the groove and timbre carry a techno track, not chord changes), a relentless 909 four-on-the-floor, offbeat open hats, and an acid TB-303 line as the default bass.
+- **Neo-Soul** *(new)* — the D'Angelo/Erykah Badu school, distinct from R&B/Soul: the **"drunk" behind-the-beat drum feel** (14ms timing humanization, the highest in the app — the J Dilla drag), genuinely richer harmony (5-note stacked-third voicings = real 9th chords, which plain triads and 7ths never reach), and a jazz guitar as a second melodic voice.
 
 ## Master-bus "grit": genres that are supposed to sound driven
 
@@ -240,6 +244,23 @@ A few smaller genre-authenticity refinements from the same pass:
 - **DX7 "E.Piano 1"** — true FM synthesis (a carrier oscillator whose frequency is modulated by a second oscillator), not the additive detuned-oscillator trick every other piano flavor here uses. The Yamaha DX7's most-copied factory patch — probably the single most-used FM sound in 80s pop — gets its bright, bell-like attack settling into a near-pure sustain from a ~14:1 modulator ratio whose own amplitude (the "modulation index") decays much faster than the carrier's: deep modulation for an instant, then almost none as the modulator dies away. New Piano flavor.
 - **Juno-106 pad** — the Roland Juno-106's signature isn't really its oscillator (a plain analog saw); it's the built-in BBD (bucket-brigade device) chorus circuit almost every classic Juno pad patch was run through, which is what actually gives it that lush, wide, shimmering character. Modeled as the real DSP a chorus circuit uses — a short delay line whose delay time is itself slowly modulated by an LFO, mixed back in with the dry signal — rather than just another detuned oscillator faking "width." New Pad flavor, and Synthwave's new default.
 - **Vocoder** — a real vocoder imposes a filter bank derived from a spoken "modulator" signal onto a synthesized carrier tone; without an actual speech input to analyze, the classic *synthesized* vocoder hit (Herbie Hancock, Zapp, Daft Punk-adjacent) is approximated with a buzzy square-wave carrier — harmonically richer and more mechanical than the vocal instrument's sawtooth — through a coarser bank of more, narrower fixed-frequency bands, and, like Auto Lead, deliberately no vibrato at all. New Vocal flavor.
+
+## Instruments that work *together*: ensemble register planning and a featured voice
+
+Direct feedback: beats didn't feel like the instruments were working together — some parts (the bass especially) sounded goofy against the rest. Root-caused to three concrete things, all fixed:
+
+- **The bass could jitter up an octave.** The per-generation register variety system rolled ±1 octave *independently for every* melodic instrument — including the bass. An 808 bumped up an octave is thin and toy-like, which is precisely the reported "goofy bass." Registers are now assigned the way an arranger voices an ensemble (`planRegisterJitters`): **the bass never leaves the bass lane**, the first melodic voice sits at-or-above its home register, and each additional voice sits at-or-below its own — voices spread apart instead of piling up or swapping lanes.
+- **Chordal instruments could sink into the bass's lane.** Pads, organs, and guitars home at a low-mid register; letting them jitter a further octave down parked them on top of the bass and turned the low end to mud. Low-homed chordal instruments now only jitter up, never down.
+- **No mix hierarchy.** Real productions have one clear featured voice per section with everything else sitting behind it. Each loop generation now picks one non-bass melodic line as the feature and gently ducks the others (via the same per-track automation lane the user can already see and edit) — so a beat presents one intentional lead, not several parts competing at equal volume.
+
+## The true 808 — and an orchestra in one hit
+
+- **True 808** — the modern-rap 808 (Travis Scott/Lil Baby/Gunna-era production), now Trap's default bass, built around the single most identifiable modern 808 technique: **the slide**. Producers put portamento on the 808 channel so the bass glides smoothly from note to note instead of re-attacking; since the engine schedules notes in time order, it tracks the previous 808 note and, when the next one follows closely at a different pitch, glides in from the old pitch instead of striking. Plus warm constant saturation on the sine body (the round, *melodic* 808 — deliberately distinct from the aggressive parallel-distortion "hard808"), a soft knock attack, and a long ring that outlives short trigger notes.
+- **Orch Hit** — the Fairlight CMI's "ORCH5" sample: a full orchestra hitting one unison note (lifted from Stravinsky's *Firebird*), launched by "Planet Rock" (1982) into decades of hip-hop and pop — easily the most famous single sample preset ever shipped. Synthesized as what the sample actually is: a broadband multi-octave unison stack with a fast percussive decay and a closing lowpass sweep standing in for the abruptly-truncated sample tail. New Stab flavor.
+
+## Start from scratch, FL-style
+
+The whole editing surface — click-to-place drum cells, the drag/draw/resize piano roll, per-track sound pickers, mute/solo/volume/reverb, automation lanes — always worked on *generated* beats. The new **Start From Scratch** button hands you the same canvas empty: a blank pattern on the current genre's kit, so you can build the entire beat by hand instead of editing a generated one. The genre still supplies the kit, key/scale, tempo feel, and chord roots, so hand-placed notes land musically instead of chromatically random.
 
 ## And three more: acid, tape strings, and funk
 

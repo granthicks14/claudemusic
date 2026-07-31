@@ -33,6 +33,7 @@ const reelOverlay = document.getElementById("reel-overlay");
 const reelCanvas = document.getElementById("reel-canvas");
 const reelStatus = document.getElementById("reel-status");
 const reelCancelBtn = document.getElementById("reel-cancel");
+const scratchBtn = document.getElementById("scratch-btn");
 const chordInput = document.getElementById("chord-input");
 const chordClearBtn = document.getElementById("chord-clear-btn");
 const chordChips = document.getElementById("chord-chips");
@@ -66,6 +67,7 @@ const FLAVOR_LABELS = {
   simmons: "Simmons SDS-V", "808": "808", sp1200: "SP-1200", talkingdrum: "Talking Drum", moog: "Moog",
   dx7ep: "DX7 E.Piano", juno: "Juno-106", vocoder: "Vocoder",
   "303": "TB-303", mellotron: "Mellotron", clav: "Clavinet",
+  true808: "True 808", orchhit: "Orch Hit",
 };
 function flavorLabel(key) {
   if (FLAVOR_LABELS[key]) return FLAVOR_LABELS[key];
@@ -76,9 +78,10 @@ const STYLE_ACCENTS = {
   hiphop: "#ff6b6b", trap: "#a55eea", house: "#26de81", rock: "#fd9644", reggaeton: "#fed330", lofi: "#45aaf2",
   drill: "#c0392b", afrobeats: "#ffa502", dubstep: "#3742fa", rnb: "#ff6b9d",
   phonk: "#8e44ad", jerseyclub: "#00cec9", dnb: "#e17055", synthwave: "#fd79a8", rap: "#ffa801",
+  amapiano: "#e1b12c", ukgarage: "#00a8ff", techno: "#9c88ff", neosoul: "#e84393",
 };
 
-const SIDECHAIN_DEFAULT_ON = new Set(["trap", "house", "dubstep", "afrobeats", "drill", "phonk", "jerseyclub", "dnb", "synthwave", "rap"]);
+const SIDECHAIN_DEFAULT_ON = new Set(["trap", "house", "dubstep", "afrobeats", "drill", "phonk", "jerseyclub", "dnb", "synthwave", "rap", "amapiano", "ukgarage", "techno"]);
 
 const TRACK_COLOR = {
   kick: "#ff6b6b", snare: "#feca57", hihat: "#48dbfb", openhat: "#0abde3", tom: "#ff9f43",
@@ -219,6 +222,37 @@ function generatePattern() {
   pushAutomationToEngine();
   if (engine.isPlaying) engine.updatePattern(currentPattern);
 }
+
+// "Start From Scratch" - a blank canvas on the current genre's kit. The
+// whole editing surface (click-to-place cells, the drag/resize piano
+// roll, per-track flavors, mixers, automation) already works FL-Studio-
+// style on generated beats; this simply hands the user an empty pattern
+// so they can build the entire beat by hand instead of editing a
+// generated one. The genre still supplies the kit, key/scale, tempo feel,
+// and default chord roots, so hand-placed notes land musically.
+function startFromScratch() {
+  if (!activeStyle) return;
+  const bars = selectedBars;
+  const totalSteps = bars * STEPS_PER_BAR;
+  const structure = arrangementMode === "song" ? currentPattern.structure : new Array(bars).fill("main");
+  const progression = (activeStyle.progressions && activeStyle.progressions[0]) || [0];
+  const barRootDegrees = new Array(structure.length).fill(0).map((_, i) => progression[i % progression.length]);
+  const instruments = {};
+  for (const inst of activeStyle.drums.instruments) instruments[inst] = new Array(totalSteps).fill(false);
+  for (const inst of [...activeStyle.melodic.monoInstruments, ...activeStyle.melodic.chordInstruments]) {
+    instruments[inst] = new Array(totalSteps).fill(null);
+  }
+  currentPattern = { instruments, structure, barRootDegrees, automation: {} };
+  renderSectionRow();
+  renderStepGrid();
+  if (openPianoRollInst) renderPianoRoll();
+  if (openAutomationInst) renderAutomation();
+  pushAutomationToEngine();
+  if (engine.isPlaying) engine.updatePattern(currentPattern);
+  shuffleStatus.textContent = "Blank canvas — click cells to place drums, click a track name to draw notes in its piano roll.";
+}
+
+scratchBtn.addEventListener("click", startFromScratch);
 
 function pushAutomationToEngine() {
   const automation = currentPattern.automation || {};
@@ -1320,11 +1354,15 @@ const GENRE_KEYWORDS = {
   drill: ["uk drill", "ny drill", "drill"],
   trap: ["trap"],
   dubstep: ["dubstep", "riddim", "wobble bass", "wobble"],
-  afrobeats: ["amapiano", "afrobeats", "afrobeat", "log drum"],
+  afrobeats: ["afrobeats", "afrobeat", "highlife"],
+  amapiano: ["amapiano", "log drum", "private school"],
+  ukgarage: ["uk garage", "2-step", "two step", "ukg", "garage"],
+  techno: ["techno", "acid house", "warehouse", "berlin"],
+  neosoul: ["neo-soul", "neo soul", "neosoul", "dilla"],
   reggaeton: ["reggaeton", "dembow"],
   house: ["four on the floor", "house", "edm", "dance beat"],
   rock: ["rock", "punk", "guitar band"],
-  rnb: ["neo-soul", "neo soul", "r&b", "r and b", "rnb", "soul"],
+  rnb: ["r&b", "r and b", "rnb", "soul"],
   lofi: ["chillhop", "chill hop", "study beat", "lo-fi", "lo fi", "lofi"],
   hiphop: ["boom bap", "boombap", "hip-hop", "hip hop", "hiphop", "rap beat"],
 };

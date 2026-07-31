@@ -973,6 +973,53 @@ class BeatEngine {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
+    if (flavor === "true808") {
+      // The modern-rap 808 (Travis Scott/Lil Baby/Gunna-era production).
+      // Three researched pieces beyond the basic "808" flavor below:
+      // 1. THE SLIDE. The single most identifiable modern 808 technique -
+      //    the bass glides smoothly from the previous note's pitch into
+      //    the new one instead of re-attacking (producers do it with
+      //    portamento/glide on the 808 channel). The engine schedules
+      //    notes in time order, so tracking the last 808 note lets a note
+      //    that follows closely glide in from the previous pitch.
+      // 2. Warm constant saturation on the sine body (not the parallel-
+      //    distortion "hard808" - this one is round and warm, the melodic
+      //    808 sound rather than the aggressive one).
+      // 3. A soft knock attack and a long ring that outlives short trigger
+      //    notes, because a real 808 decays on its own terms.
+      const ringTime = Math.max(durationSeconds, 1.5);
+      const prev = this.lastTrue808;
+      this.lastTrue808 = { freq, time };
+      osc.type = "sine";
+      if (prev && time - prev.time > 0 && time - prev.time < 0.5 && Math.abs(prev.freq - freq) > 0.5) {
+        osc.frequency.setValueAtTime(prev.freq, time);
+        osc.frequency.exponentialRampToValueAtTime(freq, time + 0.09);
+      } else {
+        osc.frequency.setValueAtTime(freq * 1.7, time);
+        osc.frequency.exponentialRampToValueAtTime(freq, time + 0.08);
+      }
+      gain.gain.setValueAtTime(vel, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + ringTime);
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = this.makeDistortionCurve(10);
+      osc.connect(shaper).connect(gain).connect(this.dest("bass"));
+      osc.start(time);
+      osc.stop(time + ringTime + 0.05);
+
+      const knock = ctx.createBufferSource();
+      knock.buffer = this.makeNoiseBuffer(0.018);
+      const knockFilter = ctx.createBiquadFilter();
+      knockFilter.type = "highpass";
+      knockFilter.frequency.value = 1800;
+      const knockGain = ctx.createGain();
+      knockGain.gain.setValueAtTime(vel * 0.3, time);
+      knockGain.gain.exponentialRampToValueAtTime(0.001, time + 0.018);
+      knock.connect(knockFilter).connect(knockGain).connect(this.dest("bass"));
+      knock.start(time);
+      knock.stop(time + 0.022);
+      return;
+    }
+
     if (flavor === "808") {
       // A real 808 rings out on its own decay, independent of how short the
       // trigger note is - that long, boomy, semi-percussive sustain is what
@@ -2703,6 +2750,36 @@ class BeatEngine {
 
     if (flavor === "bell-chord") {
       this.playLeadVoiceTo(time, freq, dur, vel, "bell", dest);
+      return;
+    }
+    if (flavor === "orchhit") {
+      // The Fairlight CMI's "ORCH5" sample - a full orchestra hitting one
+      // unison note, lifted from Stravinsky's Firebird - launched by
+      // "Planet Rock" (1982) into decades of hip-hop/pop use; easily the
+      // most famous single sample preset ever shipped. Synthesized as what
+      // the sample actually is: a broadband multi-octave unison stack
+      // (strings+brass character from detuned saws across three octaves)
+      // with a fast percussive decay and a closing lowpass sweep standing
+      // in for the abrupt room-truncated sample tail.
+      const hitDur = Math.min(dur, 0.4);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 1.1, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + hitDur);
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.setValueAtTime(5200, time);
+      lp.frequency.exponentialRampToValueAtTime(500, time + hitDur);
+      lp.connect(gain).connect(dest);
+      for (const [ratio, level] of [[0.5, 0.6], [1, 1], [1.007, 0.7], [2, 0.5], [2.01, 0.35]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(freq * ratio, time);
+        const g = ctx.createGain();
+        g.gain.value = level / 3;
+        osc.connect(g).connect(lp);
+        osc.start(time);
+        osc.stop(time + hitDur + 0.05);
+      }
       return;
     }
     if (flavor === "brass-chord") {

@@ -282,6 +282,37 @@ The activity-dot row was removed: the lanes now show everything it did, more cle
 
 *(Bug found while building this: the lookahead didn't wrap with the loop, so the upper half of the note field emptied out right before the pattern turned over — exactly when a viewer most wants to see what's coming. The lookahead now wraps around the loop.)*
 
+## The reel is as long as your beat
+
+The reel used to run for a fixed 15, 30, or 60 seconds regardless of what the beat actually was, which is the wrong unit entirely: a 4-bar loop got chopped mid-phrase, and a full song got truncated a third of the way in. **Length is now derived from the pattern**, so a video always contains a whole number of loops and never cuts off in the middle of a bar.
+
+- **4 bars / 8 bars** → the picker offers 1, 2, 4, or 8 loops, each labelled with its real running time at the current tempo (`2 loops (15s)`).
+- **Full Song** → one option, the whole arrangement, labelled with its actual duration (`Full song (1:37)`).
+- The times account for **swing**, which lengthens every odd step, and are recomputed live whenever the tempo, swing, bar count, or generated pattern changes.
+
+*(Bug found while building this: the durations were refreshed on the bars button, which fires **before** the new pattern is generated — so the label showed the length of the *previous* arrangement. Switching 4 → 8 bars showed 7s instead of 15s, and Full Song showed 14s instead of 1:37. The refresh now happens at the end of `generatePattern()`, the one place where a new pattern is guaranteed to exist.)*
+
+## Making the video worth watching
+
+The exported video is what most people will actually see of a beat, so it now gets the same treatment as the audio: layered, reactive, composed. Every element is driven by either the pattern itself or the live analyser, so the picture moves *with* the music instead of sitting on top of it as decoration.
+
+**The frame, back to front:**
+
+- **A drifting two-tone background.** The genre accent is rotated 58° around the colour wheel to derive a second, harmonically related colour, and the two blooms drift on slow independent sine paths. A vignette pulls the eye to the centre column.
+- **Film grain.** A 128px noise tile, generated once and re-tiled with a jittered origin each frame. This is not just texture — large flat gradients *band* badly under video compression, and grain is the cheapest possible fix. It also stops the render looking drawn rather than filmed.
+- **A mirrored spectrum ribbon** on real FFT data, exponentially smoothed (a raw analyser read flickers badly) with roughly logarithmic bin spacing, because linear indexing wastes most of the ribbon on high frequencies nothing in a beat occupies.
+- **The note field**, now with a dark scrim behind it so the background blooms can be strong without tinting the notes; per-lane colour-tinted columns; **motion tails** trailing each note, which is what sells speed; a **bright leading-edge cap** on the part about to hit; and a white core that only blooms in as a note nears the strike line — held high everywhere, distant notes washed out to grey and stopped reading as their instrument.
+- **Impact sparks and ripples.** Every hit fires a small burst of additively-blended particles and an expanding ellipse on the strike line. Spark count scales with how loud the hit actually is: ghost notes barely register, rolls and kick/snare/crash hit hardest. They're deliberately restrained and retired the moment they fall past the lane labels — sparks drifting over the chord readout just look like dirt on the lens.
+- **The whole stack breathes.** Kick hits drive a 1.5% zoom on the entire frame; crashes add a decaying shake. Subtle enough to feel, not enough to read as a glitch.
+- **A type layer** with letter-spaced all-caps labels (canvas has no reliable `letterSpacing`, so it's drawn glyph by glyph), a live bar counter, four beat dots with the current beat lit, the section pill, and a chord readout that **scale-pops on every chord change** — which makes the harmony legible as *movement*, the whole point of showing it.
+- **A title card and an end card**, 1.4s each. A beat video that just starts mid-pattern gives a scroller nothing to latch onto.
+
+**Two progress readouts, because they answer different questions.** The segmented bar above the footer is a *bar counter* — where you are inside the loop, resetting with it (and collapsing to one continuous bar past 16 bars, where segments shrink to unreadable dots). The hairline welded to the very bottom edge is the *scrubber* — how much of the video is left, which is what a viewer deciding whether to keep watching actually looks for. It's drawn outside the kick-zoom transform so it stays pinned to the edge instead of bobbing with the beat.
+
+**Recording quality** went up too: 60fps capture instead of 30 (the note field scrolls continuously, and at 30fps the motion strobes against the beat grid), 12 Mbps video and 192 kbps audio instead of the browser defaults — 1080×1920 of gradients and glow is exactly the content a conservative default bitrate turns into blocky mush.
+
+**An adaptive-quality guard** thins the particle system if frames get expensive, rather than dropping the recording's frame rate. *(Bug found while building this: the first version measured the **gap between frames**, which also reflects browser throttling you can't do anything about — under a headless test harness it read 88ms per frame and stripped the visuals to minimum quality while the actual draw was costing 1.9ms. It now measures the draw itself.)*
+
 ## Why the guitar sounded wrong: there was no speaker
 
 The guitar had a physical string model, real strumming, and double-tracking — and still sounded bad, because the most important component of an electric guitar's sound was missing entirely: **the speaker cabinet.**
@@ -472,13 +503,13 @@ A real frequency visualizer (Web Audio's `AnalyserNode`, tapped straight off the
 "🎥 Export Reel" in the transport renders the current beat as a real, downloadable video file, entirely client-side — no server, no render farm. The visuals got a substantial pass this round, from a static-looking bar chart to something that actually reacts to the beat like a real music-video render:
 
 - **True Reels resolution** — a 1080×1920 portrait canvas, not a downscaled preview.
-- **A circular radial visualizer** instead of a plain row of bars — 72 bars arranged in a ring around a center point, each driven by the same real `AnalyserNode` frequency data as the on-page visualizer, with a glowing inner ring.
-- **A kick-reactive pulse.** The background glow and the inner ring genuinely scale up on every kick hit (tracked live off the actual pattern data as it plays, decaying smoothly between hits), so the video visibly breathes with the beat instead of just showing generic audio-reactive noise.
+- **A kick-reactive pulse.** The visuals genuinely scale up on every kick hit (tracked live off the actual pattern data as it plays, decaying smoothly between hits), so the video visibly breathes with the beat instead of just showing generic audio-reactive noise.
 - **A live section badge** in Full Song mode — a small pill reading INTRO / VERSE 1 / CHORUS 1 / BRIDGE / etc., pulled from the real arrangement data, so the video narrates where it is in the song.
-- **Instrument-activity dots** — a row of small dots, one per instrument actually present in the genre, that light up in that instrument's own track color on the exact steps it's sounding, so the video visibly reflects the real arrangement rather than an abstract visualizer.
-- Genre name, tempo/key, the Beat Studio wordmark, and a glowing progress bar round it out.
+- Genre name, tempo/key, the Beat Studio wordmark, and a progress bar round it out.
 
-Under the hood: the canvas is captured as a video track (`canvas.captureStream`) and combined with the actual mixed audio, tapped straight off the engine's master bus via a `MediaStreamAudioDestinationNode` (the same fully-processed signal — EQ, sidechain, grit, compressor and all — that comes out of the speakers, not a separate re-render). Both tracks are recorded together with `MediaRecorder` into a `.webm` file, then automatically downloaded — pick a 15/30/60 second length, hit export, and a file lands in your downloads folder named after the genre. Recording restarts playback from the top of the pattern so the clip always begins at the start of the beat, and the whole thing can be cancelled mid-recording without leaving playback or the UI in a broken state.
+*(The radial ring visualiser and the instrument-activity dot row described here were later replaced — see "The reel now shows the notes" and "Making the video worth watching" above for what the frame looks like now.)*
+
+Under the hood: the canvas is captured as a video track (`canvas.captureStream`) and combined with the actual mixed audio, tapped straight off the engine's master bus via a `MediaStreamAudioDestinationNode` (the same fully-processed signal — EQ, sidechain, grit, compressor and all — that comes out of the speakers, not a separate re-render). Both tracks are recorded together with `MediaRecorder` into a `.webm` file, then automatically downloaded — pick how many loops (or the full song), hit export, and a file lands in your downloads folder named after the genre. Recording restarts playback from the top of the pattern so the clip always begins at the start of the beat, and the whole thing can be cancelled mid-recording without leaving playback or the UI in a broken state.
 
 **A real bug caught while building this:** the export overlay's CSS set `display: flex` directly on the same class the `hidden` attribute was supposed to toggle, which meant the browser's built-in `[hidden] { display: none }` rule silently lost the specificity fight — the overlay was invisible but still `display: flex`, and it sat on top of the entire page blocking every click, `hidden` or not. Caught by an automated click test rather than eyeballing it, and fixed with an explicit `.reel-overlay[hidden] { display: none }` rule.
 

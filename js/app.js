@@ -202,6 +202,7 @@ function selectStyle(id) {
   engine.setGrit(baseStyle.grit || 0);
 
   shuffleStatus.textContent = "";
+  refreshReelDurations();
   workspace.hidden = false;
   closePianoRoll();
   generatePattern();
@@ -222,6 +223,10 @@ function generatePattern() {
   if (openAutomationInst) renderAutomation();
   pushAutomationToEngine();
   if (engine.isPlaying) engine.updatePattern(currentPattern);
+  // Reel length is derived from the pattern, so it can only be computed
+  // once the new pattern exists - refreshing any earlier (on the bars
+  // button, say) reads the previous arrangement and shows a stale time.
+  refreshReelDurations();
 }
 
 // "Start From Scratch" - a blank canvas on the current genre's kit. The
@@ -250,6 +255,7 @@ function startFromScratch() {
   if (openAutomationInst) renderAutomation();
   pushAutomationToEngine();
   if (engine.isPlaying) engine.updatePattern(currentPattern);
+  refreshReelDurations();
   shuffleStatus.textContent = "Blank canvas — click cells to place drums, click a track name to draw notes in its piano roll.";
 }
 
@@ -1073,6 +1079,51 @@ const REEL_LANE_LABEL = {
   kalimba: "KLMB", marimba: "MRMB", arp: "ARP", autolead: "AUTO", sax: "SAX",
 };
 
+// The reel used to run for a fixed 15/30/60s regardless of what the beat
+// actually was, so a 4-bar loop got chopped mid-phrase or repeated a
+// ragged number of times. Length is now derived from the pattern itself,
+// so a video always contains a whole number of loops and never cuts off
+// in the middle of a bar.
+function reelLoopSeconds() {
+  // Prefer the pattern that actually exists - a song arrangement can end
+  // up a different length than the nominal bar count.
+  let steps = selectedBars * STEPS_PER_BAR;
+  if (currentPattern) {
+    const any = Object.values(currentPattern.instruments).find((a) => Array.isArray(a) && a.length);
+    if (any) steps = any.length;
+  }
+  const stepDur = 60 / Number(tempoSlider.value) / 4;
+  // Swing lengthens every odd step, so half the steps run long.
+  const swing = Number(swingSlider.value) / 100;
+  return steps * stepDur * (1 + swing / 2);
+}
+
+function formatReelTime(sec) {
+  const s = Math.round(sec);
+  return s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}` : `${s}s`;
+}
+
+function refreshReelDurations() {
+  if (!activeStyle) return;
+  const loop = reelLoopSeconds();
+  const prev = reelDurationSelect.value;
+  reelDurationSelect.innerHTML = "";
+  const opts = arrangementMode === "song"
+    ? [[1, `Full song (${formatReelTime(loop)})`]]
+    : [[1, `1 loop (${formatReelTime(loop)})`],
+       [2, `2 loops (${formatReelTime(loop * 2)})`],
+       [4, `4 loops (${formatReelTime(loop * 4)})`],
+       [8, `8 loops (${formatReelTime(loop * 8)})`]];
+  for (const [mult, label] of opts) {
+    const o = document.createElement("option");
+    o.value = String(mult);
+    o.textContent = label;
+    reelDurationSelect.appendChild(o);
+  }
+  const match = [...reelDurationSelect.options].find((o) => o.value === prev);
+  reelDurationSelect.value = match ? prev : (arrangementMode === "song" ? "1" : "2");
+}
+
 let reelLanes = [];
 let reelStepStartMs = 0;
 let reelStepMs = 125;
@@ -1114,15 +1165,29 @@ function reelStepHook(step) {
   reelStepStartMs = performance.now();
   reelStepMs = (60 / Number(tempoSlider.value) / 4) * 1000;
   if (pattern.instruments.kick && pattern.instruments.kick[step]) reelPulse = 1;
+  // Crashes and kicks are the two hits that physically move a room, so
+  // they are the two that shake the frame.
+  if (pattern.instruments.crash && pattern.instruments.crash[step]) reelShake = 1;
+  else if (pattern.instruments.kick && pattern.instruments.kick[step]) reelShake = Math.max(reelShake, 0.35);
   reelActiveInstruments.clear();
   for (const inst of REEL_DOT_INSTRUMENTS) {
     const track = pattern.instruments[inst];
     if (track && track[step]) reelActiveInstruments.add(inst);
   }
-  // Flash any lane whose note lands on this step - the moment of impact.
+  // Flash any lane whose note lands on this step - the moment of impact -
+  // and queue a spark burst. Geometry isn't known here, so the burst is
+  // resolved to an x position when the note field is drawn.
   for (const lane of reelLanes) {
     const v = pattern.instruments[lane.inst] && pattern.instruments[lane.inst][step];
-    if (v) reelHitFlash[lane.inst] = 1;
+    if (!v) continue;
+    reelHitFlash[lane.inst] = 1;
+    // Ghost notes barely register audibly, so they barely spark.
+    const power = v === "ghost" ? 0.35
+      : v === "roll" ? 1.15
+      : lane.inst === "kick" || lane.inst === "snare" || lane.inst === "crash" ? 1.25
+      : (v && v.vel) ? 0.6 + v.vel * 0.6
+      : 0.85;
+    reelBurstQueue.push({ inst: lane.inst, value: v, power });
   }
 }
 
@@ -1142,10 +1207,273 @@ function reelChordName(step) {
   return name + (third <= 3 ? "m" : "");
 }
 
+// ---- Reel visual system -------------------------------------------------
+// The exported video is what most people will actually see of a beat, so
+// it gets the same treatment as the audio: layered, reactive, composed.
+// Every element below is driven by either the pattern itself or the live
+// analyser, so the picture moves *with* the music instead of sitting on
+// top of it as decoration.
+//
+// Layers, back to front:
+//   1. drifting two-tone bloom background + vignette + film grain
+//   2. mirrored spectrum ribbon (real FFT data, smoothed)
+//   3. falling-note field with tails, glow and per-lane colour
+//   4. strike line, impact ripples and particle sparks
+//   5. type layer: title, chord, section, bar counter, progress
+// The whole stack is drawn inside a kick-driven zoom/shake transform so
+// the frame itself breathes on the downbeat.
+
+let reelParticles = [];
+let reelBurstQueue = [];
+let reelRipples = [];
+let reelShake = 0;
+let reelBgPhase = 0;
+let reelQuality = 1;
+let reelSmoothMs = 16;
+let reelGrainTile = null;
+let reelSpectrum = new Float32Array(72);
+let reelLastChord = "";
+let reelChordChangeMs = 0;
+
+// --- colour helpers: one accent per genre, everything else derived ---
+function reelRgb(hex) {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+function reelHex(r, g, b) {
+  const c = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0");
+  return `#${c(r)}${c(g)}${c(b)}`;
+}
+// Rotating the accent's hue gives a second, harmonically related colour
+// for gradients - far richer than a flat single-colour wash.
+function reelShiftHue(hex, deg) {
+  let [r, g, b] = reelRgb(hex).map((v) => v / 255);
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let hh = 0;
+  const l = (max + min) / 2;
+  const d = max - min;
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  if (d !== 0) {
+    if (max === r) hh = ((g - b) / d) % 6;
+    else if (max === g) hh = (b - r) / d + 2;
+    else hh = (r - g) / d + 4;
+  }
+  hh = (hh * 60 + deg + 360) % 360;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((hh / 60) % 2) - 1));
+  const m = l - c / 2;
+  let rr = 0, gg = 0, bb = 0;
+  if (hh < 60) [rr, gg, bb] = [c, x, 0];
+  else if (hh < 120) [rr, gg, bb] = [x, c, 0];
+  else if (hh < 180) [rr, gg, bb] = [0, c, x];
+  else if (hh < 240) [rr, gg, bb] = [0, x, c];
+  else if (hh < 300) [rr, gg, bb] = [x, 0, c];
+  else [rr, gg, bb] = [c, 0, x];
+  return reelHex((rr + m) * 255, (gg + m) * 255, (bb + m) * 255);
+}
+function reelAlpha(hex, a) {
+  return hex + Math.max(0, Math.min(255, Math.round(a * 255))).toString(16).padStart(2, "0");
+}
+
+// A single 128px noise tile, generated once and tiled. Grain is what
+// stops large flat gradients from banding on compressed video, and it is
+// the cheapest possible way to make a canvas render look filmed rather
+// than drawn.
+function reelGrain() {
+  if (reelGrainTile) return reelGrainTile;
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const g = c.getContext("2d");
+  const img = g.createImageData(128, 128);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 110 + Math.random() * 145;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  reelGrainTile = c;
+  return c;
+}
+
+function resetReelVisuals() {
+  reelParticles = [];
+  reelBurstQueue = [];
+  reelRipples = [];
+  reelShake = 0;
+  reelBgPhase = Math.random() * 100;
+  reelQuality = 1;
+  reelSpectrum = new Float32Array(72);
+  reelLastChord = "";
+  reelChordChangeMs = 0;
+  reelSmoothMs = 16;
+}
+
+function spawnReelBurst(x, y, color, power) {
+  // Deliberately restrained. Sparks are punctuation: enough of them to
+  // mark an impact, few enough that eight lanes firing sixteenths don't
+  // bury the note field under confetti.
+  const n = Math.max(2, Math.round((4 + power * 8) * reelQuality));
+  for (let i = 0; i < n; i++) {
+    // They fan upward from the strike line, then gravity pulls them back
+    // down through it - reads as an impact, not a firework.
+    const a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.05;
+    const sp = (3 + Math.random() * 11) * power;
+    reelParticles.push({
+      x: x + (Math.random() - 0.5) * 16,
+      y,
+      vx: Math.cos(a) * sp * 1.3,
+      vy: Math.sin(a) * sp,
+      life: 1,
+      decay: 0.028 + Math.random() * 0.03,
+      size: 2.2 + Math.random() * 5 * power,
+      color,
+    });
+  }
+  if (reelParticles.length > 420) reelParticles.splice(0, reelParticles.length - 420);
+}
+
+function drawReelParticles(ctx, floorY) {
+  if (!reelParticles.length) return;
+  ctx.save();
+  // Additive blending so overlapping sparks bloom instead of muddying.
+  ctx.globalCompositeOperation = "lighter";
+  for (let i = reelParticles.length - 1; i >= 0; i--) {
+    const p = reelParticles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.5;
+    p.vx *= 0.988;
+    p.life -= p.decay;
+    // Retired once they fall past the lane labels - sparks drifting down
+    // over the chord readout just look like dirt on the lens.
+    if (p.life <= 0 || (floorY && p.y > floorY)) { reelParticles.splice(i, 1); continue; }
+    ctx.globalAlpha = p.life * 0.8;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * (0.35 + p.life * 0.65), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawReelRipples(ctx) {
+  if (!reelRipples.length) return;
+  ctx.save();
+  for (let i = reelRipples.length - 1; i >= 0; i--) {
+    const r = reelRipples[i];
+    r.t += 0.075;
+    if (r.t >= 1) { reelRipples.splice(i, 1); continue; }
+    ctx.globalAlpha = (1 - r.t) * 0.8;
+    ctx.strokeStyle = r.color;
+    ctx.lineWidth = 3 * (1 - r.t) + 0.5;
+    ctx.beginPath();
+    ctx.ellipse(r.x, r.y, r.rx * r.t, r.ry * r.t, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Two slow-drifting colour blooms over near-black, then a vignette to
+// pull the eye to the centre column where the notes live.
+function drawReelBackground(ctx, w, h, accent, accent2) {
+  ctx.fillStyle = "#05050a";
+  ctx.fillRect(0, 0, w, h);
+
+  reelBgPhase += 0.0045;
+  const blooms = [
+    { x: w * (0.5 + 0.30 * Math.sin(reelBgPhase)), y: h * (0.20 + 0.06 * Math.cos(reelBgPhase * 0.8)), r: h * 0.46, c: accent, a: 0.30 + 0.14 * reelPulse },
+    { x: w * (0.5 - 0.34 * Math.sin(reelBgPhase * 0.73)), y: h * (0.70 + 0.07 * Math.sin(reelBgPhase * 1.1)), r: h * 0.42, c: accent2, a: 0.22 + 0.10 * reelPulse },
+  ];
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const b of blooms) {
+    const g = ctx.createRadialGradient(b.x, b.y, 10, b.x, b.y, b.r);
+    g.addColorStop(0, reelAlpha(b.c, b.a));
+    g.addColorStop(0.55, reelAlpha(b.c, b.a * 0.28));
+    g.addColorStop(1, reelAlpha(b.c, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  }
+  ctx.restore();
+
+  // Vignette
+  const v = ctx.createRadialGradient(w / 2, h * 0.5, h * 0.22, w / 2, h * 0.5, h * 0.72);
+  v.addColorStop(0, "#00000000");
+  v.addColorStop(1, "#000000b0");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, w, h);
+}
+
+function drawReelGrain(ctx, w, h) {
+  const tile = reelGrain();
+  const pat = ctx.createPattern(tile, "repeat");
+  if (!pat) return;
+  ctx.save();
+  ctx.globalCompositeOperation = "overlay";
+  ctx.globalAlpha = 0.05;
+  // Jitter the tile origin each frame so the grain shimmers instead of
+  // sitting still like a texture stuck to the lens.
+  ctx.translate(-Math.floor(Math.random() * 128), -Math.floor(Math.random() * 128));
+  ctx.fillStyle = pat;
+  ctx.fillRect(0, 0, w + 128, h + 128);
+  ctx.restore();
+}
+
+// Mirrored spectrum ribbon. Real FFT data, exponentially smoothed so it
+// glides; a raw analyser read flickers badly at 30fps.
+function drawReelSpectrum(ctx, w, h, centerY, accent, accent2) {
+  if (!engine.analyser) return;
+  const data = new Uint8Array(engine.analyser.frequencyBinCount);
+  engine.analyser.getByteFrequencyData(data);
+  const bars = reelSpectrum.length;
+  const padX = w * 0.06;
+  const usable = w - padX * 2;
+  const bw = usable / bars;
+  const maxH = h * 0.052;
+  for (let i = 0; i < bars; i++) {
+    // Log-ish bin spacing: linear indexing wastes most of the ribbon on
+    // high frequencies nothing in a beat actually occupies.
+    const t = i / bars;
+    const idx = Math.floor(Math.pow(t, 1.7) * data.length * 0.82);
+    const raw = data[idx] / 255;
+    reelSpectrum[i] += (raw - reelSpectrum[i]) * 0.32;
+  }
+  ctx.save();
+  for (let i = 0; i < bars; i++) {
+    const v = reelSpectrum[i];
+    const bh = Math.max(h * 0.0022, v * maxH);
+    const x = padX + i * bw;
+    const g = ctx.createLinearGradient(0, centerY - bh, 0, centerY + bh);
+    g.addColorStop(0, reelAlpha(accent2, 0.25 + v * 0.75));
+    g.addColorStop(0.5, reelAlpha(accent, 0.85));
+    g.addColorStop(1, reelAlpha(accent2, 0.25 + v * 0.75));
+    ctx.fillStyle = g;
+    if (v > 0.55) { ctx.shadowColor = accent; ctx.shadowBlur = 14 * v; }
+    const bwd = Math.max(1, bw * 0.62);
+    if (ctx.roundRect) {
+      ctx.beginPath();
+      ctx.roundRect(x + (bw - bwd) / 2, centerY - bh, bwd, bh * 2, bwd / 2);
+      ctx.fill();
+    } else {
+      ctx.fillRect(x + (bw - bwd) / 2, centerY - bh, bwd, bh * 2);
+    }
+    ctx.shadowBlur = 0;
+  }
+  // Centre hairline ties the two halves together.
+  ctx.globalAlpha = 0.5;
+  ctx.strokeStyle = reelAlpha(accent, 0.5);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padX, centerY);
+  ctx.lineTo(w - padX, centerY);
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawReelNotes(ctx, w, h, step, accent) {
   if (!reelLanes.length || !currentPattern) return;
-  const top = h * 0.305;
-  const strikeY = h * 0.80;
+  const top = h * 0.290;
+  const strikeY = h * 0.795;
   const field = strikeY - top;
   const LOOKAHEAD = 16; // one full bar visible above the strike line
   const total = currentPattern.instruments[reelLanes[0].inst].length;
@@ -1157,10 +1485,54 @@ function drawReelNotes(ctx, w, h, step, accent) {
   const padX = w * 0.06;
   const laneW = (w - padX * 2) / reelLanes.length;
 
-  // Lane backgrounds
+  const laneCenterX = (lane, i, v) => {
+    const laneX = padX + i * laneW;
+    if (!lane.melodic || !v || v === true) return laneX + laneW / 2;
+    const d = v.degree !== undefined ? v.degree : (v.degrees ? v.degrees[0] : lane.lo);
+    const t = (d - lane.lo) / Math.max(1, lane.hi - lane.lo);
+    return laneX + laneW * 0.08 + t * laneW * 0.84 + laneW * 0.25;
+  };
+
+  // Queued impacts from reelStepHook get their geometry here, where lane
+  // widths are known, and turn into sparks + a ripple on the strike line.
+  while (reelBurstQueue.length) {
+    const b = reelBurstQueue.shift();
+    const i = reelLanes.findIndex((l) => l.inst === b.inst);
+    if (i < 0) continue;
+    const lane = reelLanes[i];
+    const x = laneCenterX(lane, i, b.value);
+    spawnReelBurst(x, strikeY, lane.color, b.power);
+    reelRipples.push({ x, y: strikeY, rx: laneW * 0.85, ry: h * 0.011, t: 0, color: lane.color });
+  }
+
+  // Scrim behind the whole field. The background blooms are deliberately
+  // strong, but left unchecked they tint the note field and the notes
+  // stop reading as their own colours.
+  const scrim = ctx.createLinearGradient(0, top, 0, strikeY);
+  scrim.addColorStop(0, "#05050a66");
+  scrim.addColorStop(0.5, "#05050aaa");
+  scrim.addColorStop(1, "#05050a80");
+  ctx.fillStyle = scrim;
+  ctx.fillRect(padX, top, w - padX * 2, field);
+
+  // Lane columns, tinted with the lane's own colour so the field reads as
+  // instruments rather than as an anonymous grid.
   reelLanes.forEach((lane, i) => {
-    ctx.fillStyle = i % 2 ? "#ffffff08" : "#ffffff04";
-    ctx.fillRect(padX + i * laneW, top, laneW, field);
+    const x = padX + i * laneW;
+    const f = reelHitFlash[lane.inst] || 0;
+    const g = ctx.createLinearGradient(0, top, 0, strikeY);
+    g.addColorStop(0, reelAlpha(lane.color, 0.012));
+    g.addColorStop(1, reelAlpha(lane.color, 0.05 + f * 0.14));
+    ctx.fillStyle = g;
+    ctx.fillRect(x, top, laneW, field);
+    if (i > 0) {
+      ctx.strokeStyle = "#ffffff0c";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, top);
+      ctx.lineTo(x, strikeY);
+      ctx.stroke();
+    }
   });
 
   // Beat grid scrolling with the notes - gives the eye a pulse to track.
@@ -1169,8 +1541,9 @@ function drawReelNotes(ctx, w, h, step, accent) {
     if (((s2 % 4) + 4) % 4 !== 0) continue;
     const y = strikeY - ((s2 - nowPos) / LOOKAHEAD) * field;
     if (y < top || y > strikeY) continue;
-    ctx.strokeStyle = s2 % 16 === 0 ? "#ffffff28" : "#ffffff10";
-    ctx.lineWidth = s2 % 16 === 0 ? 2 : 1;
+    const isBar = ((s2 % 16) + 16) % 16 === 0;
+    ctx.strokeStyle = isBar ? reelAlpha(accent, 0.35) : "#ffffff10";
+    ctx.lineWidth = isBar ? 2 : 1;
     ctx.beginPath();
     ctx.moveTo(padX, y);
     ctx.lineTo(w - padX, y);
@@ -1191,13 +1564,13 @@ function drawReelNotes(ctx, w, h, step, accent) {
       const len = v.len || 1;
       const yEnd = strikeY - ((s2 - nowPos) / LOOKAHEAD) * field;
       const yStart = strikeY - ((s2 + len - nowPos) / LOOKAHEAD) * field;
-      const barH = Math.max(h * 0.006, yEnd - yStart);
+      const barH = Math.max(h * 0.007, yEnd - yStart);
       const yTop = yEnd - barH;
       if (yEnd < top - 20 || yTop > strikeY + 20) continue;
 
       // Pitch position within the lane for melodic parts.
-      let bx = laneX + laneW * 0.15;
-      let bw = laneW * 0.7;
+      let bx = laneX + laneW * 0.16;
+      let bw = laneW * 0.68;
       if (lane.melodic) {
         const d = v.degree !== undefined ? v.degree : (v.degrees ? v.degrees[0] : lane.lo);
         const t = (d - lane.lo) / Math.max(1, lane.hi - lane.lo);
@@ -1211,52 +1584,88 @@ function drawReelNotes(ctx, w, h, step, accent) {
 
       // Notes brighten as they approach the strike line.
       const prox = 1 - Math.max(0, Math.min(1, (strikeY - yEnd) / field));
-      ctx.globalAlpha = 0.35 + prox * 0.65;
-      ctx.fillStyle = lane.color;
-      if (prox > 0.9) {
-        ctx.shadowColor = lane.color;
-        ctx.shadowBlur = 18;
+
+      // Motion tail: a short gradient streak trailing the note upward,
+      // which is what sells the sense of speed on a 30fps export.
+      if (prox > 0.25) {
+        const tailH = Math.min(field * 0.10, barH * 2.2) * prox;
+        const tg = ctx.createLinearGradient(0, clippedTop - tailH, 0, clippedTop);
+        tg.addColorStop(0, reelAlpha(lane.color, 0));
+        tg.addColorStop(1, reelAlpha(lane.color, 0.28 * prox));
+        ctx.fillStyle = tg;
+        ctx.fillRect(bx, Math.max(top, clippedTop - tailH), bw, Math.min(tailH, clippedTop - top));
       }
+
+      // The white core only blooms in as a note nears the strike line -
+      // hold it high everywhere and distant notes wash out to grey and
+      // stop reading as their instrument.
+      const g = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+      g.addColorStop(0, reelAlpha(lane.color, 0.9));
+      g.addColorStop(0.42, "#ffffff" + Math.round((0.05 + prox * prox * 0.75) * 255).toString(16).padStart(2, "0"));
+      g.addColorStop(1, reelAlpha(lane.color, 0.9));
+      ctx.globalAlpha = 0.4 + prox * 0.6;
+      ctx.fillStyle = g;
+      if (prox > 0.82) {
+        ctx.shadowColor = lane.color;
+        ctx.shadowBlur = 14 + 22 * (prox - 0.82) / 0.18;
+      }
+      const r = Math.min(7, bw / 2, clippedH / 2);
       if (ctx.roundRect) {
         ctx.beginPath();
-        ctx.roundRect(bx, clippedTop, bw, clippedH, Math.min(6, bw / 2));
+        ctx.roundRect(bx, clippedTop, bw, clippedH, r);
         ctx.fill();
       } else {
         ctx.fillRect(bx, clippedTop, bw, clippedH);
       }
       ctx.shadowBlur = 0;
+      // Bright cap on the leading edge - the part that will hit next.
+      if (clippedH > 6) {
+        ctx.fillStyle = "#ffffff";
+        ctx.globalAlpha = (0.25 + prox * 0.6);
+        ctx.fillRect(bx, Math.min(yEnd, strikeY) - 2.5, bw, 2.5);
+      }
       ctx.globalAlpha = 1;
     }
   });
 
+  drawReelRipples(ctx);
+
   // The strike line, plus a burst on every lane that just fired.
-  ctx.strokeStyle = "#ffffff";
-  ctx.globalAlpha = 0.85;
+  const lineG = ctx.createLinearGradient(padX, 0, w - padX, 0);
+  lineG.addColorStop(0, reelAlpha(accent, 0.15));
+  lineG.addColorStop(0.5, "#ffffffee");
+  lineG.addColorStop(1, reelAlpha(accent, 0.15));
+  ctx.strokeStyle = lineG;
   ctx.lineWidth = 3;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 16;
   ctx.beginPath();
   ctx.moveTo(padX, strikeY);
   ctx.lineTo(w - padX, strikeY);
   ctx.stroke();
-  ctx.globalAlpha = 1;
+  ctx.shadowBlur = 0;
 
   reelLanes.forEach((lane, i) => {
     const f = reelHitFlash[lane.inst] || 0;
     if (f <= 0.02) return;
     const laneX = padX + i * laneW;
-    const g = ctx.createLinearGradient(0, strikeY - field * 0.16 * f, 0, strikeY);
-    g.addColorStop(0, lane.color + "00");
-    g.addColorStop(1, lane.color + "cc");
+    const gh = field * 0.20 * f;
+    const g = ctx.createLinearGradient(0, strikeY - gh, 0, strikeY);
+    g.addColorStop(0, reelAlpha(lane.color, 0));
+    g.addColorStop(1, reelAlpha(lane.color, 0.8));
     ctx.globalAlpha = f;
     ctx.fillStyle = g;
-    ctx.fillRect(laneX, strikeY - field * 0.16 * f, laneW, field * 0.16 * f);
+    ctx.fillRect(laneX, strikeY - gh, laneW, gh);
     // Impact glow on the line itself
-    ctx.fillStyle = lane.color;
+    ctx.fillStyle = "#ffffff";
     ctx.shadowColor = lane.color;
-    ctx.shadowBlur = 26 * f;
+    ctx.shadowBlur = 30 * f;
     ctx.fillRect(laneX + laneW * 0.06, strikeY - 3, laneW * 0.88, 6);
     ctx.shadowBlur = 0;
     ctx.globalAlpha = 1;
   });
+
+  drawReelParticles(ctx, strikeY + h * 0.012);
 
   // Lane labels under the strike line
   ctx.textAlign = "center";
@@ -1266,7 +1675,7 @@ function drawReelNotes(ctx, w, h, step, accent) {
     reelLanes.forEach((lane, i) => {
       const f = reelHitFlash[lane.inst] || 0;
       ctx.fillStyle = f > 0.1 ? lane.color : "#ffffff45";
-      ctx.fillText(REEL_LANE_LABEL[lane.inst] || lane.inst.slice(0, 4).toUpperCase(), padX + i * laneW + laneW / 2, strikeY + h * 0.026);
+      ctx.fillText(REEL_LANE_LABEL[lane.inst] || lane.inst.slice(0, 4).toUpperCase(), padX + i * laneW + laneW / 2, strikeY + h * 0.024);
     });
   }
 
@@ -1282,140 +1691,274 @@ function reelSectionLabel(step) {
   return label;
 }
 
+// Rounded-rect pill used for the section badge and the genre tag.
+function reelPill(ctx, cx, y, text, font, fill, stroke, textColor) {
+  ctx.font = font;
+  const padX = ctx.measureText("MM").width;
+  const textW = ctx.measureText(text).width;
+  const pillW = textW + padX * 2;
+  const pillH = parseInt(font.match(/(\d+)px/)[1], 10) * 1.9;
+  const r = pillH / 2;
+  const x = cx - pillW / 2;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x, y, pillW, pillH, r);
+  else ctx.rect(x, y, pillW, pillH);
+  ctx.fillStyle = fill;
+  ctx.fill();
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.stroke(); }
+  ctx.fillStyle = textColor;
+  ctx.textAlign = "center";
+  ctx.fillText(text, cx, y + pillH * 0.70);
+  return pillH;
+}
+
+// Letter-spaced text - canvas has no letterSpacing in every browser, and
+// wide tracking is what makes an all-caps label look designed.
+function reelTrackedText(ctx, text, cx, y, spacing) {
+  const chars = [...text];
+  let total = 0;
+  for (const c of chars) total += ctx.measureText(c).width + spacing;
+  total -= spacing;
+  let x = cx - total / 2;
+  const prev = ctx.textAlign;
+  ctx.textAlign = "left";
+  for (const c of chars) {
+    ctx.fillText(c, x, y);
+    x += ctx.measureText(c).width + spacing;
+  }
+  ctx.textAlign = prev;
+}
+
 function drawReelFrame(ctx, elapsedSec, durationSec, step) {
   const w = reelCanvas.width;
   const h = reelCanvas.height;
   const accent = STYLE_ACCENTS[selectedStyleId] || "#a55eea";
+  const accent2 = reelShiftHue(accent, 58);
   const cx = w / 2;
-  const cy = h * 0.155;
+  const now = performance.now();
+
+  // Adaptive quality: if frames start costing too much, thin the particle
+  // system rather than dropping the frame rate of the recording. This
+  // watches how long the *draw* takes, not the gap between frames - the
+  // gap also reflects browser throttling we can't do anything about, and
+  // reacting to it would strip the visuals for no reason.
+  if (reelSmoothMs > 12) reelQuality = Math.max(0.25, reelQuality - 0.02);
+  else if (reelSmoothMs < 8) reelQuality = Math.min(1, reelQuality + 0.01);
 
   reelPulse *= 0.9;
+  reelShake *= 0.86;
 
-  ctx.fillStyle = "#08080d";
-  ctx.fillRect(0, 0, w, h);
+  drawReelBackground(ctx, w, h, accent, accent2);
 
-  const pulseR = h * (0.5 + 0.06 * reelPulse);
-  const glow = ctx.createRadialGradient(cx, cy, 20, cx, cy, pulseR);
-  glow.addColorStop(0, accent + (reelPulse > 0.3 ? "70" : "45"));
-  glow.addColorStop(1, "#08080d00");
-  ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, w, h);
-
-  // A circular radial visualizer - bars radiating outward from a center
-  // ring, driven by the same real frequency data as the on-page
-  // visualizer, plus a solid inner ring that scales with the kick pulse.
-  if (engine.analyser) {
-    const data = new Uint8Array(engine.analyser.frequencyBinCount);
-    engine.analyser.getByteFrequencyData(data);
-    const bars = 72;
-    const innerR = h * 0.062 * (1 + 0.12 * reelPulse);
-    for (let i = 0; i < bars; i++) {
-      const angle = (i / bars) * Math.PI * 2 - Math.PI / 2;
-      const dataIndex = Math.floor((i / bars) * data.length * 0.75);
-      const value = data[dataIndex] / 255;
-      const len = h * 0.009 + value * h * 0.05;
-      const x1 = cx + Math.cos(angle) * innerR;
-      const y1 = cy + Math.sin(angle) * innerR;
-      const x2 = cx + Math.cos(angle) * (innerR + len);
-      const y2 = cy + Math.sin(angle) * (innerR + len);
-      ctx.strokeStyle = accent;
-      ctx.globalAlpha = 0.55 + value * 0.45;
-      ctx.lineWidth = w * 0.005;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-
-    ctx.beginPath();
-    ctx.arc(cx, cy, innerR, 0, Math.PI * 2);
-    ctx.fillStyle = "#ffffff12";
-    ctx.fill();
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = w * 0.004;
-    ctx.stroke();
-  }
+  // Everything from here breathes with the kick: a small zoom plus a
+  // decaying shake. Subtle at 1.5% - enough to feel, not enough to read
+  // as a glitch.
+  ctx.save();
+  const zoom = 1 + 0.015 * reelPulse;
+  const shakeX = (Math.random() - 0.5) * reelShake * 10;
+  const shakeY = (Math.random() - 0.5) * reelShake * 10;
+  ctx.translate(cx + shakeX, h / 2 + shakeY);
+  ctx.scale(zoom, zoom);
+  ctx.translate(-cx, -h / 2);
 
   const style = STYLES[selectedStyleId];
   ctx.textAlign = "center";
-  ctx.fillStyle = "#ffffff";
-  ctx.font = `700 ${Math.round(h * 0.038)}px sans-serif`;
-  ctx.fillText(style ? style.name : "Beat Studio", cx, h * 0.245);
 
-  ctx.font = `400 ${Math.round(h * 0.02)}px sans-serif`;
-  ctx.fillStyle = "#c9c9d8";
+  // --- header block -------------------------------------------------
+  ctx.font = `700 ${Math.round(h * 0.0125)}px sans-serif`;
+  ctx.fillStyle = reelAlpha(accent, 0.85);
+  reelTrackedText(ctx, "BEAT STUDIO", cx, h * 0.043, h * 0.007);
+
+  ctx.font = `800 ${Math.round(h * 0.040)}px sans-serif`;
+  ctx.fillStyle = "#ffffff";
+  ctx.shadowColor = reelAlpha(accent, 0.8);
+  ctx.shadowBlur = 26;
+  ctx.fillText(style ? style.name : "Beat Studio", cx, h * 0.088);
+  ctx.shadowBlur = 0;
+
   const tempo = Math.round(Number(tempoSlider.value));
   const keyLabel = keySelect.value + (keySelect.dataset.octave || "");
-  const chordNow = step !== undefined ? reelChordName(step) : "";
-  ctx.fillText(`${tempo} BPM  ·  ${keyLabel}${chordNow ? "  ·  " + chordNow : ""}`, cx, h * 0.275);
+  const total = currentPattern ? (currentPattern.instruments[Object.keys(currentPattern.instruments)[0]] || []).length : 0;
+  const totalBars = Math.max(1, Math.round(total / STEPS_PER_BAR));
+  ctx.font = `600 ${Math.round(h * 0.0155)}px sans-serif`;
+  ctx.fillStyle = "#b9b9cc";
+  reelTrackedText(ctx, `${tempo} BPM   ·   ${keyLabel}   ·   ${totalBars} BARS`, cx, h * 0.118, h * 0.0024);
 
-  // Section badge (Full Song mode only) - a small pill showing Intro /
-  // Verse / Chorus / Bridge / Outro so the video actually narrates where
-  // in the arrangement it currently is.
-  const section = step !== undefined ? reelSectionLabel(step) : "";
-  if (section) {
-    ctx.font = `700 ${Math.round(h * 0.016)}px sans-serif`;
-    const padX = w * 0.035;
-    const textW = ctx.measureText(section.toUpperCase()).width;
-    const pillW = textW + padX * 2;
-    const pillH = h * 0.032;
-    const pillY = h * 0.845;
-    ctx.fillStyle = accent + "30";
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 2;
-    const r = pillH / 2;
+  // --- spectrum ribbon ----------------------------------------------
+  drawReelSpectrum(ctx, w, h, h * 0.175, accent, accent2);
+
+  // --- bar / beat counter -------------------------------------------
+  const barIdx = Math.floor(step / STEPS_PER_BAR);
+  const beatInBar = Math.floor((step % STEPS_PER_BAR) / 4);
+  ctx.font = `700 ${Math.round(h * 0.0135)}px sans-serif`;
+  ctx.fillStyle = "#8f8fa6";
+  ctx.textAlign = "left";
+  ctx.fillText(`BAR ${Math.min(totalBars, barIdx + 1)} / ${totalBars}`, w * 0.06, h * 0.243);
+  ctx.textAlign = "center";
+  // Four beat dots, the current one lit and swollen.
+  for (let b = 0; b < 4; b++) {
+    const on = b === beatInBar;
+    const dx = w * 0.94 - (3 - b) * w * 0.032;
+    const rr = on ? h * 0.0060 : h * 0.0036;
     ctx.beginPath();
-    ctx.moveTo(cx - pillW / 2 + r, pillY);
-    ctx.arcTo(cx + pillW / 2, pillY, cx + pillW / 2, pillY + pillH, r);
-    ctx.arcTo(cx + pillW / 2, pillY + pillH, cx - pillW / 2, pillY + pillH, r);
-    ctx.arcTo(cx - pillW / 2, pillY + pillH, cx - pillW / 2, pillY, r);
-    ctx.arcTo(cx - pillW / 2, pillY, cx + pillW / 2, pillY, r);
-    ctx.closePath();
+    ctx.arc(dx, h * 0.2385, rr, 0, Math.PI * 2);
+    ctx.fillStyle = on ? accent : "#ffffff28";
+    if (on) { ctx.shadowColor = accent; ctx.shadowBlur = 18; }
     ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#ffffff";
-    ctx.fillText(section.toUpperCase(), cx, pillY + pillH * 0.72);
-  }
-
-  drawReelNotes(ctx, w, h, step === undefined ? 0 : step, accent);
-
-  if (chordNow) {
-    ctx.font = `800 ${Math.round(h * 0.052)}px sans-serif`;
-    ctx.fillStyle = "#ffffff";
-    ctx.globalAlpha = 0.93;
-    ctx.fillText(chordNow, cx, h * 0.915);
-    ctx.globalAlpha = 1;
-  }
-
-  ctx.font = `700 ${Math.round(h * 0.02)}px sans-serif`;
-  ctx.fillStyle = accent;
-  ctx.fillText("BEAT STUDIO", cx, h * 0.952);
-
-  const barY = h * 0.965;
-  const barW = w * 0.7;
-  const barX = cx - barW / 2;
-  const barH = h * 0.005;
-  const drawBar = (x, y, width, height) => {
-    if (ctx.roundRect) {
-      ctx.beginPath();
-      ctx.roundRect(x, y, width, height, height / 2);
-      ctx.fill();
-    } else {
-      ctx.fillRect(x, y, width, height);
-    }
-  };
-  ctx.fillStyle = "#2a2a3a";
-  drawBar(barX, barY, barW, barH);
-  const progressW = barW * Math.min(1, elapsedSec / durationSec);
-  if (progressW > 0) {
-    ctx.fillStyle = accent;
-    ctx.shadowColor = accent;
-    ctx.shadowBlur = 12;
-    drawBar(barX, barY, progressW, barH);
     ctx.shadowBlur = 0;
   }
+
+  // Section badge (Full Song mode only) - so the video narrates where in
+  // the arrangement it currently is.
+  const section = step !== undefined ? reelSectionLabel(step) : "";
+  if (section) {
+    reelPill(ctx, cx, h * 0.2275, section.toUpperCase(),
+      `700 ${Math.round(h * 0.0145)}px sans-serif`,
+      reelAlpha(accent, 0.22), accent, "#ffffff");
+  }
+
+  // --- the note field -----------------------------------------------
+  drawReelNotes(ctx, w, h, step === undefined ? 0 : step, accent);
+
+  // --- chord readout -------------------------------------------------
+  const chordNow = step !== undefined ? reelChordName(step) : "";
+  if (chordNow) {
+    if (chordNow !== reelLastChord) { reelLastChord = chordNow; reelChordChangeMs = now; }
+    // A quick scale-in on every chord change makes the harmony legible
+    // as *movement*, which is the whole point of showing it.
+    const since = Math.min(1, (now - reelChordChangeMs) / 260);
+    const pop = 1 + 0.13 * (1 - since) * (1 - since);
+    ctx.save();
+    ctx.translate(cx, h * 0.885);
+    ctx.scale(pop, pop);
+    ctx.font = `800 ${Math.round(h * 0.055)}px sans-serif`;
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 30 + 24 * (1 - since);
+    ctx.fillText(chordNow, 0, 0);
+    ctx.restore();
+    ctx.shadowBlur = 0;
+    ctx.font = `600 ${Math.round(h * 0.0125)}px sans-serif`;
+    ctx.fillStyle = "#7d7d95";
+    reelTrackedText(ctx, "CHORD", cx, h * 0.906, h * 0.006);
+  }
+
+  // --- progress ------------------------------------------------------
+  // Two readouts, because they answer different questions. The segmented
+  // bar is a bar counter: it shows where you are inside the loop, and
+  // resets with it. The hairline pinned to the very bottom edge is the
+  // scrubber - how much of the video is left - which is what a viewer
+  // deciding whether to keep watching actually looks for.
+  const barY = h * 0.947;
+  const barW = w * 0.76;
+  const barX = cx - barW / 2;
+  const barH = h * 0.0045;
+  const progress = Math.min(1, elapsedSec / durationSec);
+  const loops = Number(reelDurationSelect.value || 1);
+  // Past ~16 bars the segments shrink to dots and stop being readable,
+  // so a full-song arrangement gets one continuous bar instead.
+  const segs = totalBars <= 16 ? totalBars : 1;
+  const segGap = segs > 1 ? Math.min(6, barW / (segs * 6)) : 0;
+  const segW = (barW - segGap * (segs - 1)) / segs;
+  const barsDone = progress * totalBars * loops;
+  for (let b = 0; b < segs; b++) {
+    const x = barX + b * (segW + segGap);
+    const local = segs === 1
+      ? (barsDone % totalBars) / totalBars
+      : Math.max(0, Math.min(1, (barsDone % totalBars) - b));
+    ctx.fillStyle = "#ffffff18";
+    if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x, barY, segW, barH, barH / 2); ctx.fill(); }
+    else ctx.fillRect(x, barY, segW, barH);
+    if (local > 0) {
+      ctx.fillStyle = accent;
+      ctx.shadowColor = accent;
+      ctx.shadowBlur = 12;
+      if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x, barY, segW * local, barH, barH / 2); ctx.fill(); }
+      else ctx.fillRect(x, barY, segW * local, barH);
+      ctx.shadowBlur = 0;
+    }
+  }
+
+  ctx.font = `700 ${Math.round(h * 0.0125)}px sans-serif`;
+  ctx.fillStyle = "#6f6f88";
+  reelTrackedText(ctx, "MADE WITH BEAT STUDIO", cx, h * 0.972, h * 0.005);
+
+  ctx.restore();
+
+  // Overall scrubber, drawn outside the kick zoom so it stays welded to
+  // the bottom edge of the frame instead of bobbing with the beat.
+  ctx.fillStyle = "#ffffff14";
+  ctx.fillRect(0, h - 6, w, 6);
+  ctx.fillStyle = accent;
+  ctx.fillRect(0, h - 6, w * progress, 6);
+
+  drawReelGrain(ctx, w, h);
+
+  // --- title card / end card -----------------------------------------
+  // A beat video that just starts mid-pattern gives a scroller nothing to
+  // latch onto. 1.4s of title and 1.4s of sign-off frame the loop.
+  const INTRO = 1.4;
+  const OUTRO = 1.4;
+  if (elapsedSec < INTRO) {
+    const t = elapsedSec / INTRO;
+    const fade = t < 0.65 ? 1 : 1 - (t - 0.65) / 0.35;
+    drawReelCard(ctx, w, h, accent, accent2, fade, style ? style.name : "Beat Studio",
+      `${tempo} BPM   ·   ${keyLabel}`, 1 + 0.05 * (1 - t));
+  } else if (elapsedSec > durationSec - OUTRO) {
+    const t = Math.min(1, (elapsedSec - (durationSec - OUTRO)) / OUTRO);
+    drawReelCard(ctx, w, h, accent, accent2, t, style ? style.name : "Beat Studio",
+      `${tempo} BPM   ·   ${keyLabel}`, 1 + 0.05 * t);
+  }
+
+  reelSmoothMs += ((performance.now() - now) - reelSmoothMs) * 0.1;
+}
+
+function drawReelCard(ctx, w, h, accent, accent2, alpha, title, sub, scale) {
+  if (alpha <= 0.01) return;
+  const cx = w / 2;
+  ctx.save();
+  ctx.globalAlpha = Math.min(1, alpha);
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, "#05050ae0");
+  g.addColorStop(0.5, "#05050af5");
+  g.addColorStop(1, "#05050ae0");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+
+  const rg = ctx.createRadialGradient(cx, h * 0.5, 10, cx, h * 0.5, h * 0.4);
+  rg.addColorStop(0, reelAlpha(accent, 0.30));
+  rg.addColorStop(1, reelAlpha(accent, 0));
+  ctx.fillStyle = rg;
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.translate(cx, h * 0.5);
+  ctx.scale(scale, scale);
+  ctx.textAlign = "center";
+
+  ctx.font = `700 ${Math.round(h * 0.0135)}px sans-serif`;
+  ctx.fillStyle = reelAlpha(accent, 0.9);
+  reelTrackedText(ctx, "BEAT STUDIO", 0, -h * 0.085, h * 0.008);
+
+  ctx.font = `800 ${Math.round(h * 0.062)}px sans-serif`;
+  ctx.fillStyle = "#ffffff";
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 40;
+  ctx.fillText(title, 0, 0);
+  ctx.shadowBlur = 0;
+
+  // Accent rule under the title
+  const rw = h * 0.055;
+  const lg = ctx.createLinearGradient(-rw, 0, rw, 0);
+  lg.addColorStop(0, reelAlpha(accent, 0));
+  lg.addColorStop(0.5, accent2);
+  lg.addColorStop(1, reelAlpha(accent, 0));
+  ctx.fillStyle = lg;
+  ctx.fillRect(-rw, h * 0.020, rw * 2, 3);
+
+  ctx.font = `600 ${Math.round(h * 0.019)}px sans-serif`;
+  ctx.fillStyle = "#c9c9dd";
+  reelTrackedText(ctx, sub, 0, h * 0.055, h * 0.003);
+  ctx.restore();
 }
 
 let reelAnimFrame = null;
@@ -1433,7 +1976,8 @@ async function exportReel() {
     return;
   }
 
-  const duration = Number(reelDurationSelect.value);
+  // Whole loops only, so the video never ends mid-phrase.
+  const duration = reelLoopSeconds() * Number(reelDurationSelect.value || 1);
   const ctx = reelCanvas.getContext("2d");
 
   exportReelBtn.disabled = true;
@@ -1445,6 +1989,7 @@ async function exportReel() {
   reelPulse = 0;
   reelActiveInstruments.clear();
   reelHitFlash = {};
+  resetReelVisuals();
   buildReelLanes();
   let reelCurrentStep = 0;
   engine.onStep = (step) => {
@@ -1457,11 +2002,18 @@ async function exportReel() {
   playBtn.classList.add("playing");
   startVisualizer();
 
-  const videoStream = reelCanvas.captureStream(30);
+  // 60fps: the note field scrolls continuously, and at 30fps the motion
+  // strobes badly against the beat grid. Bitrate is pushed well past the
+  // default too - 1080x1920 of gradients and glow is exactly the content
+  // that a conservative default bitrate turns into blocky mush.
+  const videoStream = reelCanvas.captureStream(60);
   const combined = new MediaStream([...videoStream.getVideoTracks(), ...engine.mediaStreamDest.stream.getAudioTracks()]);
 
   const mimeType = pickReelMimeType();
-  const recorder = new MediaRecorder(combined, mimeType ? { mimeType } : undefined);
+  const recorder = new MediaRecorder(combined, Object.assign(
+    { videoBitsPerSecond: 12000000, audioBitsPerSecond: 192000 },
+    mimeType ? { mimeType } : {},
+  ));
   const chunks = [];
   recorder.ondataavailable = (e) => {
     if (e.data && e.data.size > 0) chunks.push(e.data);
@@ -1481,7 +2033,7 @@ async function exportReel() {
   function frame() {
     const elapsed = (performance.now() - startTime) / 1000;
     drawReelFrame(ctx, elapsed, duration, reelCurrentStep);
-    reelStatus.textContent = `Recording… ${Math.min(duration, elapsed).toFixed(0)}s / ${duration}s`;
+    reelStatus.textContent = `Recording… ${Math.min(duration, elapsed).toFixed(0)}s / ${duration.toFixed(0)}s`;
     if (elapsed < duration && !cancelled) {
       reelAnimFrame = requestAnimationFrame(frame);
     } else if (recorder.state !== "inactive") {
@@ -1583,11 +2135,13 @@ playBtn.addEventListener("click", togglePlay);
 tempoSlider.addEventListener("input", () => {
   tempoValue.textContent = tempoSlider.value;
   engine.updateTempo(Number(tempoSlider.value));
+  refreshReelDurations();
 });
 
 swingSlider.addEventListener("input", () => {
   swingValue.textContent = swingSlider.value;
   engine.setSwing(Number(swingSlider.value) / 100);
+  refreshReelDurations();
 });
 
 sidechainBtn.addEventListener("click", () => {
@@ -1615,6 +2169,7 @@ for (const btn of barsButtons) {
       arrangementMode = "loop";
       selectedBars = Number(btn.dataset.bars);
     }
+    refreshReelDurations();
     for (const b of barsButtons) b.classList.toggle("selected", b === btn);
     if (selectedStyleId) generatePattern();
   });

@@ -1,6 +1,6 @@
 # Beat Studio
 
-Describe the beat you want in plain English, or pick from 15 genres, and get either a quick loop or a full ~2-minute song with a real intro/verse/chorus/bridge/outro arrangement — drums, bass, piano, organ, lead, guitar, kalimba, marimba, arp, strings, horns, vocal chops, pads, synth stabs, and FX — then edit and mix it like a mini DAW, right in the browser, and export it as a vertical video for Reels/TikTok/Shorts. Everything is synthesized live with the Web Audio API; no audio files or dependencies required.
+Describe the beat you want in plain English, or pick from 19 genres, and get either a quick loop or a full ~2-minute song with a real intro/verse/chorus/bridge/outro arrangement — drums, bass, piano, organ, lead, guitar, kalimba, marimba, arp, strings, horns, vocal chops, pads, synth stabs, and FX — then edit and mix it like a mini DAW, right in the browser, and export it as a vertical video for Reels/TikTok/Shorts. Everything is synthesized live with the Web Audio API; no audio files or dependencies required.
 
 ## Run it
 
@@ -281,6 +281,69 @@ A radial visualiser reacts to audio but says nothing about the music. What makes
 The activity-dot row was removed: the lanes now show everything it did, more clearly.
 
 *(Bug found while building this: the lookahead didn't wrap with the loop, so the upper half of the note field emptied out right before the pattern turned over — exactly when a viewer most wants to see what's coming. The lookahead now wraps around the loop.)*
+
+## What the program knows about each instrument
+
+Every melodic part used to be an abstract stream of scale degrees: a stack of thirds, transposed by a register offset, played by whichever synth voice the track happened to be. That is not how any of these instruments work.
+
+A tenor saxophone cannot play a chord. A guitar cannot play the close stacked-third voicing a pianist's right hand plays — six strings tuned in fourths and a third physically cannot reach those notes. A string section doubles its bottom voice an octave down; a horn section does not. And every instrument has a range outside which it either does not exist or sounds wrong.
+
+`js/instruments.js` is that knowledge written down, and it is consumed in two places: **patterns.js** decides *which* chord tones an instrument plays and how they are spaced, in the scale-degree domain; **audio-engine.js** clamps the result into the instrument's real range once the key is finally known.
+
+**Per-instrument profiles** carry a physical range, the "sweet" register arrangers actually write in, a real simultaneous-note capacity (a wind instrument is 1; a four-piece horn section is 4 because it is four players), a voicing character, and whether the instrument sustains or decays.
+
+**Voicing character** is applied per instrument, not globally:
+
+| Instrument | Voicing | Why |
+|---|---|---|
+| Piano, stab, vocal | close | stacked thirds, the keyboard/SATB default |
+| Pad, marimba | spread | second-lowest voice lifted an octave — open position |
+| Horn section | drop-2 | voice close, drop the second-from-top an octave; the standard four-part section voicing, because it opens the chord without any player leaving their warm register |
+| Guitar | root–5th–octave–10th | the shapes that exist on a fretboard; close thirds down low do not |
+| Strings | section + octave double | spread evenly, basses doubling the cellos an octave down — their traditional role |
+| Organ | drawbar | Hammond drawbars are literally an octave-doubling device, so the organ adds the octave rather than another third |
+| Sax, lead, arp, autolead | mono | one note. Always. |
+
+**The low interval limit.** Two notes close together in a low register stop being heard as an interval and start being heard as mud — below a certain pitch there is a real risk the sound simply will not work in a normal harmonic context, because the partials beat against each other faster than the ear can separate them. Arrangers work from a chart of the lowest pitch at which each interval stays clear (a minor 3rd down to C3, a major 3rd to Bb2, a perfect 5th to Bb1, an octave to E1). That chart is now encoded, and any voicing that violates it has its upper note lifted an octave — or dropped, if that would leave the instrument's range.
+
+*(A note on sourcing: the concept and the underlying acoustics are well documented, but the specific published chart tables were behind servers that refused automated fetches, so the encoded values are the standard arranging figures rather than a table transcribed from a page I was able to read.)*
+
+**Measured across 19 genres × 12 generations (~9,400 notes, ~2,700 chords):**
+
+| | before | after |
+|---|---|---|
+| Voicings that violate the low interval limit | 58 | **0** |
+| Notes outside the instrument's real range | 261 | **0** |
+| Chords exceeding the instrument's physical polyphony | 38 | **0** |
+
+*(Bug found while measuring: the DJ-intro stab fill built its chord with a raw `chordDegrees()` call that bypassed the voicing layer, so a large extension roll could produce an eight-note stab no four-piece section could ever play. It now goes through `shapeVoicing` like every other chord.)*
+
+## Fifty new kits, and where each one belongs
+
+Kits went from 165 to **220**, and every one of them was researched before it was built — not "a filter setting that sounds vaguely like X" but what physically makes the sound.
+
+**Four more documented drum machines.** The Linn **LM-1** (1980) was the first machine to use samples of real acoustic drums rather than analog synthesis — the whole point of it was realism, so it is dry and tight with a beater click and none of an 808's tail. The Casio **RZ-1** (1986) sampled at 12-bit/~32kHz, which is genuinely lo-fi: it does not sound like a real drum, it sounds electronic and slightly broken, which is exactly why hip-hop and house producers kept using it. The Alesis **HR-16** (1987) went the other way with 16-bit acoustic samples. The Roland **R-8** (1989) was a PCM machine built for rock and big-room kits, so it gets the heaviest reverb send of any kick here.
+
+**World percussion, built from the physics.** The **tabla**'s head is loaded with a tuning paste, which makes it strongly *harmonic* — near-integer overtones and a real pitch, unlike almost any other drum — and the heel-pressure pitch bend is modelled directly. The **cabasa** and **güiro** are *scraped*, so they are many small impacts in sequence rather than one transient (the güiro slower and discrete, so you hear individual teeth). The **vibraslap** is a wooden block struck to set loose pins buzzing, so its decay stutters irregularly rather than fading smoothly. **Agogô** bells get a deliberately inharmonic ratio set — that clang is the instrument. Plus **cajón** (bass port vs corner slap), **djembe** (three canonical tones, because a djembe part is a melody of timbres), **timbales**, **roto-toms** and **taiko**.
+
+**The Solina, built to its actual circuit.** The ARP String Ensemble's sound is three bucket-brigade delay lines modulated by two three-phase generators — one slow "chorus", one fast "vibrato" — with BBD1 fed the 0° outputs, BBD2 the 120° and BBD3 the 240°. Crucially **the dry signal is not heard at all**: only the summed output of the three delays. That is why a Solina sounds like a swirling ensemble rather than like a synth with chorus on it, and it is implemented exactly that way here.
+
+**The sitar** is two things, and neither is the scale it is played in. The **jawari** — a wide, curved bridge the string grazes as it vibrates — continuously re-excites the upper partials instead of letting them decay, which is the buzz. The **sympathetic strings** (eleven to thirteen of them) are never plucked and just ring in response. Both are modelled, and the sympathetic strings deliberately do not share the note's attack.
+
+**A xylophone and a marimba differ by one undercut.** A marimba bar is arched so its first overtone tunes two octaves above the fundamental (4:1), which sounds round. A xylophone bar is cut so it tunes to a twelfth (3:1) instead, which is what makes it hard and hollow. Same material, one partial retuned, completely different instrument — and that is exactly how the two voices differ in code.
+
+**Free reeds beat against themselves.** An accordion has multiple reed banks per note tuned slightly apart (musette tuning), and the beating between them *is* the instrument's voice — the same principle a tremolo harmonica uses. A harmonium has no musette detune and is hand-pumped, so it breathes instead. A **Farfisa** is a transistor combo organ with no sine content at all, which is why it sounds thin and nasal next to a Hammond, and exactly why garage and ska records used it.
+
+**Brass is a bore shape plus a pair of lips.** A cylindrical bore (trumpet, **trombone**) reflects high harmonics and sounds bright and edgy; a conical one (**flugelhorn**, **tuba**) spreads out and sounds dark. Brass also gets brighter as it gets *louder*, so the filter opens with velocity — a brass patch with a fixed filter always sounds like a synth.
+
+**Also added:** Korg **M1 Piano** and **Organ 2** (the piano-house and deep-house presets, and the Robin S. bass organ), **CP-70** electric grand (real strings, piezo pickups, no soundboard — so it is modelled with a physical string model straight into an amp-like EQ), **honky-tonk** (an upright out of tune *with itself*), **SH-101**, **fretless** bass, **theremin** (no frets or keys, so every note is slid into and vibrato is always present — the portamento *is* the sound), **pan flute** (a stopped pipe, so odd harmonics only), **harmonica**, **ocarina** (a vessel flute, so essentially no overtones at all), **banjo** (a drum with strings on it — membrane, not soundboard), **mandolin** (paired courses beating against each other), **ukulele**, **slide guitar**, **cello section**, **spiccato**, **harp**, **handpan** (dimples tuned to exact octave and twelfth), **balafon** (the gourd's membrane buzz is considered essential, not a defect), **kora**, **tubular bells** (the pitch you hear is not actually present — the ear infers a missing fundamental), **CS-80**, **Vox Humana**, **piccolo**, and **alto/baritone sax** (the body formant sits lower on a bigger horn, and that formant is how the ear tells them apart).
+
+**Every kit is placed in the genres that actually use it.** This mattered more than the kits themselves: the shuffle draws from the shared pools, so without a genre map a techno track would sooner or later be handed a banjo. Timbre alone is not enough knowledge about an instrument — *where* it is used is part of what the instrument is. A sitar belongs in psychedelic-leaning hip-hop and lo-fi, not UK garage; a Korg M1 organ is the sound of house specifically; spiccato strings and tubular bells are drill and trap devices; a kora and a balafon are West African and belong with Afrobeats and Amapiano. The track's kit dropdown groups them into "Fits this genre" and "Other kits" — both stay selectable, because deliberately putting a sitar on a techno track is a creative choice and only the *automatic* shuffle should be stopped from doing it.
+
+**Verified by rendering every kit.** All 220 flavors are triggered through an `OfflineAudioContext` and measured: none silent, none broken, none clipping (loudest peak 0.82). Then 19 genres × 6 shuffles each are played through the live engine — 165 distinct kits actually sounded, zero console errors.
+
+*(Bug found by that regression: clicking a **drum** track's name opened a piano roll for it, and the roll's note renderer read `note.degrees[0]` off a drum hit — which is just `true` — and threw. Drum lanes carry no pitch at all, so their names no longer open a roll.)*
+
 
 ## The reel is as long as your beat
 

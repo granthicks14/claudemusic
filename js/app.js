@@ -69,6 +69,26 @@ const FLAVOR_LABELS = {
   "303": "TB-303", mellotron: "Mellotron", clav: "Clavinet",
   true808: "True 808", orchhit: "Orch Hit",
   ride: "Ride", rimclick: "Cross-Stick", woodblock: "Woodblock", slap: "Slap", whistle: "Whistle", glock: "Glockenspiel",
+  // Four more documented drum machines.
+  lm1: "Linn LM-1", rz1: "Casio RZ-1", hr16: "Alesis HR-16", r8: "Roland R-8",
+  // World percussion.
+  tabla: "Tabla", cabasa: "Cabasa", guiro: "Güiro", agogo: "Agogô", vibraslap: "Vibraslap",
+  cajon: "Cajón", djembe: "Djembe", timbale: "Timbales", roto: "Roto-Tom", taiko: "Taiko",
+  // Synths and keyboards.
+  sh101: "SH-101", fretless: "Fretless", m1organbass: "M1 Organ Bass",
+  m1piano: "M1 Piano", cp70: "CP-70", honkytonk: "Honky-Tonk",
+  solina: "Solina Strings", cs80: "CS-80", voxhumana: "Vox Humana",
+  farfisa: "Farfisa", accordion: "Accordion", harmonium: "Harmonium", m1organ: "M1 Organ",
+  // Winds and free reeds.
+  theremin: "Theremin", panflute: "Pan Flute", harmonica: "Harmonica", ocarina: "Ocarina",
+  trombone: "Trombone", tuba: "Tuba", flugelhorn: "Flugelhorn", piccolo: "Piccolo",
+  alto: "Alto Sax", bari: "Baritone Sax",
+  // Strings, plucked and bowed.
+  sitar: "Sitar", banjo: "Banjo", mandolin: "Mandolin", ukulele: "Ukulele", slide: "Slide Guitar",
+  cello: "Cello Section", spiccato: "Spiccato", harp: "Harp",
+  // Tuned percussion.
+  hangdrum: "Handpan", balafon: "Balafon", kora: "Kora",
+  xylophone: "Xylophone", tubularbell: "Tubular Bells",
 };
 function flavorLabel(key) {
   if (FLAVOR_LABELS[key]) return FLAVOR_LABELS[key];
@@ -364,14 +384,25 @@ function trackHeaderHTML(track) {
     ? `<button class="track-btn auto-btn ${hasAutomation ? "has-automation" : ""} ${openAutomationInst === track ? "on" : ""}" data-action="automation" data-track="${track}" title="Edit volume over the song">A</button>`
     : "";
   const pool = FLAVOR_POOLS[track];
+  // The picker groups kits into the ones that belong in this genre (what
+  // the shuffle draws from) and everything else. Both stay selectable -
+  // deliberately putting a sitar on a techno track is a creative choice,
+  // and only the *automatic* shuffle should be stopped from doing it.
+  const fits = pool ? pool.filter((f) => flavorFitsGenre(f, selectedStyleId)) : [];
+  const rest = pool ? pool.filter((f) => !flavorFitsGenre(f, selectedStyleId)) : [];
+  const opts = (list) => list
+    .map((f) => `<option value="${f}" ${currentFlavors[track] === f ? "selected" : ""}>${flavorLabel(f)}</option>`)
+    .join("");
   const flavorPicker = pool
-    ? `<select class="track-flavor" data-track="${track}" title="Instrument sound / kit">${pool
-        .map((f) => `<option value="${f}" ${currentFlavors[track] === f ? "selected" : ""}>${flavorLabel(f)}</option>`)
-        .join("")}</select>`
+    ? `<select class="track-flavor" data-track="${track}" title="Instrument sound / kit">` +
+      (rest.length
+        ? `<optgroup label="Fits this genre">${opts(fits)}</optgroup><optgroup label="Other kits">${opts(rest)}</optgroup>`
+        : opts(fits)) +
+      `</select>`
     : "";
   return `
     <span class="track-color" style="background:${TRACK_COLOR[track]};box-shadow:0 0 5px 1px ${TRACK_COLOR[track]}"></span>
-    <button class="track-name" data-track="${track}" title="Open piano roll">${TRACK_LABELS[track]}</button>
+    <button class="track-name" data-track="${track}" ${isMelodic ? 'title="Open piano roll"' : 'disabled title="Drum lanes have no pitch — place hits on the grid"'}>${TRACK_LABELS[track]}</button>
     ${flavorPicker}
     <button class="track-btn mute-btn ${state.muted ? "on" : ""}" data-action="mute" data-track="${track}">M</button>
     <button class="track-btn solo-btn ${state.solo ? "on" : ""}" data-action="solo" data-track="${track}">S</button>
@@ -513,7 +544,10 @@ stepGrid.addEventListener("click", (e) => {
   }
   const nameBtn = e.target.closest(".track-name");
   if (nameBtn) {
-    togglePianoRoll(nameBtn.dataset.track);
+    // A piano roll for a drum lane is meaningless - drum hits carry no
+    // pitch at all, so the roll's note renderer had nothing to read and
+    // threw. Drum lanes are edited on the step grid instead.
+    if (MELODIC_ORDER.includes(nameBtn.dataset.track)) togglePianoRoll(nameBtn.dataset.track);
     return;
   }
 
@@ -2100,7 +2134,9 @@ function shuffleFlavors() {
 
   const changed = [];
   for (const inst of activeRows()) {
-    const pool = FLAVOR_POOLS[inst];
+    // Only kits that belong in this genre - see FLAVOR_GENRES. Without
+    // this the shuffle would eventually hand a techno track a banjo.
+    const pool = poolForGenre(inst, selectedStyleId);
     if (!pool || pool.length < 1) continue;
     const tags = FLAVOR_TAGS[inst] || {};
     const current = currentFlavors[inst];

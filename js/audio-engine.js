@@ -408,6 +408,21 @@ class BeatEngine {
       // bit-crush WaveShaper models below - this preset just sets a punchy
       // boom-bap-appropriate body for that processing to color.
       sp1200: { startFreq: 128, endFreq: 50, decay: 0.28 },
+      // Four more documented machines. The Linn LM-1 (1980) was the first
+      // drum machine to use samples of real acoustic drums rather than
+      // analog synthesis - the point of it was realism, so its kick is a
+      // dry, tight, un-effected acoustic thump with none of the long tail
+      // an 808 has. The Casio RZ-1 (1986) sampled at 12-bit/~32kHz, which
+      // is genuinely lo-fi: it doesn't sound like a real drum, it sounds
+      // electronic and slightly broken, which is exactly why hip-hop and
+      // house producers kept using it. The Alesis HR-16 (1987) went the
+      // other way with 16-bit acoustic samples and is unmistakably
+      // natural-sounding. The Roland R-8 (1989) "Human Rhythm Composer"
+      // was a PCM machine aimed at rock and big-room kits.
+      lm1: { startFreq: 118, endFreq: 52, decay: 0.24 },
+      rz1: { startFreq: 108, endFreq: 46, decay: 0.26 },
+      hr16: { startFreq: 126, endFreq: 56, decay: 0.31 },
+      r8: { startFreq: 138, endFreq: 50, decay: 0.44 },
     };
     const p = presets[flavor] || presets.boombap;
     const jitter = 0.92 + Math.random() * 0.16;
@@ -429,6 +444,16 @@ class BeatEngine {
       const shaper = ctx.createWaveShaper();
       shaper.curve = this.makeDistortionCurve(flavor === "gritty" ? 22 : 6);
       osc.connect(shaper).connect(gain).connect(this.dest("kick"));
+    } else if (flavor === "rz1") {
+      // The RZ-1's charm is its converters, not its samples: 12-bit
+      // quantisation and a low sample rate. Same crush + band-limit pair
+      // as the SP-1200, pushed harder and cut lower.
+      const crush = ctx.createWaveShaper();
+      crush.curve = this.makeBitcrushCurve(22);
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 6500;
+      osc.connect(crush).connect(lp).connect(gain).connect(this.dest("kick"));
     } else if (flavor === "sp1200") {
       // The bit-crush curve, plus a lowpass sitting roughly at the
       // SP-1200's real ~26kHz sample rate's Nyquist ceiling - the actual
@@ -446,10 +471,30 @@ class BeatEngine {
     osc.start(time);
     osc.stop(time + p.decay + 0.05);
 
-    if (flavor === "roomy") {
+    if (flavor === "roomy" || flavor === "r8") {
+      // The R-8's calling card was its big PCM room kits, so it gets a
+      // heavier send than the plain "roomy" preset.
       const send = this.ctx.createGain();
-      send.gain.value = 0.35;
+      send.gain.value = flavor === "r8" ? 0.5 : 0.35;
       gain.connect(send).connect(this.reverbBus);
+    }
+
+    if (flavor === "lm1" || flavor === "hr16") {
+      // Sampled acoustic kicks have a beater click that synthesised ones
+      // don't - a short, mid-focused knock rather than the 808's bright
+      // top-end tick.
+      const beater = ctx.createBufferSource();
+      beater.buffer = this.makeNoiseBuffer(0.02);
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = flavor === "hr16" ? 1800 : 1300;
+      bp.Q.value = 1.2;
+      const bg = ctx.createGain();
+      bg.gain.setValueAtTime(vel * 0.4, time);
+      bg.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
+      beater.connect(bp).connect(bg).connect(this.dest("kick"));
+      beater.start(time);
+      beater.stop(time + 0.025);
     }
 
     if (flavor === "808") {
@@ -571,6 +616,15 @@ class BeatEngine {
       // with the bit-crush/band-limit processing below doing the real work
       // of making it read as "vintage sampler" rather than clean synthesis.
       sp1200: { noiseHp: 1000, noiseDecay: 0.21, toneFreq: 175, toneDecay: 0.15 },
+      // LM-1: the first sampled-acoustic snare, and the reason 80s pop
+      // suddenly had "real" drums on a machine - full-bodied, natural,
+      // longer tail than any analog machine. RZ-1: 12-bit, thin and
+      // electronic. HR-16: 16-bit acoustic, natural, notably its
+      // handclaps. R-8: PCM rock snare with real body.
+      lm1: { noiseHp: 1200, noiseDecay: 0.26, toneFreq: 185, toneDecay: 0.18 },
+      rz1: { noiseHp: 2400, noiseDecay: 0.14, toneFreq: 260, toneDecay: 0.09 },
+      hr16: { noiseHp: 1100, noiseDecay: 0.29, toneFreq: 178, toneDecay: 0.2 },
+      r8: { noiseHp: 1300, noiseDecay: 0.3, toneFreq: 190, toneDecay: 0.22 },
     };
     const p = presets[flavor] || presets.crisp;
 
@@ -730,6 +784,13 @@ class BeatEngine {
       // with, which is exactly its charm in early acid/techno.
       "707": { hp: 8000, lp: 12500, peak: 9500 },
       "606": { hp: 9800, lp: null },
+      // LM-1: a sampled real hi-hat, so it has more body and a lower
+      // centre than any analog machine's filtered hiss. RZ-1: 12-bit,
+      // band-limited by its own converters - bright but capped. R-8: a
+      // clean, full PCM hat with a wide spectrum.
+      lm1: { hp: 6000, lp: 11500, peak: 7500 },
+      rz1: { hp: 7500, lp: 9000 },
+      r8: { hp: 6800, lp: 14000, peak: 8500 },
     };
     const decay = open ? 0.32 + Math.random() * 0.1 : 0.05 + Math.random() * 0.02;
 
@@ -834,6 +895,68 @@ class BeatEngine {
 
   playTom(time, vel, flavor) {
     const ctx = this.ctx;
+    if (flavor === "taiko") {
+      // A large Japanese barrel drum: a very heavy, low, slowly-decaying
+      // fundamental with a thick wooden body and almost no attack noise,
+      // played with heavy bachi sticks. The weight is the instrument.
+      const base = 62 + Math.random() * 12;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 1.1, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.95);
+      gain.connect(this.dest("tom"));
+      for (const [ratio, lvl] of [[1, 1], [1.62, 0.3], [2.4, 0.14]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(base * ratio, time);
+        osc.frequency.exponentialRampToValueAtTime(base * ratio * 0.8, time + 0.5);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(lvl, time);
+        g.gain.exponentialRampToValueAtTime(0.001, time + 0.95 / (ratio * 0.8));
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + 1.0);
+      }
+      const wood = ctx.createBufferSource();
+      wood.buffer = this.makeNoiseBuffer(0.04);
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 1400;
+      const wg = ctx.createGain();
+      wg.gain.setValueAtTime(vel * 0.45, time);
+      wg.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+      wood.connect(lp).connect(wg).connect(this.dest("tom"));
+      wood.start(time);
+      wood.stop(time + 0.05);
+      return;
+    }
+    if (flavor === "roto") {
+      // Roto-toms have no shell at all - just a head on a tunable frame -
+      // so they are bright, dry, and very pitched, with the fast downward
+      // glissando 80s records used them for.
+      const base = 240 + Math.random() * 120;
+      const osc = ctx.createOscillator();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(base, time);
+      osc.frequency.exponentialRampToValueAtTime(base * 0.55, time + 0.28);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.85, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
+      osc.connect(gain).connect(this.dest("tom"));
+      osc.start(time);
+      osc.stop(time + 0.32);
+      const head = ctx.createBufferSource();
+      head.buffer = this.makeNoiseBuffer(0.02);
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 2200;
+      const hg = ctx.createGain();
+      hg.gain.setValueAtTime(vel * 0.35, time);
+      hg.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
+      head.connect(hp).connect(hg).connect(this.dest("tom"));
+      head.start(time);
+      head.stop(time + 0.03);
+      return;
+    }
     if (flavor === "simmons") {
       // The Simmons SDS-V (1981) is the definitive 80s "electronic tom" -
       // not a drum sound at all really, but a pure sine with a fast,
@@ -1088,6 +1211,234 @@ class BeatEngine {
       osc.stop(time + 0.4);
       return;
     }
+    // ---- World percussion -------------------------------------------
+    // Each of these is built from what physically makes the sound, not
+    // from a generic noise burst with a different filter setting.
+    if (flavor === "tabla") {
+      // The tabla's defining feature is that its head is deliberately
+      // loaded with a tuning paste (the syahi), which makes the drum
+      // strongly HARMONIC - unlike almost every other drum, it has a
+      // clear pitch with near-integer overtones, which is why tabla
+      // "speaks" in pitched syllables. Bending the pitch down with heel
+      // pressure is the "ge" stroke.
+      const bend = Math.random() < 0.4;
+      const base = 290 + Math.random() * 30;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.75, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.42);
+      gain.connect(this.dest("perc"));
+      [1, 2.0, 3.0, 4.0].forEach((ratio, i) => {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(base * ratio, time);
+        if (bend) osc.frequency.exponentialRampToValueAtTime(base * ratio * 0.72, time + 0.3);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(1 / (i + 1.6), time);
+        g.gain.exponentialRampToValueAtTime(0.001, time + 0.42 / (i * 0.5 + 1));
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + 0.45);
+      });
+      const slap = ctx.createBufferSource();
+      slap.buffer = this.makeNoiseBuffer(0.02);
+      const sf = ctx.createBiquadFilter();
+      sf.type = "bandpass";
+      sf.frequency.value = 2400;
+      const sg = ctx.createGain();
+      sg.gain.setValueAtTime(vel * 0.3, time);
+      sg.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
+      slap.connect(sf).connect(sg).connect(this.dest("perc"));
+      slap.start(time);
+      slap.stop(time + 0.025);
+      return;
+    }
+    if (flavor === "cabasa" || flavor === "guiro") {
+      // Both are scraped, not struck: many small impacts in sequence
+      // rather than one transient. A cabasa is steel beads dragged over a
+      // cylinder (fast, dense, bright); a guiro is a stick dragged over
+      // notches (slower, discrete, you can hear individual teeth).
+      const teeth = flavor === "cabasa" ? 14 : 7;
+      const span = flavor === "cabasa" ? 0.09 : 0.17;
+      for (let i = 0; i < teeth; i++) {
+        const t = time + (i / teeth) * span;
+        const n = ctx.createBufferSource();
+        n.buffer = this.makeNoiseBuffer(0.02);
+        const bp2 = ctx.createBiquadFilter();
+        bp2.type = "bandpass";
+        bp2.frequency.value = flavor === "cabasa" ? 7000 + Math.random() * 2500 : 2600 + i * 180;
+        bp2.Q.value = flavor === "cabasa" ? 1.2 : 3;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(vel * (flavor === "cabasa" ? 0.16 : 0.24) * (1 - i / (teeth * 1.6)), t);
+        g.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+        n.connect(bp2).connect(g).connect(this.dest("perc"));
+        n.start(t);
+        n.stop(t + 0.035);
+      }
+      return;
+    }
+    if (flavor === "agogo") {
+      // Two pitched iron bells a fourth or so apart, alternating - the
+      // timeline instrument of samba and of West African bell patterns.
+      const hi = Math.random() < 0.5;
+      const base = hi ? 900 : 660;
+      const bp2 = ctx.createBiquadFilter();
+      bp2.type = "bandpass";
+      bp2.frequency.value = base * 1.5;
+      bp2.Q.value = 3;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.6, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.26);
+      bp2.connect(gain).connect(this.dest("perc"));
+      // Iron bells are strongly inharmonic - that clangy ratio set is the
+      // whole character.
+      for (const ratio of [1, 1.51, 2.37]) {
+        const osc = ctx.createOscillator();
+        osc.type = "square";
+        osc.frequency.value = base * ratio;
+        osc.connect(bp2);
+        osc.start(time);
+        osc.stop(time + 0.28);
+      }
+      return;
+    }
+    if (flavor === "vibraslap") {
+      // A rattle: a wooden block struck, setting loose pins buzzing for a
+      // long, irregular decay. The buzz is the instrument.
+      const strike = ctx.createOscillator();
+      strike.type = "triangle";
+      strike.frequency.setValueAtTime(360, time);
+      const sg = ctx.createGain();
+      sg.gain.setValueAtTime(vel * 0.5, time);
+      sg.gain.exponentialRampToValueAtTime(0.001, time + 0.06);
+      strike.connect(sg).connect(this.dest("perc"));
+      strike.start(time);
+      strike.stop(time + 0.07);
+      const rattle = ctx.createBufferSource();
+      rattle.buffer = this.makeNoiseBuffer(0.9);
+      const bp2 = ctx.createBiquadFilter();
+      bp2.type = "bandpass";
+      bp2.frequency.value = 3200;
+      bp2.Q.value = 2;
+      const rg = ctx.createGain();
+      // Irregular, stuttering decay rather than a smooth one.
+      rg.gain.setValueAtTime(vel * 0.42, time);
+      for (let i = 1; i <= 7; i++) {
+        rg.gain.linearRampToValueAtTime(vel * 0.42 * (1 - i / 7) * (0.6 + Math.random() * 0.6), time + i * 0.11);
+      }
+      rg.gain.exponentialRampToValueAtTime(0.001, time + 0.85);
+      rattle.connect(bp2).connect(rg).connect(this.dest("perc"));
+      rattle.start(time);
+      rattle.stop(time + 0.9);
+      return;
+    }
+    if (flavor === "cajon") {
+      // A plywood box: a bass port note when struck in the centre, a
+      // sharp corner slap with snare wires behind the top edge.
+      const slapHit = Math.random() < 0.5;
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(slapHit ? 190 : 95, time);
+      osc.frequency.exponentialRampToValueAtTime(slapHit ? 140 : 62, time + 0.1);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vel * (slapHit ? 0.45 : 0.9), time);
+      g.gain.exponentialRampToValueAtTime(0.001, time + (slapHit ? 0.1 : 0.2));
+      osc.connect(g).connect(this.dest("perc"));
+      osc.start(time);
+      osc.stop(time + 0.22);
+      const wood = ctx.createBufferSource();
+      wood.buffer = this.makeNoiseBuffer(slapHit ? 0.12 : 0.04);
+      const hp2 = ctx.createBiquadFilter();
+      hp2.type = "highpass";
+      hp2.frequency.value = slapHit ? 2600 : 1500;
+      const wg = ctx.createGain();
+      wg.gain.setValueAtTime(vel * (slapHit ? 0.5 : 0.2), time);
+      wg.gain.exponentialRampToValueAtTime(0.001, time + (slapHit ? 0.12 : 0.04));
+      wood.connect(hp2).connect(wg).connect(this.dest("perc"));
+      wood.start(time);
+      wood.stop(time + 0.14);
+      return;
+    }
+    if (flavor === "djembe") {
+      // A goatskin head on a wooden shell, played with three canonical
+      // tones: bass (centre), tone (edge), slap (rim). Wide pitch spread
+      // between them is the point - a djembe part is a melody of timbres.
+      const kind = Math.random();
+      const base = kind < 0.3 ? 90 : kind < 0.7 ? 210 : 330;
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(base, time);
+      osc.frequency.exponentialRampToValueAtTime(base * 0.75, time + 0.13);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vel * (kind < 0.3 ? 0.95 : 0.6), time);
+      g.gain.exponentialRampToValueAtTime(0.001, time + (kind < 0.3 ? 0.3 : 0.16));
+      osc.connect(g).connect(this.dest("perc"));
+      osc.start(time);
+      osc.stop(time + 0.32);
+      if (kind >= 0.7) {
+        const slap = ctx.createBufferSource();
+        slap.buffer = this.makeNoiseBuffer(0.07);
+        const hp2 = ctx.createBiquadFilter();
+        hp2.type = "highpass";
+        hp2.frequency.value = 3400;
+        const sg2 = ctx.createGain();
+        sg2.gain.setValueAtTime(vel * 0.5, time);
+        sg2.gain.exponentialRampToValueAtTime(0.001, time + 0.07);
+        slap.connect(hp2).connect(sg2).connect(this.dest("perc"));
+        slap.start(time);
+        slap.stop(time + 0.08);
+      }
+      return;
+    }
+    if (flavor === "timbale") {
+      // Shallow metal-shelled drums, played with sticks, no snares - so
+      // they ring metallically and much longer than a conga, and the rim
+      // (cascara) click is half the instrument.
+      const rim = Math.random() < 0.35;
+      if (rim) {
+        const n = ctx.createBufferSource();
+        n.buffer = this.makeNoiseBuffer(0.05);
+        const bp2 = ctx.createBiquadFilter();
+        bp2.type = "bandpass";
+        bp2.frequency.value = 2800;
+        bp2.Q.value = 4;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(vel * 0.55, time);
+        g.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+        n.connect(bp2).connect(g).connect(this.dest("perc"));
+        n.start(time);
+        n.stop(time + 0.06);
+        return;
+      }
+      const base = 300 + Math.random() * 90;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.7, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
+      gain.connect(this.dest("perc"));
+      for (const ratio of [1, 1.59, 2.14]) {
+        const osc = ctx.createOscillator();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(base * ratio, time);
+        osc.frequency.exponentialRampToValueAtTime(base * ratio * 0.86, time + 0.2);
+        const g = ctx.createGain();
+        g.gain.value = ratio === 1 ? 1 : 0.3;
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + 0.32);
+      }
+      const stick = ctx.createBufferSource();
+      stick.buffer = this.makeNoiseBuffer(0.015);
+      const hp3 = ctx.createBiquadFilter();
+      hp3.type = "highpass";
+      hp3.frequency.value = 4000;
+      const stg = ctx.createGain();
+      stg.gain.setValueAtTime(vel * 0.35, time);
+      stg.gain.exponentialRampToValueAtTime(0.001, time + 0.015);
+      stick.connect(hp3).connect(stg).connect(this.dest("perc"));
+      stick.start(time);
+      stick.stop(time + 0.02);
+      return;
+    }
+
     const noise = ctx.createBufferSource();
     noise.buffer = this.makeNoiseBuffer(0.2);
     const bp = ctx.createBiquadFilter();
@@ -1240,6 +1591,87 @@ class BeatEngine {
     // (roughly C1) is lifted an octave so it stays audible; real
     // engineers do the same thing rather than let a sub note disappear.
     while (freq < 33) freq *= 2;
+
+    if (flavor === "sh101") {
+      // Roland SH-101: one oscillator, one filter, and that is the whole
+      // instrument - which is exactly why it became the acid/house bass.
+      // Its character is the SQUARE-plus-SUB pairing and a snappy
+      // envelope on a 24dB lowpass with real resonance, all of which
+      // happens in the first 80ms of the note.
+      const dur = Math.max(durationSeconds, 0.18);
+      const filt = ctx.createBiquadFilter();
+      filt.type = "lowpass";
+      filt.Q.value = 7;
+      filt.frequency.setValueAtTime(Math.min(6000, freq * 14), time);
+      filt.frequency.exponentialRampToValueAtTime(Math.max(90, freq * 2.2), time + 0.12);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      filt.connect(gain).connect(this.dest("bass"));
+      const sq = ctx.createOscillator();
+      sq.type = "square";
+      sq.frequency.value = freq;
+      sq.connect(filt);
+      sq.start(time);
+      sq.stop(time + dur + 0.05);
+      const sub = ctx.createOscillator();
+      sub.type = "square";
+      sub.frequency.value = freq / 2;
+      const sg = ctx.createGain();
+      sg.gain.value = 0.5;
+      sub.connect(sg).connect(filt);
+      sub.start(time);
+      sub.stop(time + dur + 0.05);
+      return;
+    }
+
+    if (flavor === "fretless") {
+      // No frets means no fixed stopping point, so every note is slid
+      // into and every note has a slow finger vibrato - a fretless bass
+      // is identified almost entirely by those two things plus the
+      // "mwah": the string buzzing briefly against the bare fingerboard
+      // right at the attack.
+      const dur = Math.max(durationSeconds, 0.3);
+      const mwah = ctx.createBiquadFilter();
+      mwah.type = "lowpass";
+      mwah.frequency.setValueAtTime(Math.min(3400, freq * 12), time);
+      mwah.frequency.exponentialRampToValueAtTime(Math.max(120, freq * 3), time + 0.18);
+      mwah.Q.value = 3.5;
+      mwah.connect(this.dest("bass"));
+      this.pluckString(time, freq, dur, vel * 0.95, mwah,
+        { damp: 0.3, feedback: 0.985, pluckNoise: 0.012, brightness: 0.95, sustain: 1.1 });
+      return;
+    }
+
+    if (flavor === "m1organbass") {
+      // The Korg M1 "Organ 2" bass - the single most-used bass sound in
+      // 90s house, and the low half of the Robin S "Show Me Love" patch.
+      // It is an organ, not a bass synth: a stack of pure octaves and a
+      // fifth with a hard attack and no filter movement at all, which is
+      // why it stays perfectly defined under a four-to-the-floor kick.
+      const dur = Math.max(durationSeconds, 0.2);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel, time + 0.006);
+      gain.gain.setValueAtTime(vel * 0.85, time + Math.max(0.05, dur - 0.05));
+      gain.gain.linearRampToValueAtTime(0.0001, time + dur + 0.02);
+      const tone = ctx.createBiquadFilter();
+      tone.type = "lowpass";
+      tone.frequency.value = 2400;
+      gain.connect(tone).connect(this.dest("bass"));
+      for (const [ratio, lvl] of [[1, 1], [2, 0.4], [3, 0.16]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = freq * ratio;
+        const g = ctx.createGain();
+        g.gain.value = lvl;
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + dur + 0.08);
+      }
+      return;
+    }
+
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
@@ -1899,6 +2331,121 @@ class BeatEngine {
       return;
     }
 
+    if (flavor === "sitar") {
+      // Two features make a sitar a sitar, and neither is the scale it's
+      // played in:
+      //  1. The JAWARI - a wide, curved, flat-topped bridge the string
+      //     grazes as it vibrates. That repeated contact re-excites the
+      //     string's upper partials continuously instead of letting them
+      //     decay, which is the famous buzz. Modelled here as a bright,
+      //     lightly-damped string driven into a waveshaper, so the high
+      //     harmonics keep being regenerated rather than dying away.
+      //  2. The SYMPATHETIC STRINGS (taraf) - eleven to thirteen strings
+      //     under the frets that are never plucked at all and just ring
+      //     in response, tuned to the raga. They are what gives a sitar
+      //     its halo of pitched resonance around every note.
+      const body = this.makeAcousticBody(dest);
+      const buzz = ctx.createWaveShaper();
+      buzz.curve = this.makeDistortionCurve(14);
+      const buzzTone = ctx.createBiquadFilter();
+      buzzTone.type = "peaking";
+      buzzTone.frequency.value = 3000;
+      buzzTone.Q.value = 1.1;
+      buzzTone.gain.value = 8;
+      buzz.connect(buzzTone).connect(body);
+      this.addPickNoise(time, vel, body, 0.9);
+      this.pluckString(time, freq, dur, vel, buzz, { damp: 0.08, feedback: 0.995, pluckNoise: 0.006, brightness: 1.6, sustain: 2.2 });
+      // The sympathetic strings: quiet, undamped, and deliberately NOT
+      // struck at the same instant - they respond to the note, they don't
+      // share its attack.
+      for (const ratio of [0.5, 1.5, 2, 3]) {
+        this.pluckString(time + 0.02, freq * ratio, dur * 1.6, vel * 0.14, body,
+          { damp: 0.05, feedback: 0.996, pluckNoise: 0.002, brightness: 1.4, sustain: 3 });
+      }
+      return;
+    }
+
+    if (flavor === "banjo") {
+      // A five-string banjo is a drum with strings on it: the head is a
+      // membrane, not a wooden soundboard, so there is almost no low end
+      // and an extremely fast, bright, percussive decay. Played with
+      // fingerpicks, which is a harder attack than flesh.
+      const head = ctx.createBiquadFilter();
+      head.type = "highpass";
+      head.frequency.value = 220;   // membrane: no body resonance down low
+      const ring = ctx.createBiquadFilter();
+      ring.type = "peaking";
+      ring.frequency.value = 1900;
+      ring.Q.value = 1.4;
+      ring.gain.value = 6;
+      head.connect(ring).connect(dest);
+      this.addPickNoise(time, vel, dest, 1.3);
+      this.pluckString(time, freq, Math.min(dur, 0.7), vel, head, { damp: 0.16, feedback: 0.972, pluckNoise: 0.005, brightness: 1.5, sustain: 0.45 });
+      return;
+    }
+
+    if (flavor === "mandolin") {
+      // Courses of PAIRED strings, tuned very slightly apart - that pair
+      // beating against itself is the mandolin's shimmer, and it is also
+      // why mandolin parts are so often tremolo-picked: the instrument
+      // decays too fast to sustain any other way.
+      const body = this.makeAcousticBody(dest);
+      const strokes = dur > 0.35 ? Math.max(2, Math.round(dur / 0.075)) : 1;
+      for (let s = 0; s < strokes; s++) {
+        const t = time + s * 0.075;
+        const amp = vel * (s === 0 ? 1 : 0.6);
+        for (const detune of [0.997, 1.003]) {
+          this.pluckString(t, freq * detune, 0.25, amp * 0.6, body,
+            { damp: 0.2, feedback: 0.975, pluckNoise: 0.004, brightness: 1.35, sustain: 0.35 });
+        }
+      }
+      return;
+    }
+
+    if (flavor === "ukulele") {
+      // Nylon strings on a very small box: no sustain, no low end, and a
+      // soft fingertip attack rather than a pick.
+      const body = this.makeAcousticBody(dest);
+      const small = ctx.createBiquadFilter();
+      small.type = "highpass";
+      small.frequency.value = 260;
+      small.connect(body);
+      this.pluckString(time, freq, Math.min(dur, 0.55), vel * 0.9, small, { damp: 0.34, feedback: 0.968, pluckNoise: 0.012, brightness: 0.85, sustain: 0.4 });
+      return;
+    }
+
+    if (flavor === "slide") {
+      // Bottleneck slide: no frets involved, so the note ARRIVES from
+      // somewhere else - a continuous glide into pitch - and it carries a
+      // slow, wide vibrato from the player rocking the slide. That
+      // approach glide is the entire identity of the sound.
+      const cab = this.makeGuitarCab(dest, { bright: 0.85, body: 1.2, presence: 3 });
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      const from = freq * (Math.random() < 0.5 ? 0.84 : 1.19);
+      osc.frequency.setValueAtTime(from, time);
+      osc.frequency.exponentialRampToValueAtTime(freq, time + Math.min(0.16, dur * 0.4));
+      const vib = ctx.createOscillator();
+      vib.frequency.value = 5.2;
+      const vibAmt = ctx.createGain();
+      vibAmt.gain.value = freq * 0.012;
+      vib.connect(vibAmt).connect(osc.frequency);
+      vib.start(time);
+      vib.stop(time + dur + 0.1);
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 2600;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.7, time + 0.03);
+      gain.gain.setValueAtTime(vel * 0.7, time + dur * 0.6);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      osc.connect(lp).connect(gain).connect(cab);
+      osc.start(time);
+      osc.stop(time + dur + 0.05);
+      return;
+    }
+
     if (flavor === "jazz") {
       // Dark, round, heavily-damped string - the hollow-body archtop tone.
       const jazzCab = this.makeGuitarCab(dest, { bright: 0.55, body: 1.4, presence: 1 });
@@ -1990,9 +2537,172 @@ class BeatEngine {
     this.pluckString(time, freq, dur, vel, cleanCab, { damp: 0.08, feedback: 0.99, pluckNoise: 0.006, brightness: 1.3, sustain: 1.0 });
   }
 
+  // The ARP Solina / String Ensemble chorus, built to its actual circuit
+  // rather than as "a chorus effect". Three bucket-brigade delay lines are
+  // modulated by two three-phase generators - one slow ("chorus"), one
+  // fast ("vibrato") - with BBD1 fed the 0-degree outputs, BBD2 the
+  // 120-degree outputs and BBD3 the 240-degree outputs. Crucially the dry
+  // signal is NOT heard at all: only the summed output of the three
+  // delays. That is what makes a Solina sound like a swirling ensemble
+  // rather than like a synth with chorus on it, and it is why every
+  // 70s string machine sounds the way it does.
+  makeSolinaEnsemble(dest, depthScale = 1) {
+    const ctx = this.ctx;
+    const input = ctx.createGain();
+    const chorusLfo = ctx.createOscillator();
+    chorusLfo.frequency.value = 0.6;
+    const vibratoLfo = ctx.createOscillator();
+    vibratoLfo.frequency.value = 6.1;
+    const now = ctx.currentTime;
+    chorusLfo.start(now);
+    vibratoLfo.start(now);
+
+    for (let i = 0; i < 3; i++) {
+      const phase = (i * 2 * Math.PI) / 3;
+      const delay = ctx.createDelay(0.05);
+      delay.delayTime.value = 0.012 + i * 0.001;
+      // A DelayNode has no phase control, so each tap's phase offset is
+      // realised as a fixed delay on the modulation signal itself -
+      // 120 degrees of the LFO period.
+      for (const [lfo, depth] of [[chorusLfo, 0.0035], [vibratoLfo, 0.0008]]) {
+        const amt = ctx.createGain();
+        amt.gain.value = depth * depthScale;
+        const phaseDelay = ctx.createDelay(1);
+        phaseDelay.delayTime.value = phase / (2 * Math.PI * lfo.frequency.value);
+        lfo.connect(phaseDelay).connect(amt).connect(delay.delayTime);
+      }
+      const tap = ctx.createGain();
+      tap.gain.value = 1 / 3;
+      input.connect(delay).connect(tap).connect(dest);
+    }
+    return input;
+  }
+
   playStringsVoice(time, freq, durationSeconds, vel, flavor) {
     const ctx = this.ctx;
     const dest = this.dest("strings");
+
+    if (flavor === "solina") {
+      // Divide-down organ tone (a single master oscillator divided for
+      // every note, so all notes are phase-locked and perfectly in tune -
+      // sterile on its own) run entirely through the ensemble above.
+      const dur = Math.max(durationSeconds, 0.7);
+      const ens = this.makeSolinaEnsemble(dest);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.5, time + 0.12);
+      gain.gain.setValueAtTime(vel * 0.5, time + dur * 0.75);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur + 0.25);
+      const tone = ctx.createBiquadFilter();
+      tone.type = "lowpass";
+      tone.frequency.value = 4200;
+      gain.connect(tone).connect(ens);
+      // Divide-down keyboards produce square/pulse waves, plus the octave
+      // above from the next divider stage.
+      for (const [ratio, lvl] of [[1, 1], [2, 0.45]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.value = freq * ratio;
+        const g = ctx.createGain();
+        g.gain.value = lvl;
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + dur + 0.35);
+      }
+      return;
+    }
+
+    if (flavor === "cello") {
+      // Cello section: the bottom of the string family. Bowed, so it
+      // starts slowly (rosin has to grab the string) and has a strong
+      // even-harmonic body; the register is what does the work, so this
+      // voice deliberately emphasises the low partials.
+      const dur = Math.max(durationSeconds, 0.5);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.6, time + 0.14);
+      gain.gain.setValueAtTime(vel * 0.6, time + dur * 0.8);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur + 0.2);
+      const body = ctx.createBiquadFilter();
+      body.type = "peaking";
+      body.frequency.value = 230;   // the cello's main air resonance
+      body.Q.value = 1.1;
+      body.gain.value = 6;
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 3000;
+      gain.connect(body).connect(lp).connect(dest);
+      // Three players never bow in exact unison - the spread is the
+      // section sound.
+      for (const detune of [-6, 0, 5]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.value = freq;
+        osc.detune.value = detune;
+        const g = ctx.createGain();
+        g.gain.value = 0.4;
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + dur + 0.3);
+      }
+      return;
+    }
+
+    if (flavor === "spiccato") {
+      // Spiccato: the bow is bounced off the string, so every note is a
+      // short, dry, articulated dot with a hard attack and no tail. It is
+      // the standard "driving strings" articulation in film and trailer
+      // writing, and it is rhythmic rather than sustaining.
+      const dur = Math.min(durationSeconds, 0.16);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.8, time + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 4500;
+      gain.connect(lp).connect(dest);
+      for (const detune of [-8, 0, 7]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.value = freq;
+        osc.detune.value = detune;
+        const g = ctx.createGain();
+        g.gain.value = 0.35;
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + dur + 0.05);
+      }
+      // Bow bite - the scrape of hair grabbing the string.
+      const bite = ctx.createBufferSource();
+      bite.buffer = this.makeNoiseBuffer(0.02);
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 2800;
+      const bg = ctx.createGain();
+      bg.gain.setValueAtTime(vel * 0.18, time);
+      bg.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
+      bite.connect(bp).connect(bg).connect(dest);
+      bite.start(time);
+      bite.stop(time + 0.025);
+      return;
+    }
+
+    if (flavor === "harp") {
+      // A concert harp is plucked with the flesh of the finger, not a
+      // pick or nail, so it has almost no attack noise - just a pure,
+      // long, evenly-decaying tone with a lot of soundboard resonance.
+      const dur = Math.min(Math.max(durationSeconds, 1.2), 3);
+      const board = ctx.createBiquadFilter();
+      board.type = "peaking";
+      board.frequency.value = 400;
+      board.Q.value = 0.8;
+      board.gain.value = 4;
+      board.connect(dest);
+      this.pluckString(time, freq, dur, vel * 0.85, board,
+        { damp: 0.2, feedback: 0.9935, pluckNoise: 0.001, brightness: 0.9, sustain: 2.4 });
+      return;
+    }
 
     if (flavor === "mellotron") {
       // The Mellotron (1963) - the tape-replay "strings in a box" behind
@@ -2121,9 +2831,131 @@ class BeatEngine {
     lfo.stop(time + dur + 0.1);
   }
 
+  // A brass instrument is a long tube plus a player's lips. Two things
+  // follow, and they are what all four flavors below share:
+  //  * The bore shape decides the harmonic content. A CYLINDRICAL bore
+  //    (trumpet, trombone) reflects high harmonics strongly and sounds
+  //    bright and edgy; a CONICAL bore (flugelhorn, tuba, French horn)
+  //    spreads out and sounds dark and round. This is why a flugelhorn
+  //    and a trumpet in the same register sound nothing alike.
+  //  * Brass gets brighter as it gets louder, because harder blowing
+  //    drives the air column nonlinearly. A brass patch with a fixed
+  //    filter always sounds like a synth; the filter has to open with
+  //    velocity and over the attack.
+  playBrassVoice(time, freq, dur, vel, dest, opts) {
+    const ctx = this.ctx;
+    const { bright, bodyHz, bodyGain, rasp, attack } = opts;
+    const filt = ctx.createBiquadFilter();
+    filt.type = "lowpass";
+    filt.frequency.setValueAtTime(bright * 0.45, time);
+    filt.frequency.linearRampToValueAtTime(bright * (0.7 + vel * 0.5), time + attack * 2.5);
+    filt.frequency.linearRampToValueAtTime(bright * 0.6, time + dur);
+    filt.Q.value = 1.1;
+    const body = ctx.createBiquadFilter();
+    body.type = "peaking";
+    body.frequency.value = bodyHz;
+    body.Q.value = 1.1;
+    body.gain.value = bodyGain;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(vel * 0.55, time + attack);
+    gain.gain.setValueAtTime(vel * 0.55, time + Math.max(attack, dur * 0.8));
+    gain.gain.exponentialRampToValueAtTime(0.001, time + dur + 0.08);
+    filt.connect(body).connect(gain).connect(dest);
+    // Lip attack: real brass notes start slightly flat and settle.
+    const osc = ctx.createOscillator();
+    osc.type = rasp ? "sawtooth" : "square";
+    osc.frequency.setValueAtTime(freq * 0.985, time);
+    osc.frequency.linearRampToValueAtTime(freq, time + attack * 1.4);
+    osc.connect(filt);
+    osc.start(time);
+    osc.stop(time + dur + 0.15);
+    const sub = ctx.createOscillator();
+    sub.type = "sine";
+    sub.frequency.value = freq;
+    const sg = ctx.createGain();
+    sg.gain.value = 0.35;
+    sub.connect(sg).connect(filt);
+    sub.start(time);
+    sub.stop(time + dur + 0.15);
+    // Air through the mouthpiece.
+    const air = ctx.createBufferSource();
+    air.buffer = this.makeNoiseBuffer(Math.min(dur + 0.2, 1.5));
+    const ahp = ctx.createBiquadFilter();
+    ahp.type = "highpass";
+    ahp.frequency.value = 2500;
+    const ag = ctx.createGain();
+    ag.gain.setValueAtTime(vel * 0.12, time);
+    ag.gain.exponentialRampToValueAtTime(0.0001, time + 0.09);
+    air.connect(ahp).connect(ag).connect(dest);
+    air.start(time);
+    air.stop(time + dur + 0.1);
+  }
+
   playHornVoice(time, freq, durationSeconds, vel, flavor) {
     const ctx = this.ctx;
     const dest = this.dest("horn");
+
+    // Cylindrical bore, so bright and edgy, but a much larger one than a
+    // trumpet: the trombone is the tenor voice of the section and the
+    // only brass instrument with continuous pitch (the slide), which is
+    // why glissandi and fall-offs are its signature.
+    if (flavor === "trombone") {
+      this.playBrassVoice(time, freq, Math.max(durationSeconds, 0.25), vel, dest,
+        { bright: 3400, bodyHz: 520, bodyGain: 5, rasp: true, attack: 0.035 });
+      return;
+    }
+    // Conical bore and a huge one: almost no upper harmonics survive, so
+    // a tuba is essentially a very loud fundamental. It is a bass
+    // instrument and belongs under the section, not in it.
+    if (flavor === "tuba") {
+      this.playBrassVoice(time, freq, Math.max(durationSeconds, 0.3), vel * 1.15, dest,
+        { bright: 1300, bodyHz: 180, bodyGain: 7, rasp: false, attack: 0.06 });
+      return;
+    }
+    // A flugelhorn is a trumpet's conical cousin - same range, completely
+    // different colour: dark, velvety, no edge. The classic warm solo
+    // voice on ballads and on Brazilian/soul records.
+    if (flavor === "flugelhorn") {
+      this.playBrassVoice(time, freq, Math.max(durationSeconds, 0.25), vel, dest,
+        { bright: 2200, bodyHz: 700, bodyGain: 4, rasp: false, attack: 0.05 });
+      return;
+    }
+    // Piccolo is not brass at all, but it lives in the same "top line of
+    // the wind section" role: a tiny stopped-free pipe sounding an octave
+    // above written, so bright it cuts through an entire orchestra.
+    if (flavor === "piccolo") {
+      const dur = Math.max(durationSeconds, 0.2);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.42, time + 0.03);
+      gain.gain.setValueAtTime(vel * 0.42, time + dur * 0.8);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur + 0.08);
+      gain.connect(dest);
+      for (const [ratio, lvl] of [[2, 1], [4, 0.18], [6, 0.06]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = freq * ratio;
+        const g = ctx.createGain();
+        g.gain.value = lvl;
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + dur + 0.12);
+      }
+      const breath = ctx.createBufferSource();
+      breath.buffer = this.makeNoiseBuffer(Math.min(dur + 0.1, 1.2));
+      const bhp = ctx.createBiquadFilter();
+      bhp.type = "highpass";
+      bhp.frequency.value = 5000;
+      const bg = ctx.createGain();
+      bg.gain.setValueAtTime(vel * 0.14, time);
+      bg.gain.linearRampToValueAtTime(vel * 0.05, time + 0.08);
+      bg.gain.linearRampToValueAtTime(0.0001, time + dur);
+      breath.connect(bhp).connect(bg).connect(dest);
+      breath.start(time);
+      breath.stop(time + dur + 0.1);
+      return;
+    }
 
     if (flavor === "trumpetstab") {
       const dur = Math.min(durationSeconds, 0.22);
@@ -2284,6 +3116,146 @@ class BeatEngine {
   playOrganVoice(time, freq, durationSeconds, vel, flavor) {
     const ctx = this.ctx;
     const dest = this.dest("organ");
+
+    if (flavor === "accordion" || flavor === "harmonium") {
+      // Both are free-reed instruments: air is pushed past a metal tongue
+      // that vibrates at its own fixed pitch. Two consequences define the
+      // sound. First, a free reed produces a bright, buzzy, odd-harmonic-
+      // rich waveform much closer to a square than to a sine. Second, an
+      // accordion has multiple reed banks per note tuned slightly apart
+      // ("musette" / celeste tuning) and the beating between them IS the
+      // instrument's voice - this is the same detuned-pair principle a
+      // tremolo harmonica uses. A harmonium has no musette detune and is
+      // pumped by a bellows the player works by hand, so it breathes.
+      const dur = Math.max(durationSeconds, 0.35);
+      const isAccordion = flavor === "accordion";
+      const gain = ctx.createGain();
+      // Bellows: pressure builds, it does not switch on.
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.55, time + (isAccordion ? 0.05 : 0.13));
+      gain.gain.setValueAtTime(vel * 0.55, time + Math.max(0.15, dur - 0.1));
+      gain.gain.linearRampToValueAtTime(0.0001, time + dur + (isAccordion ? 0.04 : 0.12));
+      const reedTone = ctx.createBiquadFilter();
+      reedTone.type = "peaking";
+      reedTone.frequency.value = 1500;
+      reedTone.Q.value = 0.9;
+      reedTone.gain.value = 5;
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 5200;
+      gain.connect(reedTone).connect(lp).connect(dest);
+      // The reed banks. Musette detune on the accordion; the harmonium
+      // gets a 16'/8'/4' style stack instead, no detune.
+      const banks = isAccordion
+        ? [[1, 0, 0.5], [1, 14, 0.42], [1, -13, 0.42], [2, 0, 0.18]]
+        : [[0.5, 0, 0.35], [1, 0, 0.55], [2, 0, 0.22]];
+      for (const [ratio, detune, lvl] of banks) {
+        const osc = ctx.createOscillator();
+        osc.type = "square";
+        osc.frequency.value = freq * ratio;
+        osc.detune.value = detune;
+        const g = ctx.createGain();
+        g.gain.value = lvl;
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + dur + 0.25);
+      }
+      // Air rushing past the reeds - quiet, but its absence is why
+      // synthesised accordions sound like organs.
+      const air = ctx.createBufferSource();
+      air.buffer = this.makeNoiseBuffer(Math.min(dur + 0.2, 2));
+      const airBp = ctx.createBiquadFilter();
+      airBp.type = "bandpass";
+      airBp.frequency.value = 2600;
+      airBp.Q.value = 0.8;
+      const airGain = ctx.createGain();
+      airGain.gain.setValueAtTime(0.0001, time);
+      airGain.gain.linearRampToValueAtTime(vel * 0.05, time + 0.06);
+      airGain.gain.linearRampToValueAtTime(0.0001, time + dur);
+      air.connect(airBp).connect(airGain).connect(dest);
+      air.start(time);
+      air.stop(time + dur + 0.1);
+      return;
+    }
+
+    if (flavor === "farfisa") {
+      // A Farfisa is a transistor combo organ, not a tonewheel one: the
+      // tone is generated by square-wave dividers with no sine content at
+      // all, which is why it sounds thin, reedy and nasal next to a
+      // Hammond - and exactly why 60s garage and ska records used it.
+      const dur2 = Math.max(durationSeconds, 0.3);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.5, time + 0.008);
+      gain.gain.setValueAtTime(vel * 0.5, time + Math.max(0.05, dur2 - 0.05));
+      gain.gain.linearRampToValueAtTime(0.0001, time + dur2 + 0.02);
+      const nasal = ctx.createBiquadFilter();
+      nasal.type = "peaking";
+      nasal.frequency.value = 2200;
+      nasal.Q.value = 1.6;
+      nasal.gain.value = 9;
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 300;   // no low-end weight at all
+      gain.connect(nasal).connect(hp).connect(dest);
+      for (const [ratio, lvl] of [[1, 0.55], [2, 0.35], [4, 0.14]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "square";
+        osc.frequency.value = freq * ratio;
+        const g = ctx.createGain();
+        g.gain.value = lvl;
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + dur2 + 0.1);
+      }
+      return;
+    }
+
+    if (flavor === "m1organ") {
+      // The Korg M1's "Organ 2" preset is, by common consensus, the
+      // original house organ - the sound of Robin S's "Show Me Love" and
+      // most of what "deep house organ" means. It is not a Hammond
+      // emulation: it is a bright digital stack with a hard attack, a
+      // fast percussive click on top, and very little of the drawbar
+      // organ's warmth, which is precisely why it cuts through a club mix.
+      const dur3 = Math.max(durationSeconds, 0.25);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.62, time + 0.006);
+      gain.gain.exponentialRampToValueAtTime(vel * 0.42, time + 0.12);
+      gain.gain.setValueAtTime(vel * 0.42, time + Math.max(0.13, dur3 - 0.04));
+      gain.gain.linearRampToValueAtTime(0.0001, time + dur3 + 0.03);
+      const shine = ctx.createBiquadFilter();
+      shine.type = "peaking";
+      shine.frequency.value = 3400;
+      shine.Q.value = 0.9;
+      shine.gain.value = 6;
+      gain.connect(shine).connect(dest);
+      for (const [ratio, lvl] of [[1, 0.6], [2, 0.4], [3, 0.18], [4, 0.14], [6, 0.08]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = freq * ratio;
+        const g = ctx.createGain();
+        g.gain.value = lvl;
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + dur3 + 0.1);
+      }
+      // The percussive digital click on the attack.
+      const click = ctx.createBufferSource();
+      click.buffer = this.makeNoiseBuffer(0.012);
+      const chp = ctx.createBiquadFilter();
+      chp.type = "highpass";
+      chp.frequency.value = 4000;
+      const cg = ctx.createGain();
+      cg.gain.setValueAtTime(vel * 0.18, time);
+      cg.gain.exponentialRampToValueAtTime(0.001, time + 0.012);
+      click.connect(chp).connect(cg).connect(dest);
+      click.start(time);
+      click.stop(time + 0.015);
+      return;
+    }
+
     const attack = flavor === "church" ? 0.09 : 0.015;
     const dur = flavor === "church" ? Math.max(durationSeconds, 1.4) : Math.max(durationSeconds, 0.3);
 
@@ -2473,6 +3445,98 @@ class BeatEngine {
   playKalimbaVoice(time, freq, durationSeconds, vel, flavor) {
     const ctx = this.ctx;
     const dest = this.dest("kalimba");
+
+    if (flavor === "hangdrum") {
+      // A hang (handpan) is a steel shell with tuned dimples, and each
+      // note field is deliberately tuned so its overtones are the OCTAVE
+      // and the TWELFTH above - exact harmonic ratios, unlike a bell or a
+      // gong. That harmonicity is why a handpan sounds serene rather than
+      // clangy, and the shell's Helmholtz cavity adds a soft low bloom.
+      const dur = Math.min(Math.max(durationSeconds, 1.2), 2.6);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.8, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      gain.connect(dest);
+      for (const [ratio, lvl] of [[1, 1], [2, 0.5], [3, 0.32], [4, 0.12]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = freq * ratio;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(lvl, time);
+        g.gain.exponentialRampToValueAtTime(0.001, time + dur / (ratio * 0.35 + 0.7));
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + dur + 0.15);
+      }
+      // Fingertip on steel: soft, low, no snap.
+      const touch = ctx.createBufferSource();
+      touch.buffer = this.makeNoiseBuffer(0.02);
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 1800;
+      const tg = ctx.createGain();
+      tg.gain.setValueAtTime(vel * 0.2, time);
+      tg.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
+      touch.connect(lp).connect(tg).connect(dest);
+      touch.start(time);
+      touch.stop(time + 0.025);
+      return;
+    }
+
+    if (flavor === "balafon") {
+      // A West African gourd-resonated xylophone. Its signature is not
+      // the bar at all - it is the RESONATOR: each gourd has a hole
+      // covered with a thin membrane (traditionally spider-egg sac) that
+      // buzzes when the note sounds. That deliberate buzz is considered
+      // essential to the instrument's voice, not a defect.
+      const dur = Math.min(durationSeconds, 0.6);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.85, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      gain.connect(dest);
+      for (const [ratio, lvl] of [[1, 1], [4, 0.3], [9.2, 0.1]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = freq * ratio;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(lvl, time);
+        g.gain.exponentialRampToValueAtTime(0.001, time + dur / (ratio * 0.3 + 0.8));
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + dur + 0.1);
+      }
+      // The membrane buzz - band-limited noise gated by the note itself.
+      const buzz = ctx.createBufferSource();
+      buzz.buffer = this.makeNoiseBuffer(Math.min(dur, 0.5));
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = Math.min(6000, freq * 6);
+      bp.Q.value = 2.5;
+      const bg = ctx.createGain();
+      bg.gain.setValueAtTime(vel * 0.22, time);
+      bg.gain.exponentialRampToValueAtTime(0.001, time + dur * 0.7);
+      buzz.connect(bp).connect(bg).connect(dest);
+      buzz.start(time);
+      buzz.stop(time + dur);
+      return;
+    }
+
+    if (flavor === "kora") {
+      // A 21-string West African harp-lute with a calabash body and a
+      // skin soundboard. Plucked with thumbs and forefingers only, it is
+      // closer to a harp than to a guitar: a clean, ringing, long-
+      // sustaining nylon string over a drum-like resonator.
+      const dur = Math.min(Math.max(durationSeconds, 0.9), 2.2);
+      const skin = ctx.createBiquadFilter();
+      skin.type = "peaking";
+      skin.frequency.value = 320;
+      skin.Q.value = 0.9;
+      skin.gain.value = 5;
+      skin.connect(dest);
+      this.pluckString(time, freq, dur, vel * 0.85, skin,
+        { damp: 0.24, feedback: 0.9925, pluckNoise: 0.003, brightness: 1.1, sustain: 2 });
+      return;
+    }
     const dur = Math.min(durationSeconds, flavor === "musicbox" ? 0.9 : flavor === "steeldrum" ? 1.1 : flavor === "glock" ? 1.6 : 0.6);
 
     // A short noise "pluck" transient for the thumb-against-tine attack -
@@ -2582,11 +3646,18 @@ class BeatEngine {
     osc.frequency.setValueAtTime(freq * 0.89, time);
     osc.frequency.exponentialRampToValueAtTime(freq, time + 0.05);
 
+    // A saxophone is a conical bore with a single reed, and the size of
+    // the cone is what separates the members of the family. The formant
+    // peak - the resonance the body imposes on the reed's buzz - sits
+    // lower on a bigger horn, and that formant is what the ear uses to
+    // tell an alto from a baritone even when they play the same note.
+    // Alto is bright and vocal; baritone is broad and throaty.
+    const formantHz = flavor === "alto" ? 1250 : flavor === "bari" ? 620 : 950;
     const formant = ctx.createBiquadFilter();
     formant.type = "peaking";
-    formant.frequency.value = 950;
+    formant.frequency.value = formantHz;
     formant.Q.value = 2.2;
-    formant.gain.value = 8;
+    formant.gain.value = flavor === "bari" ? 10 : 8;
     const lp = ctx.createBiquadFilter();
     lp.type = "lowpass";
     lp.frequency.value = breathy ? 2600 : 3400;
@@ -2618,6 +3689,84 @@ class BeatEngine {
   playMarimbaVoice(time, freq, durationSeconds, vel, flavor) {
     const ctx = this.ctx;
     const dest = this.dest("marimba");
+
+    if (flavor === "xylophone") {
+      // A xylophone and a marimba are both tuned wooden bars, and the
+      // difference between them is entirely in how the bar is UNDERCUT.
+      // A marimba bar is arched so the first overtone tunes to two
+      // octaves above the fundamental (a 4:1 ratio), which sounds round
+      // and warm. A xylophone bar is cut so it tunes to a twelfth (a 3:1
+      // ratio) instead, which is what makes a xylophone sound hard,
+      // hollow and bright. Same material, different tuning of one
+      // partial, completely different instrument.
+      const dur = Math.min(durationSeconds, 0.35);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.9, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      gain.connect(dest);
+      for (const [ratio, lvl, decay] of [[1, 1, 1], [3, 0.55, 0.45], [6, 0.18, 0.25]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = freq * ratio;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(lvl, time);
+        g.gain.exponentialRampToValueAtTime(0.001, time + dur * decay);
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + dur + 0.05);
+      }
+      const strike = ctx.createBufferSource();
+      strike.buffer = this.makeNoiseBuffer(0.012);
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 3500;
+      const sg = ctx.createGain();
+      sg.gain.setValueAtTime(vel * 0.4, time);
+      sg.gain.exponentialRampToValueAtTime(0.001, time + 0.012);
+      strike.connect(hp).connect(sg).connect(dest);
+      strike.start(time);
+      strike.stop(time + 0.015);
+      return;
+    }
+
+    if (flavor === "tubularbell") {
+      // Orchestral chimes: long hanging brass tubes. Their partials are
+      // strongly inharmonic and - famously - the pitch you hear is not
+      // actually present in the sound. The ear infers a missing
+      // fundamental from partials near the 2:3:4 ratios, which is why
+      // tubular bells sound simultaneously enormous and slightly
+      // ambiguous in pitch.
+      const dur = Math.min(Math.max(durationSeconds, 2), 4);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.75, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      gain.connect(dest);
+      for (const [ratio, lvl] of [[2, 1], [3, 0.75], [4, 0.6], [5.4, 0.3], [6.8, 0.2], [8.2, 0.12]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = freq * ratio;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(lvl, time);
+        g.gain.exponentialRampToValueAtTime(0.001, time + dur / (ratio * 0.22 + 0.6));
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + dur + 0.2);
+      }
+      const clang = ctx.createBufferSource();
+      clang.buffer = this.makeNoiseBuffer(0.03);
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 3800;
+      bp.Q.value = 1.5;
+      const cg = ctx.createGain();
+      cg.gain.setValueAtTime(vel * 0.35, time);
+      cg.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+      clang.connect(bp).connect(cg).connect(dest);
+      clang.start(time);
+      clang.stop(time + 0.04);
+      return;
+    }
+
     const dur = Math.min(durationSeconds, flavor === "vibraphone" ? 1.4 : 0.8);
 
     // A soft mallet-strike noise transient - lower and rounder than the
@@ -2716,6 +3865,106 @@ class BeatEngine {
     const ctx = this.ctx;
     const dest = this.dest("piano");
     const dur = Math.min(durationSeconds, 1.4);
+
+    if (flavor === "m1piano") {
+      // The Korg M1's "Piano 16" - the sound that got its own subgenre
+      // (piano house) and is all over early-90s dance and pop. It is not
+      // an acoustic piano emulation and never was: a bright, hard,
+      // percussive attack with a strong mid presence and a fast decay,
+      // built to punch through a club system rather than to sound real.
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 1.05, time);
+      gain.gain.exponentialRampToValueAtTime(vel * 0.3, time + 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + Math.max(dur, 0.5));
+      const presence = ctx.createBiquadFilter();
+      presence.type = "peaking";
+      presence.frequency.value = 2600;
+      presence.Q.value = 0.9;
+      presence.gain.value = 7;
+      gain.connect(presence).connect(dest);
+      for (const [ratio, lvl] of [[1, 1], [2, 0.5], [3, 0.22], [4.02, 0.14], [6.1, 0.07]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = freq * ratio;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(lvl, time);
+        g.gain.exponentialRampToValueAtTime(0.001, time + Math.max(dur, 0.5) / (ratio * 0.5 + 0.7));
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + Math.max(dur, 0.5) + 0.1);
+      }
+      // The hard digital attack tick that makes it cut.
+      const tick = ctx.createBufferSource();
+      tick.buffer = this.makeNoiseBuffer(0.01);
+      const thp = ctx.createBiquadFilter();
+      thp.type = "highpass";
+      thp.frequency.value = 5000;
+      const tg = ctx.createGain();
+      tg.gain.setValueAtTime(vel * 0.3, time);
+      tg.gain.exponentialRampToValueAtTime(0.001, time + 0.01);
+      tick.connect(thp).connect(tg).connect(dest);
+      tick.start(time);
+      tick.stop(time + 0.014);
+      return;
+    }
+
+    if (flavor === "cp70") {
+      // Yamaha CP-70 electric grand: real strings and real hammers, but
+      // no soundboard at all - piezo pickups under the bridge instead.
+      // That is why it sounds like a piano that has been through a guitar
+      // amp: hard, mid-forward, slightly metallic, with a long clean
+      // sustain and none of an acoustic piano's air. Peter Gabriel,
+      // Genesis, Toto, and a great deal of 80s pop.
+      const board = ctx.createBiquadFilter();
+      board.type = "peaking";
+      board.frequency.value = 1200;
+      board.Q.value = 0.8;
+      board.gain.value = 6;
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 90;   // no soundboard = no low air
+      board.connect(hp).connect(dest);
+      // Pickups sense the string directly, so a physical string model is
+      // literally the right model here.
+      this.pluckString(time, freq, Math.max(dur, 0.9), vel * 0.9, board,
+        { damp: 0.22, feedback: 0.992, pluckNoise: 0.004, brightness: 1.25, sustain: 1.6 });
+      return;
+    }
+
+    if (flavor === "honkytonk") {
+      // A honky-tonk piano is an ordinary upright that has gone badly out
+      // of tune - and specifically out of tune WITH ITSELF, because each
+      // note has two or three strings that have drifted apart. The beating
+      // between those unison strings is the entire effect.
+      for (const detune of [-18, 0, 15]) {
+        const osc = ctx.createOscillator();
+        osc.type = "triangle";
+        osc.frequency.value = freq;
+        osc.detune.value = detune;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(vel * 0.4, time);
+        g.gain.exponentialRampToValueAtTime(0.001, time + Math.max(dur, 0.6));
+        const tone = ctx.createBiquadFilter();
+        tone.type = "lowpass";
+        tone.frequency.setValueAtTime(4200, time);
+        tone.frequency.exponentialRampToValueAtTime(900, time + Math.max(dur, 0.6));
+        osc.connect(tone).connect(g).connect(dest);
+        osc.start(time);
+        osc.stop(time + Math.max(dur, 0.6) + 0.1);
+      }
+      const hammer = ctx.createBufferSource();
+      hammer.buffer = this.makeNoiseBuffer(0.015);
+      const hbp = ctx.createBiquadFilter();
+      hbp.type = "bandpass";
+      hbp.frequency.value = 2600;
+      const hg = ctx.createGain();
+      hg.gain.setValueAtTime(vel * 0.28, time);
+      hg.gain.exponentialRampToValueAtTime(0.001, time + 0.015);
+      hammer.connect(hbp).connect(hg).connect(dest);
+      hammer.start(time);
+      hammer.stop(time + 0.02);
+      return;
+    }
 
     if (flavor === "pluck") {
       const osc = ctx.createOscillator();
@@ -2948,6 +4197,170 @@ class BeatEngine {
     const ctx = this.ctx;
     const dest = this.dest("lead");
     const dur = Math.min(durationSeconds, 1);
+
+    if (flavor === "theremin") {
+      // The only instrument played without being touched. Because there
+      // are no frets, keys or holes, pitch is CONTINUOUS: every note is
+      // arrived at by sliding, and the player's hand is never perfectly
+      // still, so there is always vibrato. The waveform itself is close
+      // to a pure sine (it's a heterodyne oscillator), which means the
+      // portamento and the vibrato are essentially the entire sound.
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      const from = freq * (Math.random() < 0.5 ? 0.78 : 1.26);
+      osc.frequency.setValueAtTime(from, time);
+      osc.frequency.exponentialRampToValueAtTime(freq, time + Math.min(0.22, dur * 0.5));
+      const vib = ctx.createOscillator();
+      vib.frequency.value = 5.5;
+      const vibAmt = ctx.createGain();
+      vibAmt.gain.setValueAtTime(0.0001, time);
+      vibAmt.gain.linearRampToValueAtTime(freq * 0.022, time + 0.2);
+      vib.connect(vibAmt).connect(osc.frequency);
+      vib.start(time);
+      vib.stop(time + dur + 0.2);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.55, time + 0.09);
+      gain.gain.setValueAtTime(vel * 0.55, time + dur * 0.8);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur + 0.15);
+      // A touch of second harmonic - a real theremin is not a lab sine.
+      const h2 = ctx.createOscillator();
+      h2.type = "sine";
+      h2.frequency.value = freq * 2;
+      const h2g = ctx.createGain();
+      h2g.gain.value = 0.12;
+      h2.connect(h2g).connect(gain);
+      h2.start(time);
+      h2.stop(time + dur + 0.2);
+      osc.connect(gain).connect(dest);
+      osc.start(time);
+      osc.stop(time + dur + 0.2);
+      return;
+    }
+
+    if (flavor === "panflute") {
+      // An end-blown stopped pipe. A stopped pipe suppresses even
+      // harmonics, so the tone is hollow and dominated by odd partials,
+      // and the chiff - the burst of turbulent air noise before the pipe
+      // speaks - is proportionally much louder than on a concert flute.
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.6, time + 0.05);
+      gain.gain.setValueAtTime(vel * 0.6, time + dur * 0.75);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur + 0.1);
+      gain.connect(dest);
+      for (const [ratio, lvl] of [[1, 1], [3, 0.16], [5, 0.05]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = freq * ratio;
+        const g = ctx.createGain();
+        g.gain.value = lvl;
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + dur + 0.15);
+      }
+      const chiff = ctx.createBufferSource();
+      chiff.buffer = this.makeNoiseBuffer(0.12);
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = freq * 2.2;
+      bp.Q.value = 1.4;
+      const cg = ctx.createGain();
+      cg.gain.setValueAtTime(vel * 0.4, time);
+      cg.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+      chiff.connect(bp).connect(cg).connect(dest);
+      chiff.start(time);
+      chiff.stop(time + 0.12);
+      return;
+    }
+
+    if (flavor === "harmonica") {
+      // A free-reed instrument played by breath, in both directions -
+      // blow and draw. Its two defining qualities are a bright, buzzy,
+      // odd-harmonic reed tone and the fact that most harmonica notes
+      // are BENT into place, since bending is how a diatonic harp reaches
+      // the notes it does not have.
+      const osc = ctx.createOscillator();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(freq * 0.965, time);
+      osc.frequency.linearRampToValueAtTime(freq, time + 0.07);
+      const vib = ctx.createOscillator();
+      vib.frequency.value = 6.4;
+      const vibAmt = ctx.createGain();
+      vibAmt.gain.setValueAtTime(0.0001, time);
+      vibAmt.gain.linearRampToValueAtTime(freq * 0.011, time + 0.18);
+      vib.connect(vibAmt).connect(osc.frequency);
+      vib.start(time);
+      vib.stop(time + dur + 0.15);
+      const reed = ctx.createBiquadFilter();
+      reed.type = "peaking";
+      reed.frequency.value = 1700;
+      reed.Q.value = 1.2;
+      reed.gain.value = 8;
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 4200;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.42, time + 0.04);
+      gain.gain.setValueAtTime(vel * 0.42, time + dur * 0.75);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur + 0.1);
+      osc.connect(reed).connect(lp).connect(gain).connect(dest);
+      osc.start(time);
+      osc.stop(time + dur + 0.15);
+      // Breath around the reed.
+      const breath = ctx.createBufferSource();
+      breath.buffer = this.makeNoiseBuffer(Math.min(dur + 0.2, 1.5));
+      const bhp = ctx.createBiquadFilter();
+      bhp.type = "highpass";
+      bhp.frequency.value = 3000;
+      const bg = ctx.createGain();
+      bg.gain.setValueAtTime(0.0001, time);
+      bg.gain.linearRampToValueAtTime(vel * 0.06, time + 0.05);
+      bg.gain.linearRampToValueAtTime(0.0001, time + dur);
+      breath.connect(bhp).connect(bg).connect(dest);
+      breath.start(time);
+      breath.stop(time + dur + 0.1);
+      return;
+    }
+
+    if (flavor === "ocarina") {
+      // A vessel flute: the whole enclosed cavity resonates as a
+      // Helmholtz resonator rather than as a pipe, so it has essentially
+      // NO overtones at all - close to a pure sine, which is why an
+      // ocarina sounds so simple and so instantly recognisable.
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const vib = ctx.createOscillator();
+      vib.frequency.value = 4.8;
+      const vibAmt = ctx.createGain();
+      vibAmt.gain.setValueAtTime(0.0001, time);
+      vibAmt.gain.linearRampToValueAtTime(freq * 0.009, time + 0.25);
+      vib.connect(vibAmt).connect(osc.frequency);
+      vib.start(time);
+      vib.stop(time + dur + 0.15);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.6, time + 0.045);
+      gain.gain.setValueAtTime(vel * 0.6, time + dur * 0.8);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur + 0.1);
+      osc.connect(gain).connect(dest);
+      osc.start(time);
+      osc.stop(time + dur + 0.15);
+      const chiff = ctx.createBufferSource();
+      chiff.buffer = this.makeNoiseBuffer(0.05);
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = freq * 3;
+      const cg = ctx.createGain();
+      cg.gain.setValueAtTime(vel * 0.16, time);
+      cg.gain.exponentialRampToValueAtTime(0.001, time + 0.05);
+      chiff.connect(bp).connect(cg).connect(dest);
+      chiff.start(time);
+      chiff.stop(time + 0.06);
+      return;
+    }
 
     if (flavor === "flute") {
       // A flute's tone is almost a pure fundamental with very few upper
@@ -3189,6 +4602,105 @@ class BeatEngine {
     const dest = this.dest("pad");
     const attack = 0.25;
     const dur = Math.max(durationSeconds, 0.6);
+
+    if (flavor === "solina") {
+      // The same string-machine ensemble as the strings track, voiced as
+      // a pad: slower attack, longer tail.
+      const ens = this.makeSolinaEnsemble(dest);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.45, time + 0.35);
+      gain.gain.setValueAtTime(vel * 0.45, time + dur * 0.8);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur + 0.5);
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 3600;
+      gain.connect(lp).connect(ens);
+      for (const [ratio, lvl] of [[1, 1], [2, 0.4], [0.5, 0.3]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.value = freq * ratio;
+        const g = ctx.createGain();
+        g.gain.value = lvl;
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + dur + 0.6);
+      }
+      return;
+    }
+
+    if (flavor === "cs80") {
+      // The Yamaha CS-80's signature is that it is genuinely two complete
+      // synthesizers stacked per key, detuned against each other, with a
+      // slow "sub-oscillator" style beating and a very characteristic
+      // resonant lowpass that opens over the note. Vangelis's "Blade
+      // Runner" sound is essentially that plus the CS-80's ring modulator
+      // -like brightness, and the slow filter opening is what makes it
+      // feel like the sound is inhaling.
+      const filt = ctx.createBiquadFilter();
+      filt.type = "lowpass";
+      filt.frequency.setValueAtTime(500, time);
+      filt.frequency.linearRampToValueAtTime(3200, time + Math.min(1.4, dur * 0.7));
+      filt.frequency.linearRampToValueAtTime(1400, time + dur);
+      filt.Q.value = 3.5;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.4, time + 0.3);
+      gain.gain.setValueAtTime(vel * 0.4, time + dur * 0.85);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur + 0.4);
+      filt.connect(gain).connect(dest);
+      // Two layers, each with its own detune - the "two synths per key".
+      for (const [type, detune, lvl] of [["sawtooth", -9, 0.5], ["sawtooth", 8, 0.5], ["square", -4, 0.25]]) {
+        const osc = ctx.createOscillator();
+        osc.type = type;
+        osc.frequency.value = freq;
+        osc.detune.value = detune;
+        const g = ctx.createGain();
+        g.gain.value = lvl;
+        osc.connect(g).connect(filt);
+        osc.start(time);
+        osc.stop(time + dur + 0.5);
+      }
+      return;
+    }
+
+    if (flavor === "voxhumana") {
+      // "Vox Humana" - the breathy choir-ish preset every 70s/80s string
+      // machine and combo organ had. It is not a real voice model: it is a
+      // narrow formant-ish bandpass over detuned saws plus a slow tremolo,
+      // and that specific fakeness is the sound people actually want.
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.42, time + 0.22);
+      gain.gain.setValueAtTime(vel * 0.42, time + dur * 0.8);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur + 0.35);
+      const formant = ctx.createBiquadFilter();
+      formant.type = "bandpass";
+      formant.frequency.value = 780;
+      formant.Q.value = 1.6;
+      const trem = ctx.createOscillator();
+      trem.frequency.value = 5.6;
+      const tremAmt = ctx.createGain();
+      tremAmt.gain.value = 0.12;
+      const tremGain = ctx.createGain();
+      tremGain.gain.value = 0.88;
+      trem.connect(tremAmt).connect(tremGain.gain);
+      trem.start(time);
+      trem.stop(time + dur + 0.4);
+      gain.connect(formant).connect(tremGain).connect(dest);
+      for (const detune of [-11, 0, 10]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.value = freq;
+        osc.detune.value = detune;
+        const g = ctx.createGain();
+        g.gain.value = 0.4;
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + dur + 0.45);
+      }
+      return;
+    }
 
     if (flavor === "glass") {
       for (const ratio of [1, 2, 4.02]) {
@@ -3461,13 +4973,17 @@ class BeatEngine {
   // every other pattern uses - this is the one place playback needs to
   // know the difference.
   freqForDegree(deg, step) {
+    return midiToFreq(this.midiForDegree(deg, step));
+  }
+
+  midiForDegree(deg, step) {
     const contexts = this.pattern.barChordContexts;
     if (contexts && contexts.length) {
       const barIdx = Math.floor(step / STEPS_PER_BAR) % contexts.length;
       const ctx = contexts[barIdx];
-      return degreeToFreq(ctx.rootMidi, ctx.scale, deg);
+      return scaleDegreeToMidi(ctx.rootMidi, ctx.scale, deg);
     }
-    return degreeToFreq(this.rootMidi, this.style.scale, deg);
+    return scaleDegreeToMidi(this.rootMidi, this.style.scale, deg);
   }
 
   scheduleStep(step, time) {
@@ -3509,8 +5025,13 @@ class BeatEngine {
       const noteDur = val.len * dur;
       this.applyFilterAutomation(inst, step, time);
       if (val.degrees) {
-        for (const deg of val.degrees) {
-          const freq = this.freqForDegree(deg, step);
+        // The key is only known here, so this is where scale degrees turn
+        // into real pitches - and therefore the only place the chord can
+        // be checked against the instrument's actual range and against the
+        // low interval limit. See fitChordToInstrument in instruments.js.
+        const voiced = fitChordToInstrument(val.degrees.map((d) => this.midiForDegree(d, step)), inst);
+        for (const midi of voiced) {
+          const freq = midiToFreq(midi);
           const vel = this.jitterVel(BASE_VELOCITY[inst] * 0.85 * (1 + (this.metricAccent(step) - 1) * 0.5)) * autoMul;
           if (inst === "piano") this.playPianoVoice(t, freq, noteDur, vel, flavors.piano);
           else if (inst === "pad") this.playPadVoice(t, freq, noteDur, vel, flavors.pad);

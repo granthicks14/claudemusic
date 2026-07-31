@@ -3,23 +3,23 @@ const STEPS_PER_BAR = 16;
 const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14, arp: 18, autolead: 14, sax: 14 };
 
 const FLAVOR_POOLS = {
-  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "909", "linn", "707", "606", "dmx", "sp1200"],
-  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn", "707", "dmx", "sp1200", "rimclick", "gatedverb"],
-  hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909", "707", "606", "ride"],
-  perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78", "talkingdrum", "woodblock"],
-  tom: ["acoustic", "simmons"],
-  bass: ["warm", "synth", "808", "true808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog", "303", "slap"],
-  piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord", "dx7ep", "clav"],
-  lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm", "whistle"],
-  pad: ["warm", "ensemble", "airy", "glass", "choir", "dark", "juno"],
+  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "909", "linn", "707", "606", "dmx", "sp1200", "lm1", "rz1", "hr16", "r8"],
+  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn", "707", "dmx", "sp1200", "rimclick", "gatedverb", "lm1", "rz1", "hr16", "r8"],
+  hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909", "707", "606", "ride", "lm1", "rz1", "r8"],
+  perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78", "talkingdrum", "woodblock", "tabla", "cabasa", "guiro", "agogo", "vibraslap", "cajon", "djembe", "timbale"],
+  tom: ["acoustic", "simmons", "roto", "taiko"],
+  bass: ["warm", "synth", "808", "true808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog", "303", "slap", "sh101", "fretless", "m1organbass"],
+  piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord", "dx7ep", "clav", "m1piano", "cp70", "honkytonk"],
+  lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm", "whistle", "theremin", "panflute", "harmonica", "ocarina"],
+  pad: ["warm", "ensemble", "airy", "glass", "choir", "dark", "juno", "solina", "cs80", "voxhumana"],
   stab: ["pluck-chord", "square-chord", "bell-chord", "brass-chord", "organ-chord", "string-chord", "orchhit"],
-  guitar: ["clean", "power", "muted", "nylon", "acoustic", "jazz", "funk", "twelvestring"],
-  strings: ["soul", "orchestral", "staccato", "synth", "pizzicato", "tremolo", "mellotron"],
-  horn: ["brass", "soft", "muted", "sax", "trumpetstab", "section", "clarinet", "frenchhorn", "oboe"],
-  organ: ["drawbar", "gospel", "church", "combo"],
+  guitar: ["clean", "power", "muted", "nylon", "acoustic", "jazz", "funk", "twelvestring", "sitar", "banjo", "mandolin", "ukulele", "slide"],
+  strings: ["soul", "orchestral", "staccato", "synth", "pizzicato", "tremolo", "mellotron", "solina", "cello", "spiccato", "harp"],
+  horn: ["brass", "soft", "muted", "sax", "trumpetstab", "section", "clarinet", "frenchhorn", "oboe", "trombone", "tuba", "flugelhorn", "piccolo"],
+  organ: ["drawbar", "gospel", "church", "combo", "farfisa", "accordion", "harmonium", "m1organ"],
   vocal: ["ooh", "ahh", "ay", "oh", "choir", "vocoder"],
-  kalimba: ["kalimba", "musicbox", "steeldrum", "glock"],
-  marimba: ["marimba", "vibraphone"],
+  kalimba: ["kalimba", "musicbox", "steeldrum", "glock", "hangdrum", "balafon", "kora"],
+  marimba: ["marimba", "vibraphone", "xylophone", "tubularbell"],
   arp: ["arp", "pulse"],
   // A real mono hook instrument for the "Auto-Tune hook" modern rap/trap
   // production leans on - distinct from the existing "vocal" chordal
@@ -29,9 +29,101 @@ const FLAVOR_POOLS = {
   autolead: ["hard", "moody"],
   // A real mono solo-line instrument - saxophone melodies are played one
   // note at a time, a different musical role from Horn's chord stabs.
-  sax: ["smooth", "breathy"],
+  sax: ["smooth", "breathy", "alto", "bari"],
   fx: ["riser", "siren", "impact"],
 };
+
+// Which genres each kit actually belongs to.
+//
+// Adding fifty highly characterful instruments to the shared pools without
+// this map would be actively harmful: the shuffle picks from the whole
+// pool, so a techno track would sooner or later be handed a banjo. Timbre
+// alone is not enough knowledge about an instrument - WHERE it is used is
+// part of what the instrument is. A sitar belongs in psychedelic-leaning
+// hip-hop and lo-fi, not in UK garage; a Korg M1 organ is the sound of
+// house specifically; spiccato strings and tubular bells are drill and
+// trap devices; a kora and a balafon are West African and belong with
+// Afrobeats and Amapiano.
+//
+// Any flavor NOT listed here is treated as universal - that covers every
+// generic flavor the program already had ("warm", "bright", "grand"...).
+const FLAVOR_GENRES = {
+  // --- drum machines, placed by the era and scene that actually used them
+  lm1: ["synthwave", "rnb", "rock", "lofi", "hiphop", "rap"],
+  rz1: ["lofi", "hiphop", "house", "phonk", "jerseyclub"],
+  hr16: ["rock", "rnb", "neosoul", "lofi"],
+  r8: ["rock", "dnb", "techno", "house"],
+  // --- world percussion
+  tabla: ["afrobeats", "lofi", "rnb", "amapiano"],
+  cabasa: ["afrobeats", "house", "reggaeton", "amapiano", "neosoul"],
+  guiro: ["reggaeton", "afrobeats", "house"],
+  agogo: ["afrobeats", "amapiano", "house", "reggaeton", "jerseyclub"],
+  vibraslap: ["rock", "lofi", "neosoul"],
+  cajon: ["lofi", "neosoul", "rnb", "afrobeats"],
+  djembe: ["afrobeats", "amapiano", "house"],
+  timbale: ["reggaeton", "house", "afrobeats", "jerseyclub"],
+  roto: ["rock", "synthwave", "dnb"],
+  taiko: ["dubstep", "drill", "trap", "dnb", "rap"],
+  // --- synths and keyboards
+  sh101: ["house", "techno", "ukgarage", "synthwave", "dnb", "jerseyclub"],
+  fretless: ["neosoul", "rnb", "lofi"],
+  m1organbass: ["house", "ukgarage", "amapiano", "techno", "jerseyclub"],
+  m1piano: ["house", "ukgarage", "amapiano", "jerseyclub"],
+  m1organ: ["house", "ukgarage", "amapiano", "techno", "jerseyclub"],
+  cp70: ["synthwave", "rnb", "neosoul", "rock"],
+  honkytonk: ["lofi", "hiphop"],
+  solina: ["synthwave", "lofi", "neosoul", "rnb", "house"],
+  cs80: ["synthwave", "dubstep", "techno", "dnb"],
+  voxhumana: ["synthwave", "lofi", "house"],
+  farfisa: ["rock", "lofi", "house"],
+  accordion: ["afrobeats", "lofi", "reggaeton"],
+  harmonium: ["lofi", "neosoul", "afrobeats"],
+  // --- winds
+  theremin: ["synthwave", "lofi", "dubstep"],
+  panflute: ["afrobeats", "lofi", "amapiano"],
+  harmonica: ["rock", "lofi", "hiphop", "rnb"],
+  ocarina: ["lofi", "synthwave", "afrobeats"],
+  trombone: ["afrobeats", "neosoul", "rnb", "house", "rock"],
+  tuba: ["rock", "hiphop", "afrobeats"],
+  flugelhorn: ["neosoul", "rnb", "lofi", "amapiano"],
+  // The high flute/piccolo lead over a dark 808 is a trap and drill
+  // signature, not an orchestral gesture.
+  piccolo: ["drill", "trap", "dubstep", "rap"],
+  alto: ["neosoul", "rnb", "house", "afrobeats"],
+  bari: ["neosoul", "rnb", "rock", "hiphop", "rap"],
+  // --- plucked and bowed strings
+  sitar: ["lofi", "hiphop", "trap", "afrobeats", "phonk", "rap"],
+  banjo: ["rock", "lofi", "hiphop"],
+  mandolin: ["rock", "lofi", "afrobeats"],
+  ukulele: ["lofi", "afrobeats", "amapiano"],
+  slide: ["rock", "lofi", "hiphop", "phonk", "rap"],
+  // Dark, sustained low strings are central to UK drill and to the
+  // orchestral side of trap.
+  cello: ["rnb", "neosoul", "drill", "trap", "dnb", "rap"],
+  spiccato: ["drill", "trap", "dubstep", "dnb", "rap"],
+  harp: ["rnb", "neosoul", "lofi", "trap", "rap"],
+  // --- tuned percussion
+  hangdrum: ["lofi", "amapiano", "afrobeats", "neosoul"],
+  balafon: ["afrobeats", "amapiano", "house"],
+  kora: ["afrobeats", "amapiano", "lofi"],
+  xylophone: ["afrobeats", "amapiano", "house", "lofi"],
+  tubularbell: ["drill", "trap", "phonk", "dubstep", "rap"],
+};
+
+// A flavor is available to a genre if it is universal, or if that genre is
+// in its list.
+function flavorFitsGenre(flavor, styleId) {
+  const allowed = FLAVOR_GENRES[flavor];
+  return !allowed || allowed.includes(styleId);
+}
+
+function poolForGenre(inst, styleId) {
+  const pool = FLAVOR_POOLS[inst] || [];
+  const fitted = pool.filter((f) => flavorFitsGenre(f, styleId));
+  // Never hand back an empty pool - if a genre somehow excludes
+  // everything, fall back to the full list rather than break the shuffle.
+  return fitted.length ? fitted : pool;
+}
 
 // Tags each flavor by sonic character (warm/bright/dark) so a shuffle can
 // pick one character and apply it across every instrument at once, instead
@@ -41,26 +133,26 @@ const FLAVOR_POOLS = {
 // applied to a shuffle, so "Generate Beat" lands on a beat that sounds like
 // one production instead of several unrelated instruments stacked together.
 const FLAVOR_TAGS = {
-  kick: { boombap: "warm", "808": "dark", fourfloor: "bright", acoustic: "warm", lofi: "warm", deep: "dark", snappy: "bright", click: "bright", punch: "bright", subkick: "dark", gritty: "dark", roomy: "warm", "909": "bright", linn: "warm", "707": "bright", "606": "dark", dmx: "dark", sp1200: "warm", rimclick: "warm" },
-  snare: { crisp: "bright", clap: "bright", fat: "warm", rimshot: "bright", trapsnap: "bright", brush: "warm", gated: "dark", acoustic: "warm", ghost: "dark", layered: "dark", "909snare": "bright", linn: "warm", "707": "bright", dmx: "dark", sp1200: "warm", rimclick: "warm", gatedverb: "bright" },
-  hihat: { bright: "bright", dark: "dark", vinyl: "warm", metallic: "bright", analog: "warm", tape: "warm", sizzle: "bright", lofi808: "dark", "909": "bright", "707": "bright", "606": "dark", ride: "bright" },
-  perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright", timpani: "dark", cr78: "warm", talkingdrum: "warm", woodblock: "bright" },
-  tom: { acoustic: "warm", simmons: "bright" },
-  bass: { warm: "warm", synth: "bright", "808": "dark", true808: "dark", hard808: "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm", moog: "warm", "303": "bright", slap: "bright" },
-  piano: { electric: "bright", pluck: "bright", grand: "warm", rhodes: "warm", wurlitzer: "warm", upright: "warm", celesta: "bright", toy: "bright", harpsichord: "bright", dx7ep: "bright", clav: "bright" },
-  lead: { square: "bright", saw: "bright", bell: "bright", flute: "warm", supersaw: "bright", pluck: "bright", sine: "warm", chip: "bright", brasslead: "warm", fm: "bright", whistle: "bright" },
-  pad: { warm: "warm", ensemble: "warm", airy: "bright", glass: "bright", choir: "warm", dark: "dark", juno: "warm" },
+  kick: { boombap: "warm", "808": "dark", fourfloor: "bright", acoustic: "warm", lofi: "warm", deep: "dark", snappy: "bright", click: "bright", punch: "bright", subkick: "dark", gritty: "dark", roomy: "warm", "909": "bright", linn: "warm", "707": "bright", "606": "dark", dmx: "dark", sp1200: "warm", rimclick: "warm" , lm1: "warm", rz1: "dark", hr16: "warm", r8: "warm"},
+  snare: { crisp: "bright", clap: "bright", fat: "warm", rimshot: "bright", trapsnap: "bright", brush: "warm", gated: "dark", acoustic: "warm", ghost: "dark", layered: "dark", "909snare": "bright", linn: "warm", "707": "bright", dmx: "dark", sp1200: "warm", rimclick: "warm", gatedverb: "bright" , lm1: "warm", rz1: "bright", hr16: "warm", r8: "warm"},
+  hihat: { bright: "bright", dark: "dark", vinyl: "warm", metallic: "bright", analog: "warm", tape: "warm", sizzle: "bright", lofi808: "dark", "909": "bright", "707": "bright", "606": "dark", ride: "bright" , lm1: "warm", rz1: "bright", r8: "bright"},
+  perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright", timpani: "dark", cr78: "warm", talkingdrum: "warm", woodblock: "bright" , tabla: "warm", cabasa: "bright", guiro: "bright", agogo: "bright", vibraslap: "bright", cajon: "warm", djembe: "warm", timbale: "bright"},
+  tom: { acoustic: "warm", simmons: "bright" , roto: "bright", taiko: "dark"},
+  bass: { warm: "warm", synth: "bright", "808": "dark", true808: "dark", hard808: "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm", moog: "warm", "303": "bright", slap: "bright" , sh101: "bright", fretless: "warm", m1organbass: "bright"},
+  piano: { electric: "bright", pluck: "bright", grand: "warm", rhodes: "warm", wurlitzer: "warm", upright: "warm", celesta: "bright", toy: "bright", harpsichord: "bright", dx7ep: "bright", clav: "bright" , m1piano: "bright", cp70: "bright", honkytonk: "warm"},
+  lead: { square: "bright", saw: "bright", bell: "bright", flute: "warm", supersaw: "bright", pluck: "bright", sine: "warm", chip: "bright", brasslead: "warm", fm: "bright", whistle: "bright" , theremin: "warm", panflute: "warm", harmonica: "bright", ocarina: "warm"},
+  pad: { warm: "warm", ensemble: "warm", airy: "bright", glass: "bright", choir: "warm", dark: "dark", juno: "warm" , solina: "warm", cs80: "warm", voxhumana: "warm"},
   stab: { "pluck-chord": "bright", "square-chord": "bright", "bell-chord": "bright", "brass-chord": "warm", "organ-chord": "warm", "string-chord": "warm", orchhit: "dark" },
-  guitar: { clean: "bright", power: "dark", muted: "dark", nylon: "warm", acoustic: "warm", jazz: "warm", funk: "bright", twelvestring: "bright" },
-  strings: { soul: "warm", orchestral: "warm", staccato: "bright", synth: "bright", pizzicato: "bright", tremolo: "dark", mellotron: "warm" },
-  horn: { brass: "bright", soft: "warm", muted: "dark", sax: "warm", trumpetstab: "bright", section: "bright", clarinet: "warm", frenchhorn: "warm", oboe: "bright" },
-  organ: { drawbar: "warm", gospel: "dark", church: "dark", combo: "bright" },
+  guitar: { clean: "bright", power: "dark", muted: "dark", nylon: "warm", acoustic: "warm", jazz: "warm", funk: "bright", twelvestring: "bright" , sitar: "bright", banjo: "bright", mandolin: "bright", ukulele: "warm", slide: "warm"},
+  strings: { soul: "warm", orchestral: "warm", staccato: "bright", synth: "bright", pizzicato: "bright", tremolo: "dark", mellotron: "warm" , solina: "warm", cello: "dark", spiccato: "bright", harp: "warm"},
+  horn: { brass: "bright", soft: "warm", muted: "dark", sax: "warm", trumpetstab: "bright", section: "bright", clarinet: "warm", frenchhorn: "warm", oboe: "bright" , trombone: "warm", tuba: "dark", flugelhorn: "warm", piccolo: "bright"},
+  organ: { drawbar: "warm", gospel: "dark", church: "dark", combo: "bright" , farfisa: "bright", accordion: "warm", harmonium: "warm", m1organ: "bright"},
   vocal: { ooh: "warm", ahh: "warm", ay: "bright", oh: "warm", choir: "warm", vocoder: "bright" },
-  kalimba: { kalimba: "warm", musicbox: "bright", steeldrum: "bright", glock: "bright" },
-  marimba: { marimba: "warm", vibraphone: "bright" },
+  kalimba: { kalimba: "warm", musicbox: "bright", steeldrum: "bright", glock: "bright" , hangdrum: "warm", balafon: "warm", kora: "warm"},
+  marimba: { marimba: "warm", vibraphone: "bright" , xylophone: "bright", tubularbell: "bright"},
   arp: { arp: "bright", pulse: "warm" },
   autolead: { hard: "bright", moody: "dark" },
-  sax: { smooth: "warm", breathy: "dark" },
+  sax: { smooth: "warm", breathy: "dark" , alto: "bright", bari: "dark"},
   fx: { riser: "bright", siren: "dark", impact: "dark" },
 };
 
@@ -1925,6 +2017,9 @@ function resolveChordBarTrack(instKey, cfg, barRootDegree, opts = {}) {
     // the major/minor quality - the open, unresolved sound house and
     // techno lean on.
     if (sus) degs = degs.map((d, i) => (i === 1 ? d + 1 : d));
+    // Respace the stack of thirds the way this instrument's players
+    // actually voice a chord - see INSTRUMENT_PROFILE in instruments.js.
+    degs = shapeVoicing(degs, instKey);
     const led = voiceLeadDegrees(degs, running);
     running = led[0];
     return { degrees: led, len: spec.len };
@@ -2121,7 +2216,11 @@ function buildChordBar(style, variant, barRootDegree, chordVariety, prevLowest =
       if (bar[inst][i]) { prevLowest[inst] = bar[inst][i].degrees[0]; break; }
     }
     if (variant === "fill" && inst === "stab") {
-      bar[inst][0] = { degrees: chordDegrees(barRootDegree + REGISTER.stab + (v.registerOffset || 0), 3 + (v.voicingBonus || 0)), len: 2 };
+      // Goes through shapeVoicing like every other chord - otherwise a
+      // big voicingBonus builds an eight-note stab no four-piece section
+      // could ever play.
+      const fillDegs = chordDegrees(barRootDegree + REGISTER.stab + (v.registerOffset || 0), 3 + (v.voicingBonus || 0));
+      bar[inst][0] = { degrees: shapeVoicing(fillDegs, "stab"), len: 2 };
     }
   }
   return bar;

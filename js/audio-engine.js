@@ -1187,6 +1187,24 @@ class BeatEngine {
 
       this.pluckString(time, freq, durationSeconds, vel * 0.85, this.dest("bass"), { damp: 0.42, feedback: 0.965, pluckNoise: 0.015, brightness: 0.7, sustain: 0.45 });
       return;
+    } else if (flavor === "303") {
+      // Roland TB-303 "Bassline" (1981) - the acid house machine, one of
+      // the most-cloned circuits in electronic music. Its identity is a
+      // bare sawtooth into a very resonant lowpass whose cutoff envelope
+      // snaps shut fast (that squelch IS the 303), plus the sequencer's
+      // signature slide - approximated per-note as a quick upward glide
+      // into pitch, since the engine is stateless between notes.
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freq * 0.94, time);
+      osc.frequency.exponentialRampToValueAtTime(freq, time + 0.05);
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.Q.value = 12;
+      filter.frequency.setValueAtTime(2400, time);
+      filter.frequency.exponentialRampToValueAtTime(Math.max(180, freq * 1.5), time + 0.2);
+      gain.gain.setValueAtTime(vel * 0.85, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + Math.max(durationSeconds, 0.18));
+      osc.connect(filter).connect(gain).connect(this.dest("bass"));
     } else if (flavor === "moog") {
       // A classic Minimoog-style bass patch. Web Audio has no true ladder-
       // filter model, but the thing that actually makes a Moog bass sound
@@ -1459,6 +1477,57 @@ class BeatEngine {
   playStringsVoice(time, freq, durationSeconds, vel, flavor) {
     const ctx = this.ctx;
     const dest = this.dest("strings");
+
+    if (flavor === "mellotron") {
+      // The Mellotron (1963) - the tape-replay "strings in a box" behind
+      // "Strawberry Fields Forever" and most of early prog. Each key
+      // pulled a strip of magnetic tape across a head, so its character
+      // is really three tape artifacts stacked: wow/flutter (slow random
+      // pitch instability from imperfect tape transport - modeled as a
+      // sub-Hz LFO wobbling every oscillator's pitch), a hard band-limit
+      // (the tapes simply had no top end), and a faint constant hiss
+      // under the note. None of the other string flavors have any of
+      // those - they're all "perfect" oscillators.
+      const dur = Math.max(durationSeconds, 0.8);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.7, time + 0.09);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 2700;
+      lp.connect(gain).connect(dest);
+
+      const wow = ctx.createOscillator();
+      wow.frequency.value = 0.8 + Math.random() * 0.5;
+      const wowGain = ctx.createGain();
+      wowGain.gain.value = freq * 0.006;
+      wow.connect(wowGain);
+      for (const det of [0, 0.005, -0.006]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(freq * (1 + det), time);
+        wowGain.connect(osc.frequency);
+        osc.connect(lp);
+        osc.start(time);
+        osc.stop(time + dur + 0.1);
+      }
+      wow.start(time);
+      wow.stop(time + dur + 0.1);
+
+      const hiss = ctx.createBufferSource();
+      hiss.buffer = this.makeNoiseBuffer(dur + 0.05);
+      const hissBp = ctx.createBiquadFilter();
+      hissBp.type = "bandpass";
+      hissBp.frequency.value = 5000;
+      const hissGain = ctx.createGain();
+      hissGain.gain.setValueAtTime(vel * 0.025, time);
+      hissGain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      hiss.connect(hissBp).connect(hissGain).connect(dest);
+      hiss.start(time);
+      hiss.stop(time + dur + 0.05);
+      return;
+    }
 
     if (flavor === "pizzicato") {
       // Plucked strings: near-instant attack, fast triangle-body decay,
@@ -2156,6 +2225,23 @@ class BeatEngine {
       osc2.start(time);
       osc1.stop(time + dur + 0.1);
       osc2.stop(time + dur + 0.15);
+      return;
+    }
+
+    if (flavor === "clav") {
+      // Hohner Clavinet D6 - the funk keyboard (Stevie Wonder's
+      // "Superstition"). Mechanically it IS a plucked string instrument:
+      // each key slaps a rubber pad against a real string, so the honest
+      // synthesis route is the same Karplus-Strong physical model the
+      // guitars use, tuned tight and percussive, then pushed through a
+      // bright peaking EQ for the D6's characteristic nasal bite.
+      const peak = ctx.createBiquadFilter();
+      peak.type = "peaking";
+      peak.frequency.value = 2200;
+      peak.Q.value = 2;
+      peak.gain.value = 9;
+      peak.connect(dest);
+      this.pluckString(time, freq, Math.min(dur, 0.45), vel, peak, { damp: 0.12, feedback: 0.972, pluckNoise: 0.02, brightness: 1.5, sustain: 0.3 });
       return;
     }
 

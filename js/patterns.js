@@ -8,13 +8,13 @@ const FLAVOR_POOLS = {
   hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909", "707", "606"],
   perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78", "talkingdrum"],
   tom: ["acoustic", "simmons"],
-  bass: ["warm", "synth", "808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog"],
-  piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord", "dx7ep"],
+  bass: ["warm", "synth", "808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog", "303"],
+  piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord", "dx7ep", "clav"],
   lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm"],
   pad: ["warm", "ensemble", "airy", "glass", "choir", "dark", "juno"],
   stab: ["pluck-chord", "square-chord", "bell-chord", "brass-chord", "organ-chord", "string-chord"],
   guitar: ["clean", "power", "muted", "nylon", "acoustic", "jazz", "funk", "twelvestring"],
-  strings: ["soul", "orchestral", "staccato", "synth", "pizzicato", "tremolo"],
+  strings: ["soul", "orchestral", "staccato", "synth", "pizzicato", "tremolo", "mellotron"],
   horn: ["brass", "soft", "muted", "sax", "trumpetstab", "section", "clarinet", "frenchhorn", "oboe"],
   organ: ["drawbar", "gospel", "church", "combo"],
   vocal: ["ooh", "ahh", "ay", "oh", "choir", "vocoder"],
@@ -46,13 +46,13 @@ const FLAVOR_TAGS = {
   hihat: { bright: "bright", dark: "dark", vinyl: "warm", metallic: "bright", analog: "warm", tape: "warm", sizzle: "bright", lofi808: "dark", "909": "bright", "707": "bright", "606": "dark" },
   perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright", timpani: "dark", cr78: "warm", talkingdrum: "warm" },
   tom: { acoustic: "warm", simmons: "bright" },
-  bass: { warm: "warm", synth: "bright", "808": "dark", hard808: "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm", moog: "warm" },
-  piano: { electric: "bright", pluck: "bright", grand: "warm", rhodes: "warm", wurlitzer: "warm", upright: "warm", celesta: "bright", toy: "bright", harpsichord: "bright", dx7ep: "bright" },
+  bass: { warm: "warm", synth: "bright", "808": "dark", hard808: "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm", moog: "warm", "303": "bright" },
+  piano: { electric: "bright", pluck: "bright", grand: "warm", rhodes: "warm", wurlitzer: "warm", upright: "warm", celesta: "bright", toy: "bright", harpsichord: "bright", dx7ep: "bright", clav: "bright" },
   lead: { square: "bright", saw: "bright", bell: "bright", flute: "warm", supersaw: "bright", pluck: "bright", sine: "warm", chip: "bright", brasslead: "warm", fm: "bright" },
   pad: { warm: "warm", ensemble: "warm", airy: "bright", glass: "bright", choir: "warm", dark: "dark", juno: "warm" },
   stab: { "pluck-chord": "bright", "square-chord": "bright", "bell-chord": "bright", "brass-chord": "warm", "organ-chord": "warm", "string-chord": "warm" },
   guitar: { clean: "bright", power: "dark", muted: "dark", nylon: "warm", acoustic: "warm", jazz: "warm", funk: "bright", twelvestring: "bright" },
-  strings: { soul: "warm", orchestral: "warm", staccato: "bright", synth: "bright", pizzicato: "bright", tremolo: "dark" },
+  strings: { soul: "warm", orchestral: "warm", staccato: "bright", synth: "bright", pizzicato: "bright", tremolo: "dark", mellotron: "warm" },
   horn: { brass: "bright", soft: "warm", muted: "dark", sax: "warm", trumpetstab: "bright", section: "bright", clarinet: "warm", frenchhorn: "warm", oboe: "bright" },
   organ: { drawbar: "warm", gospel: "dark", church: "dark", combo: "bright" },
   vocal: { ooh: "warm", ahh: "warm", ay: "bright", oh: "warm", choir: "warm", vocoder: "bright" },
@@ -113,7 +113,7 @@ function pickWeighted(pool) {
 // phrase is layered on top (Meyer, "Emotion and Meaning in Music", 1956) so
 // the result has both local coherence (each note relates sensibly to the
 // last) and a global shape (the phrase reads as one arc, not a random walk).
-function pickNextDegree(prevOffset, lastLeapDirection, candidates, arcTarget) {
+function pickNextDegree(prevOffset, lastLeapDirection, candidates, arcTarget, repeatStreak) {
   let best = candidates[0].value;
   let bestScore = -Infinity;
   for (const { value: c, weight } of candidates) {
@@ -127,6 +127,13 @@ function pickNextDegree(prevOffset, lastLeapDirection, candidates, arcTarget) {
     // the time instead of steps mechanically sweeping every choice.
     let score = -dist * 0.55;
     if (dist === 0) score -= 0.4; // some motion is more interesting than none
+    // Repeated notes are a legitimate hook device (a trap 808 line
+    // hammering its root is authentic), but past a few repeats a line
+    // reads as a drone rather than a phrase - so the penalty *scales*
+    // with the running streak instead of being flat, letting short
+    // repetitions through while making long drones progressively lose
+    // to any candidate that moves.
+    if (dist === 0 && repeatStreak >= 2) score -= (repeatStreak - 1) * 1.1;
     if (lastLeapDirection !== 0 && dist > 0) {
       // post-skip reversal: after a leap, favor snapping back the other way
       const dir = delta > 0 ? 1 : -1;
@@ -143,13 +150,44 @@ function pickNextDegree(prevOffset, lastLeapDirection, candidates, arcTarget) {
   return best;
 }
 
-function generateMotif(lengthSteps, params) {
+// Rhythm "feels" give each generation a genuinely different rhythmic
+// personality on top of the pitch logic, instead of every melody rendering
+// its durations from the same weighted pool in the same way forever:
+// - "authored": the genre's own tuned duration pool (most common).
+// - "tresillo": durations locked to the 3-3-2 cycle - the single most
+//   widespread rhythmic cell in popular music (the Cuban tresillo,
+//   backbone of reggaeton's dembow, trap hi-hat phrasing, and countless
+//   pop toplines).
+// - "offbeat": the phrase starts with a short rest so the line enters
+//   after the downbeat - a standard groove-displacement device.
+// - "halftime": durations doubled, a sparser line at half the density.
+const TRESILLO = [3, 3, 2];
+
+function generateMotif(lengthSteps, params, feel = "authored") {
   const events = [];
   let pos = 0;
   let prevOffset = 0;
   let lastLeapDirection = 0;
+  let repeatStreak = 0;
+  let tresilloIdx = 0;
+
+  if (feel === "offbeat") {
+    const off = Math.random() < 0.5 ? 1 : 2;
+    events.push({ offset: 0, duration: off, degreeOffset: null });
+    pos = off;
+  }
+
   while (pos < lengthSteps) {
-    const dur = Math.min(pickWeighted(params.noteLengths), lengthSteps - pos);
+    let dur;
+    if (feel === "tresillo") {
+      dur = TRESILLO[tresilloIdx % TRESILLO.length];
+      tresilloIdx++;
+    } else {
+      dur = pickWeighted(params.noteLengths);
+      if (feel === "halftime") dur = Math.min(dur * 2, 8);
+    }
+    dur = Math.min(dur, lengthSteps - pos);
+
     if (Math.random() < params.restProbability) {
       events.push({ offset: pos, duration: dur, degreeOffset: null });
     } else {
@@ -165,8 +203,9 @@ function generateMotif(lengthSteps, params) {
       if (!candidates.some((c) => c.value === 0)) candidates.push({ value: 0, weight: 0.5 });
 
       const arcTarget = Math.sin((pos / lengthSteps) * Math.PI) * 3;
-      const next = pickNextDegree(prevOffset, lastLeapDirection, candidates, arcTarget);
+      const next = pickNextDegree(prevOffset, lastLeapDirection, candidates, arcTarget, repeatStreak);
       const delta = next - prevOffset;
+      repeatStreak = delta === 0 ? repeatStreak + 1 : 0;
       lastLeapDirection = Math.abs(delta) >= 2 ? Math.sign(delta) : 0;
       prevOffset = next;
       events.push({ offset: pos, duration: dur, degreeOffset: next });
@@ -211,7 +250,11 @@ function generateMonoMelody(register, structure, barRootDegrees, params, totalSt
 
   const arr = new Array(totalSteps).fill(null);
   const motifLen = params.motifBars * STEPS_PER_BAR;
-  const motif = generateMotif(motifLen, params);
+  // Each generation rolls a rhythmic personality for this instrument's
+  // line (see the feel definitions above generateMotif) so two beats in
+  // the same genre can differ in rhythmic phrasing, not just in pitches.
+  const rhythmFeel = pickWeighted([["authored", 4], ["tresillo", 1.3], ["offbeat", 1.3], ["halftime", 0.9]]);
+  const motif = generateMotif(motifLen, params, rhythmFeel);
   const totalChunks = Math.ceil(totalSteps / motifLen);
   let chunkStart = 0;
   let chunkIndex = 0;
@@ -690,7 +733,10 @@ const STYLES = {
     scale: "dorian",
     progressions: [[0, 3, 4, 0], [0, 2, 3, 0], [0, 4, 3, 0], [0, 3]],
     ambience: "vinyl",
-    defaultFlavors: { kick: "lofi", snare: "fat", hihat: "vinyl", perc: "shaker", bass: "warm", piano: "electric", pad: "airy", lead: "flute", strings: "soul", stab: "pluck-chord", marimba: "marimba", horn: "clarinet" },
+    // Mellotron strings for the default kit - a tape-warbled, band-limited
+    // string machine is about as on-brand as lo-fi texture gets, far more
+    // so than a clean "soul" string patch.
+    defaultFlavors: { kick: "lofi", snare: "fat", hihat: "vinyl", perc: "shaker", bass: "warm", piano: "electric", pad: "airy", lead: "flute", strings: "mellotron", stab: "pluck-chord", marimba: "marimba", horn: "clarinet" },
     drums: {
       instruments: ["kick", "snare", "hihat", "perc"],
       main: {
@@ -1412,7 +1458,7 @@ function rollNoteTrack(core, optional, probability) {
 // an optional split into two half-bar chords with real harmonic motion
 // between them instead of one static block of sound.
 function resolveChordBarTrack(instKey, cfg, barRootDegree, opts = {}) {
-  const { registerOffset = 0, voicingBonus = 0, splitMotion = null } = opts;
+  const { registerOffset = 0, voicingBonus = 0, splitMotion = null, anticipate = false } = opts;
   const raw = rollNoteTrack(cfg.core, cfg.optional, cfg.optionalProbability);
   const register = REGISTER[instKey] + registerOffset;
   const resolved = raw.map((spec) => {
@@ -1434,6 +1480,23 @@ function resolveChordBarTrack(instKey, cfg, barRootDegree, opts = {}) {
       }
     }
   }
+
+  // The "push": all of this instrument's hits anticipate the beat by an
+  // 8th note (2 steps), the standard funk/R&B/gospel comping move where
+  // the chords land on the "and" just ahead of the beat instead of on it.
+  // Rotation wraps the bar, which in looped playback reads exactly like
+  // anticipating the next bar's downbeat. Skipped whenever the pattern
+  // holds any long sustain (a pushed whole-bar pad makes no sense).
+  if (anticipate) {
+    const lens = resolved.filter(Boolean).map((n) => n.len);
+    if (lens.length && Math.max(...lens) <= 8) {
+      const pushed = new Array(resolved.length).fill(null);
+      for (let i = 0; i < resolved.length; i++) {
+        if (resolved[i]) pushed[(i - 2 + resolved.length) % resolved.length] = resolved[i];
+      }
+      return pushed;
+    }
+  }
   return resolved;
 }
 
@@ -1444,15 +1507,21 @@ function pickChordVariety(style) {
       registerOffset: pickWeighted([[-7, 1], [0, 3], [7, 1]]),
       voicingBonus: pickWeighted([[0, 3], [1, 2], [2, 1]]),
       splitMotion: Math.random() < 0.45 ? pickWeighted([[4, 1], [-3, 1], [3, 1], [-4, 1]]) : null,
+      anticipate: Math.random() < 0.22,
     };
   }
   return variety;
 }
 
 function buildStructure(bars) {
+  // The thinned-out intro bar used to appear on literally every 4-bar-plus
+  // generation, which made bar 1 feel identical across generations even
+  // when everything else changed - now it's a coin-flip production choice,
+  // like a real producer sometimes opening cold on the full groove.
+  const useIntro = bars >= 4 && Math.random() < 0.6;
   const seq = [];
   for (let i = 0; i < bars; i++) {
-    if (i === 0 && bars >= 4) seq.push("intro");
+    if (i === 0 && useIntro) seq.push("intro");
     else if ((i + 1) % 4 === 0) seq.push("fill");
     else seq.push("main");
   }
@@ -1484,19 +1553,42 @@ function buildDrumBar(style, variant) {
   }
 
   if (variant === "fill") {
-    if (bar.tom) {
-      bar.tom[12] = true;
-      bar.tom[13] = Math.random() < 0.5;
-      bar.tom[14] = true;
-    } else if (bar.snare) {
-      bar.snare[12] = true;
-      bar.snare[14] = true;
+    const type = style.fillType || "tomRun";
+    if (type === "cut") {
+      // Dropout fill: everything cuts for the last beat so the next
+      // downbeat lands harder - the modern trap/EDM "pull the floor out"
+      // move, and the exact opposite gesture from adding hits.
+      for (const inst of Object.keys(bar)) {
+        for (let s = 12; s < STEPS_PER_BAR; s++) bar[inst][s] = false;
+      }
+    } else if (type === "snareRush") {
+      if (bar.snare) {
+        bar.snare[12] = true;
+        bar.snare[13] = true;
+        bar.snare[14] = true;
+        bar.snare[15] = true;
+      }
+      if (bar.hihat) bar.hihat[15] = "roll";
+    } else if (type === "hatLift") {
+      if (bar.hihat) {
+        for (let s = 12; s < STEPS_PER_BAR; s++) bar.hihat[s] = "roll";
+      }
+      if (bar.openhat) bar.openhat[15] = true;
+    } else {
+      if (bar.tom) {
+        bar.tom[12] = true;
+        bar.tom[13] = Math.random() < 0.5;
+        bar.tom[14] = true;
+      } else if (bar.snare) {
+        bar.snare[12] = true;
+        bar.snare[14] = true;
+      }
+      if (bar.hihat) {
+        bar.hihat[14] = "roll";
+        bar.hihat[15] = "roll";
+      }
+      if (bar.openhat) bar.openhat[15] = true;
     }
-    if (bar.hihat) {
-      bar.hihat[14] = "roll";
-      bar.hihat[15] = "roll";
-    }
-    if (bar.openhat) bar.openhat[15] = true;
   }
 
   return bar;
@@ -1537,8 +1629,137 @@ function pickDrumMain(style) {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+// ---- Groove mutation ----
+// Even with two authored groove variants per genre, measurement showed 15%
+// of generation pairs shared a byte-identical kick+snare skeleton and the
+// rest differed by only ~3 steps out of 32 - the rhythmic backbone barely
+// moved between generations, which is exactly what "different sounds but
+// the same order" describes. Instead of hand-authoring dozens more
+// variants, each generation now algorithmically mutates the picked groove
+// while protecting what makes the genre that genre:
+//
+// - Kick displacement never touches quarter-note positions (steps 0/4/8/12),
+//   so House's four-on-the-floor and every genre's downbeat stay intact;
+//   only syncopated kicks roam, and only by one step.
+// - The snare backbeat is never moved at all - it's the single strongest
+//   genre anchor in the whole kit.
+// - Percussion patterns re-roll through a Euclidean rhythm generator
+//   (Bjorklund's algorithm - Toussaint, "The Euclidean Algorithm Generates
+//   Traditional Musical Rhythms", 2005, showed evenly-distributed onset
+//   patterns underlie a huge share of the world's traditional rhythms,
+//   which is why a rotated Euclidean pattern sounds like a groove and not
+//   like noise), at a density near the authored one.
+// - Dense 16th-note hat lines get occasional "hiccup" gaps dropped in, a
+//   standard trap/house hat trick that changes the perceived groove a lot
+//   for a tiny edit.
+function euclideanPattern(hits, steps) {
+  const out = [];
+  let bucket = 0;
+  for (let i = 0; i < steps; i++) {
+    bucket += hits;
+    if (bucket >= steps) {
+      bucket -= steps;
+      out.push(1);
+    } else out.push(0);
+  }
+  return out;
+}
+
+function rotatePattern(arr, offset) {
+  const n = arr.length;
+  return arr.map((_, i) => arr[(i - offset + n) % n]);
+}
+
+function cloneGroove(m) {
+  const g = {
+    core: {}, optional: {},
+    optionalProbability: m.optionalProbability,
+    hihatRollProbability: m.hihatRollProbability,
+  };
+  if (m.hihatRollSteps) g.hihatRollSteps = [...m.hihatRollSteps];
+  for (const k of Object.keys(m.core)) g.core[k] = [...m.core[k]];
+  for (const k of Object.keys(m.optional || {})) g.optional[k] = [...m.optional[k]];
+  return g;
+}
+
+function mutateGroove(m) {
+  const g = cloneGroove(m);
+
+  if (g.core.kick) {
+    const kick = g.core.kick;
+    // 1-2 kick edits per generation from {displace, add, remove}, all
+    // restricted to syncopated (off-quarter) positions and guarded so the
+    // groove never collapses below its authored on-the-beat backbone.
+    const ops = 1 + (Math.random() < 0.4 ? 1 : 0);
+    for (let op = 0; op < ops; op++) {
+      const roll = Math.random();
+      const offQuarter = [];
+      const emptyOffQuarter = [];
+      for (let i = 1; i < STEPS_PER_BAR; i++) {
+        if (i % 4 === 0) continue;
+        if (kick[i]) offQuarter.push(i);
+        else emptyOffQuarter.push(i);
+      }
+      if (roll < 0.5 && offQuarter.length) {
+        const idx = offQuarter[Math.floor(Math.random() * offQuarter.length)];
+        const dir = Math.random() < 0.5 ? -1 : 1;
+        const target = idx + dir;
+        if (target > 0 && target < STEPS_PER_BAR && !kick[target]) {
+          kick[idx] = 0;
+          kick[target] = 1;
+        }
+      } else if (roll < 0.8 && emptyOffQuarter.length) {
+        kick[emptyOffQuarter[Math.floor(Math.random() * emptyOffQuarter.length)]] = 1;
+      } else if (offQuarter.length && kick.filter(Boolean).length > 2) {
+        kick[offQuarter[Math.floor(Math.random() * offQuarter.length)]] = 0;
+      }
+    }
+  }
+
+  if (g.core.hihat) {
+    const hat = g.core.hihat;
+    const density = hat.filter(Boolean).length;
+    if (density >= 12 && Math.random() < 0.45) {
+      const drops = 1 + (Math.random() < 0.4 ? 1 : 0);
+      for (let d = 0; d < drops; d++) {
+        const filled = [];
+        for (let i = 0; i < STEPS_PER_BAR; i++) if (hat[i] && i % 4 !== 0) filled.push(i);
+        if (filled.length) hat[filled[Math.floor(Math.random() * filled.length)]] = 0;
+      }
+    }
+  }
+
+  if (g.core.perc) {
+    const density = g.core.perc.filter(Boolean).length;
+    if (density >= 2 && density <= 8 && Math.random() < 0.5) {
+      const k = Math.max(2, Math.min(9, density + (Math.random() < 0.4 ? (Math.random() < 0.5 ? -1 : 1) : 0)));
+      g.core.perc = rotatePattern(euclideanPattern(k, STEPS_PER_BAR), Math.floor(Math.random() * 4));
+    }
+  }
+
+  if (g.optional.hihat && Math.random() < 0.5) {
+    g.optional.hihat = rotatePattern(g.optional.hihat, [2, 4, 6][Math.floor(Math.random() * 3)]);
+  }
+
+  return g;
+}
+
+// The fill bar was also identical in shape every generation (always the
+// same tom run into the downbeat). Four genuinely different fill idioms,
+// one picked per generation, all standard production moves:
+// a tom run, a snare rush build, a hat lift, and the modern "cut" where
+// everything drops out for the last beat so the downbeat lands harder.
+function pickFillType() {
+  return pickWeighted([["tomRun", 3], ["snareRush", 2], ["hatLift", 1.2], ["cut", 1]]);
+}
+
 function resolveGenerationStyle(style) {
-  return { ...style, drums: { ...style.drums, main: pickDrumMain(style) }, progression: pickProgression(style) };
+  return {
+    ...style,
+    drums: { ...style.drums, main: mutateGroove(pickDrumMain(style)) },
+    progression: pickProgression(style),
+    fillType: pickFillType(),
+  };
 }
 
 // User-typed chords ("Cm7 Fm7 Ab Bb7") replace the genre's own progression

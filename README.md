@@ -271,7 +271,7 @@ Crucially, **harmony is applied to structural notes rather than to every passing
 
 ## Every beat is composed, not just rolled
 
-The most important change in the whole project. Generating one random pattern and shipping it means the program never actually *tries* to make a good beat — it accepts whatever the dice produced. Real producers write several versions of an idea and keep the one that works, so that's what happens now: **each request composes nine complete candidate beats, judges each against real musical criteria, and returns the strongest.**
+The most important change in the whole project. Generating one random pattern and shipping it means the program never actually *tries* to make a good beat — it accepts whatever the dice produced. Real producers write several versions of an idea and keep the one that works, so that's what happens now: **each request composes twelve complete candidate beats, judges each against real musical criteria, and returns the strongest.**
 
 Nothing scored is a proxy for novelty; every criterion is a property music is actually judged on:
 
@@ -281,7 +281,21 @@ Nothing scored is a proxy for novelty; every criterion is a property music is ac
 - **Interlock, not collision** — voices sharing a step ~20% of the time reads as an ensemble; constant overlap is clutter, zero overlap is incoherent.
 - **Density sweet spot**, **singable range** (~an octave), **contour** (mostly steps, occasional leaps), **hook recurrence** (bar 3 restating bar 1), and **chords actually sounding** rather than rolling their way into silence.
 
-Measured across all 19 genres: **musical quality +22% over accepting a random first attempt**, with melody notes landing on chord tones on strong beats going from **88.7% → 97.6%** and bass downbeats hitting the chord root **86.7% → 97.6%**. Generation-to-generation uniqueness *improved* at the same time (identical drum patterns 1.9% → 0.2%), so beats got more intentional without getting more samey. The whole selection pass costs a few milliseconds — it's array math, not audio.
+**And then it reworks what it chose.** Picking the best of several candidates is only half of how music gets made; the other half is iteration. A producer keeps the take, then reworks the bassline, then the hook, auditioning each change *against everything already in place*. So after selection, each melodic part is re-composed several times and the version that makes the **whole arrangement** score best is kept, one instrument at a time, twice through. Because every trial is judged in context, the parts end up fitting each other rather than merely being individually acceptable — which is exactly the difference between a pile of decent parts and an arrangement.
+
+The scoring also judges the harmony itself, not just the melody over it: **chordal parts are checked against the progression** (a comping part on the wrong chord is far more damaging than a melody note doing it, because the chord *is* the harmony), **low-end mud** is penalised (more than one voice in the bass octave at once is the most common way an arrangement turns to soup), and **harmony density** is targeted near 30% (some chord-voiced notes give body; every note voiced as a chord is a wall).
+
+Measured across all 19 genres:
+
+| | Random first attempt | Composed + refined |
+|---|---|---|
+| Overall musical quality | — | **+21%** |
+| Melody on strong beats that are chord tones | 90.0% | **99.6%** |
+| Bass downbeats on the chord root | 82.3% | **99.9%** |
+| Low-end mud (2+ voices in the bass octave) | 3.2% | **2.2%** |
+| Identical beats between generations | — | **0.0%** |
+
+Beats got dramatically more intentional while generation-to-generation variety *improved*. The whole compose-and-refine pass costs **~11ms** in the browser — imperceptible, because it's array math, not audio.
 
 ## Ten techniques taken from how records are actually made
 

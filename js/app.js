@@ -44,16 +44,17 @@ const chordChips = document.getElementById("chord-chips");
 const TRACK_HEADER_WIDTH = 356;
 
 const DRUM_ORDER = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "fx"];
-const MELODIC_ORDER = ["bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "marimba", "arp", "autolead", "sax"];
-const MONO_INSTRUMENTS = ["bass", "lead", "guitar", "kalimba", "marimba", "arp", "autolead", "sax"];
+const MELODIC_ORDER = ["bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "marimba", "arp", "autolead", "sax", "woodwind", "leadguitar"];
+const MONO_INSTRUMENTS = ["bass", "lead", "guitar", "kalimba", "marimba", "arp", "autolead", "sax", "woodwind", "leadguitar"];
 
 const TRACK_LABELS = {
   kick: "Kick", snare: "Snare", hihat: "Hi-Hat", openhat: "Open Hat", tom: "Tom", perc: "Perc", crash: "Crash", fx: "FX Riser",
   bass: "Bass", piano: "Piano", lead: "Melody", pad: "Pad", stab: "Stab", guitar: "Guitar", strings: "Strings", horn: "Horn",
   organ: "Organ", vocal: "Vocal", kalimba: "Kalimba", marimba: "Marimba", arp: "Arp", autolead: "Auto Lead", sax: "Sax",
+  woodwind: "Woodwind", leadguitar: "Lead Guitar",
 };
 
-const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, strings: 4, horn: 1, organ: 4, vocal: 1, kalimba: 1, marimba: 1, arp: 1, autolead: 3, sax: 2 };
+const DEFAULT_LEN = { bass: 2, lead: 1, guitar: 2, piano: 2, pad: 8, stab: 1, strings: 4, horn: 1, organ: 4, vocal: 1, kalimba: 1, marimba: 1, arp: 1, autolead: 3, sax: 2, woodwind: 2, leadguitar: 2 };
 
 // Flavors are otherwise only ever set by a genre's defaults or by the
 // random shuffle - there was no way to deliberately reach for, say, "I
@@ -89,6 +90,16 @@ const FLAVOR_LABELS = {
   // Tuned percussion.
   hangdrum: "Handpan", balafon: "Balafon", kora: "Kora",
   xylophone: "Xylophone", tubularbell: "Tubular Bells",
+  // Woodwinds — the sax family's siblings.
+  flute: "Concert Flute", altoflute: "Alto Flute", bassclarinet: "Bass Clarinet",
+  englishhorn: "English Horn", bassoon: "Bassoon", sopranosax: "Soprano Sax",
+  shakuhachi: "Shakuhachi", bansuri: "Bansuri", duduk: "Duduk", recorder: "Recorder",
+  // Lead guitar tones.
+  overdrive: "Overdrive", fuzz: "Fuzz", wah: "Wah", sustain: "Feedback Sustain",
+  octave: "Octave Lead", cleantone: "Clean Lead", harmonics: "Pinch Harmonics",
+  // More classic synths.
+  hoover: "Hoover", ms20: "MS-20", d50: "D-50", prophet: "Prophet-5", obxa: "OB-Xa",
+  phasedist: "CZ Phase Dist", jupiter8: "Jupiter-8", polysix: "Polysix", ppgwave: "PPG Wave",
 };
 function flavorLabel(key) {
   if (FLAVOR_LABELS[key]) return FLAVOR_LABELS[key];
@@ -108,7 +119,7 @@ const TRACK_COLOR = {
   kick: "#ff6b6b", snare: "#feca57", hihat: "#48dbfb", openhat: "#0abde3", tom: "#ff9f43",
   perc: "#1dd1a1", crash: "#c8d6e5", fx: "#c8d6e5", bass: "#a55eea", piano: "#00d2d3", lead: "#ff9ff3", pad: "#54a0ff",
   stab: "#f368e0", guitar: "#ff6348", strings: "#7bed9f", horn: "#eccc68", organ: "#e58e26", vocal: "#ff7f9f", kalimba: "#fdcb6e",
-  marimba: "#55efc4", arp: "#74b9ff", autolead: "#ff5e78", sax: "#ffb142",
+  marimba: "#55efc4", arp: "#74b9ff", autolead: "#ff5e78", sax: "#ffb142", woodwind: "#a3cb38", leadguitar: "#e55039",
 };
 
 let selectedStyleId = null;
@@ -1110,7 +1121,7 @@ const REEL_LANE_LABEL = {
   kick: "KICK", snare: "SNR", hihat: "HAT", openhat: "OPEN", tom: "TOM", perc: "PERC",
   crash: "CRSH", fx: "FX", bass: "BASS", piano: "PIANO", lead: "LEAD", pad: "PAD",
   stab: "STAB", guitar: "GTR", strings: "STR", horn: "HORN", organ: "ORG", vocal: "VOX",
-  kalimba: "KLMB", marimba: "MRMB", arp: "ARP", autolead: "AUTO", sax: "SAX",
+  kalimba: "KLMB", marimba: "MRMB", arp: "ARP", autolead: "AUTO", sax: "SAX", woodwind: "WIND", leadguitar: "LEAD G",
 };
 
 // The reel used to run for a fixed 15/30/60s regardless of what the beat

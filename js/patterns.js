@@ -1,6 +1,6 @@
 const STEPS_PER_BAR = 16;
 
-const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14, arp: 18, autolead: 14, sax: 14 };
+const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14, arp: 18, autolead: 14, sax: 14, woodwind: 17, leadguitar: 14 };
 
 const FLAVOR_POOLS = {
   kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "909", "linn", "707", "606", "dmx", "sp1200", "lm1", "rz1", "hr16", "r8"],
@@ -10,8 +10,8 @@ const FLAVOR_POOLS = {
   tom: ["acoustic", "simmons", "roto", "taiko"],
   bass: ["warm", "synth", "808", "true808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog", "303", "slap", "sh101", "fretless", "m1organbass"],
   piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord", "dx7ep", "clav", "m1piano", "cp70", "honkytonk"],
-  lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm", "whistle", "theremin", "panflute", "harmonica", "ocarina"],
-  pad: ["warm", "ensemble", "airy", "glass", "choir", "dark", "juno", "solina", "cs80", "voxhumana"],
+  lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm", "whistle", "theremin", "panflute", "harmonica", "ocarina", "hoover", "ms20", "d50", "prophet", "obxa", "phasedist"],
+  pad: ["warm", "ensemble", "airy", "glass", "choir", "dark", "juno", "solina", "cs80", "voxhumana", "jupiter8", "polysix", "ppgwave"],
   stab: ["pluck-chord", "square-chord", "bell-chord", "brass-chord", "organ-chord", "string-chord", "orchhit"],
   guitar: ["clean", "power", "muted", "nylon", "acoustic", "jazz", "funk", "twelvestring", "sitar", "banjo", "mandolin", "ukulele", "slide"],
   strings: ["soul", "orchestral", "staccato", "synth", "pizzicato", "tremolo", "mellotron", "solina", "cello", "spiccato", "harp"],
@@ -30,6 +30,17 @@ const FLAVOR_POOLS = {
   // A real mono solo-line instrument - saxophone melodies are played one
   // note at a time, a different musical role from Horn's chord stabs.
   sax: ["smooth", "breathy", "alto", "bari"],
+  // The rest of the woodwind family - the sax's siblings. Every one of
+  // these is a single-line solo instrument, and the family splits on one
+  // acoustic fact (see playWoodwindVoice): a CONICAL bore (sax, oboe,
+  // bassoon) produces the complete harmonic series, while a CYLINDRICAL
+  // one (clarinet) produces essentially only the ODD harmonics - which
+  // is exactly why a clarinet sounds hollow next to an oboe.
+  woodwind: ["flute", "altoflute", "clarinet", "bassclarinet", "oboe", "englishhorn", "bassoon", "sopranosax", "shakuhachi", "bansuri", "duduk", "recorder"],
+  // A dedicated solo/lead guitar track, separate from the rhythm guitar.
+  // Six genres had no solo voice at all; rock in particular had a rhythm
+  // guitar and nothing to play over it.
+  leadguitar: ["overdrive", "fuzz", "wah", "sustain", "octave", "cleantone", "harmonics"],
   fx: ["riser", "siren", "impact"],
 };
 
@@ -108,6 +119,37 @@ const FLAVOR_GENRES = {
   kora: ["afrobeats", "amapiano", "lofi"],
   xylophone: ["afrobeats", "amapiano", "house", "lofi"],
   tubularbell: ["drill", "trap", "phonk", "dubstep", "rap"],
+
+  // --- synths, placed by the scene that actually made them famous
+  hoover: ["dnb", "dubstep", "techno", "jerseyclub", "phonk"],
+  ms20: ["techno", "dnb", "dubstep", "phonk", "drill"],
+  d50: ["synthwave", "house", "rnb", "ukgarage", "amapiano"],
+  prophet: ["synthwave", "house", "rock", "techno"],
+  obxa: ["synthwave", "rock", "house"],
+  phasedist: ["synthwave", "techno", "ukgarage", "dnb"],
+  jupiter8: ["synthwave", "house", "techno", "lofi", "rnb"],
+  polysix: ["synthwave", "lofi", "house", "neosoul"],
+  ppgwave: ["synthwave", "techno", "dnb", "dubstep"],
+  // --- woodwinds. Amapiano in particular is built on live sax and flute
+  // over the log drum, and dark flute lines are a UK drill signature.
+  flute: ["trap", "drill", "rap", "lofi", "afrobeats", "amapiano", "rnb", "neosoul", "hiphop"],
+  altoflute: ["lofi", "neosoul", "rnb", "amapiano"],
+  bassclarinet: ["drill", "neosoul", "lofi", "dnb"],
+  englishhorn: ["neosoul", "lofi", "rnb"],
+  bassoon: ["drill", "dubstep", "neosoul", "rock"],
+  sopranosax: ["amapiano", "neosoul", "rnb", "house", "afrobeats"],
+  shakuhachi: ["lofi", "trap", "drill", "phonk"],
+  bansuri: ["lofi", "afrobeats", "amapiano", "hiphop"],
+  duduk: ["drill", "lofi", "trap", "phonk", "neosoul"],
+  recorder: ["lofi", "afrobeats"],
+  // --- lead guitar
+  overdrive: ["rock", "phonk", "synthwave", "dnb", "neosoul"],
+  fuzz: ["rock", "phonk", "dubstep"],
+  wah: ["neosoul", "rnb", "rock", "afrobeats", "amapiano"],
+  sustain: ["rock", "synthwave", "dubstep", "phonk"],
+  octave: ["neosoul", "rnb", "lofi", "amapiano"],
+  cleantone: ["neosoul", "rnb", "lofi", "amapiano", "afrobeats"],
+  harmonics: ["rock", "phonk", "dubstep"],
 };
 
 // A flavor is available to a genre if it is universal, or if that genre is
@@ -140,8 +182,8 @@ const FLAVOR_TAGS = {
   tom: { acoustic: "warm", simmons: "bright" , roto: "bright", taiko: "dark"},
   bass: { warm: "warm", synth: "bright", "808": "dark", true808: "dark", hard808: "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm", moog: "warm", "303": "bright", slap: "bright" , sh101: "bright", fretless: "warm", m1organbass: "bright"},
   piano: { electric: "bright", pluck: "bright", grand: "warm", rhodes: "warm", wurlitzer: "warm", upright: "warm", celesta: "bright", toy: "bright", harpsichord: "bright", dx7ep: "bright", clav: "bright" , m1piano: "bright", cp70: "bright", honkytonk: "warm"},
-  lead: { square: "bright", saw: "bright", bell: "bright", flute: "warm", supersaw: "bright", pluck: "bright", sine: "warm", chip: "bright", brasslead: "warm", fm: "bright", whistle: "bright" , theremin: "warm", panflute: "warm", harmonica: "bright", ocarina: "warm"},
-  pad: { warm: "warm", ensemble: "warm", airy: "bright", glass: "bright", choir: "warm", dark: "dark", juno: "warm" , solina: "warm", cs80: "warm", voxhumana: "warm"},
+  lead: { square: "bright", saw: "bright", bell: "bright", flute: "warm", supersaw: "bright", pluck: "bright", sine: "warm", chip: "bright", brasslead: "warm", fm: "bright", whistle: "bright" , theremin: "warm", panflute: "warm", harmonica: "bright", ocarina: "warm", hoover: "dark", ms20: "bright", d50: "bright", prophet: "bright", obxa: "warm", phasedist: "bright"},
+  pad: { warm: "warm", ensemble: "warm", airy: "bright", glass: "bright", choir: "warm", dark: "dark", juno: "warm" , solina: "warm", cs80: "warm", voxhumana: "warm", jupiter8: "warm", polysix: "warm", ppgwave: "bright"},
   stab: { "pluck-chord": "bright", "square-chord": "bright", "bell-chord": "bright", "brass-chord": "warm", "organ-chord": "warm", "string-chord": "warm", orchhit: "dark" },
   guitar: { clean: "bright", power: "dark", muted: "dark", nylon: "warm", acoustic: "warm", jazz: "warm", funk: "bright", twelvestring: "bright" , sitar: "bright", banjo: "bright", mandolin: "bright", ukulele: "warm", slide: "warm"},
   strings: { soul: "warm", orchestral: "warm", staccato: "bright", synth: "bright", pizzicato: "bright", tremolo: "dark", mellotron: "warm" , solina: "warm", cello: "dark", spiccato: "bright", harp: "warm"},
@@ -153,6 +195,8 @@ const FLAVOR_TAGS = {
   arp: { arp: "bright", pulse: "warm" },
   autolead: { hard: "bright", moody: "dark" },
   sax: { smooth: "warm", breathy: "dark" , alto: "bright", bari: "dark"},
+  woodwind: { flute: "bright", altoflute: "warm", clarinet: "warm", bassclarinet: "dark", oboe: "bright", englishhorn: "warm", bassoon: "dark", sopranosax: "bright", shakuhachi: "warm", bansuri: "warm", duduk: "dark", recorder: "bright" },
+  leadguitar: { overdrive: "warm", fuzz: "dark", wah: "bright", sustain: "warm", octave: "bright", cleantone: "bright", harmonics: "bright" },
   fx: { riser: "bright", siren: "dark", impact: "dark" },
 };
 
@@ -689,7 +733,7 @@ const STYLES = {
     progressions: [[0,5],[0,3],[0,4],[0,5,3,4],[0,6,5,6],[0,5,2,6]],
     // "true808" - the sliding, warm-saturated modern-rap 808 (see
     // playBass) - is the bass sound today's trap actually runs on.
-    defaultFlavors: { kick: "808", snare: "clap", hihat: "bright", bass: "true808", lead: "bell", stab: "bell-chord", vocal: "ooh", fx: "riser" },
+    defaultFlavors: { kick: "808", snare: "clap", hihat: "bright", bass: "true808", lead: "bell", stab: "bell-chord", vocal: "ooh", fx: "riser" , woodwind: "flute"},
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash", "fx"],
       main: {
@@ -725,8 +769,9 @@ const STYLES = {
         hihatRollProbability: 0.45,
       }],
     },
-    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["stab", "vocal"] },
+    melodic: { monoInstruments: ["bass", "lead", "woodwind"], chordInstruments: ["stab", "vocal"] },
     melody: {
+      woodwind: { motifBars: 2, noteLengths: [[4,3],[6,3],[8,2],[3,1]], restProbability: 0.52, chordToneProbability: 0.78, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1],[5,1]], variationProbability: 0.35 },
       bass: { motifBars: 1, noteLengths: [[3,2],[4,3],[2,1]], restProbability: 0.3, chordToneProbability: 0.9, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1],[3,1]], variationProbability: 0.3 },
       lead: { motifBars: 1, noteLengths: [[2,3],[3,2],[4,1]], restProbability: 0.55, chordToneProbability: 0.6, chordTonePool: [[0,2],[2,2],[4,2]], passingTonePool: [[-1,1],[1,1],[6,1]], variationProbability: 0.4 , harmony: { shape: "fifth", probability: 0.3, minLen: 2 } },
     },
@@ -826,7 +871,7 @@ const STYLES = {
     key: "E2",
     scale: "major",
     progressions: [[0,4,5,3],[0,3,4,0],[5,3,0,4],[0,5,3,4],[0,3,4,3],[0,4,3,4],[0,5,2,3]],
-    defaultFlavors: { kick: "acoustic", snare: "acoustic", hihat: "bright", bass: "pluck", guitar: "power", perc: "timpani", tom: "acoustic" },
+    defaultFlavors: { kick: "acoustic", snare: "acoustic", hihat: "bright", bass: "pluck", guitar: "power", perc: "timpani", tom: "acoustic" , leadguitar: "overdrive"},
     drums: {
       // "perc" is a sparse orchestral timpani hit, not a percussion groove -
       // the same big low arena-rock boom bands like Queen/Muse reach for
@@ -868,8 +913,9 @@ const STYLES = {
         optionalProbability: 0.3,
       }],
     },
-    melodic: { monoInstruments: ["bass", "guitar"], chordInstruments: [] },
+    melodic: { monoInstruments: ["bass", "guitar", "leadguitar"], chordInstruments: [] },
     melody: {
+      leadguitar: { motifBars: 2, noteLengths: [[2,3],[3,3],[4,2],[6,1]], restProbability: 0.42, chordToneProbability: 0.7, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1],[6,1]], variationProbability: 0.4 },
       bass: { motifBars: 2, noteLengths: [[2,4],[4,2]], restProbability: 0.2, chordToneProbability: 0.9, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.3 },
       guitar: { motifBars: 2, noteLengths: [[2,4],[4,2],[1,2]], restProbability: 0.25, chordToneProbability: 0.75, chordTonePool: [[0,4],[4,3],[7,2]], passingTonePool: [[1,1],[3,1],[-1,1],[6,1]], variationProbability: 0.4 , harmony: { shape: "triad", probability: 0.85, minLen: 1 } },
     },
@@ -959,7 +1005,7 @@ const STYLES = {
     // Mellotron strings for the default kit - a tape-warbled, band-limited
     // string machine is about as on-brand as lo-fi texture gets, far more
     // so than a clean "soul" string patch.
-    defaultFlavors: { kick: "lofi", snare: "fat", hihat: "vinyl", perc: "shaker", bass: "warm", piano: "electric", pad: "airy", lead: "flute", strings: "mellotron", stab: "pluck-chord", marimba: "marimba", horn: "clarinet" },
+    defaultFlavors: { kick: "lofi", snare: "fat", hihat: "vinyl", perc: "shaker", bass: "warm", piano: "electric", pad: "airy", lead: "flute", strings: "mellotron", stab: "pluck-chord", marimba: "marimba", horn: "clarinet" , woodwind: "flute"},
     drums: {
       instruments: ["kick", "snare", "hihat", "perc"],
       main: {
@@ -993,8 +1039,9 @@ const STYLES = {
         optionalProbability: 0.28,
       }],
     },
-    melodic: { monoInstruments: ["bass", "lead", "marimba"], chordInstruments: ["piano", "pad", "strings", "stab", "horn"] },
+    melodic: { monoInstruments: ["bass", "lead", "marimba", "woodwind"], chordInstruments: ["piano", "pad", "strings", "stab", "horn"] },
     melody: {
+      woodwind: { motifBars: 2, noteLengths: [[4,3],[6,3],[8,2],[3,1]], restProbability: 0.52, chordToneProbability: 0.78, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1],[5,1]], variationProbability: 0.35 },
       bass: { motifBars: 2, noteLengths: [[4,3],[6,2],[8,1]], restProbability: 0.35, chordToneProbability: 0.8, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.35 },
       lead: { motifBars: 2, noteLengths: [[4,2],[6,2],[8,2],[3,1]], restProbability: 0.5, chordToneProbability: 0.7, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-2,1]], variationProbability: 0.45 , harmony: { shape: "third", probability: 0.35, minLen: 3 } },
       marimba: { motifBars: 2, noteLengths: [[4,2],[6,2],[8,1]], restProbability: 0.62, chordToneProbability: 0.75, chordTonePool: [[0,3],[4,2],[7,1]], passingTonePool: [[2,1],[-2,1]], variationProbability: 0.3 , harmony: { shape: "third", probability: 0.4, minLen: 2 } },
@@ -1040,7 +1087,7 @@ const STYLES = {
     key: "C2",
     scale: "phrygian",
     progressions: [[0,3],[0,1,0],[0,1,3,0],[0,3,1,0],[0,6,5,4],[0,1,5,4]],
-    defaultFlavors: { kick: "808", snare: "trapsnap", hihat: "dark", bass: "drillslide", piano: "electric", stab: "pluck-chord" },
+    defaultFlavors: { kick: "808", snare: "trapsnap", hihat: "dark", bass: "drillslide", piano: "electric", stab: "pluck-chord" , woodwind: "duduk"},
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash"],
       main: {
@@ -1074,8 +1121,9 @@ const STYLES = {
         hihatRollProbability: 0.4,
       }],
     },
-    melodic: { monoInstruments: ["bass"], chordInstruments: ["piano", "stab"] },
+    melodic: { monoInstruments: ["bass", "woodwind"], chordInstruments: ["piano", "stab"] },
     melody: {
+      woodwind: { motifBars: 2, noteLengths: [[4,3],[6,3],[8,2],[3,1]], restProbability: 0.52, chordToneProbability: 0.78, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1],[5,1]], variationProbability: 0.35 },
       bass: { motifBars: 1, noteLengths: [[3,2],[4,3],[6,1]], restProbability: 0.35, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2]], passingTonePool: [[-2,1],[3,1]], variationProbability: 0.3 },
     },
     chords: {
@@ -1101,7 +1149,7 @@ const STYLES = {
     key: "C2",
     scale: "major",
     progressions: [[0,3,4,0],[0,4,5,3],[0,5,3,4],[0,1,3,4],[0,4,5,4],[3,4,0,0]],
-    defaultFlavors: { kick: "acoustic", snare: "clap", hihat: "bright", perc: "shaker", bass: "logdrum", guitar: "nylon", pad: "warm", stab: "pluck-chord", organ: "drawbar", marimba: "marimba", horn: "brass" },
+    defaultFlavors: { kick: "acoustic", snare: "clap", hihat: "bright", perc: "shaker", bass: "logdrum", guitar: "nylon", pad: "warm", stab: "pluck-chord", organ: "drawbar", marimba: "marimba", horn: "brass" , woodwind: "bansuri"},
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc"],
       main: {
@@ -1135,8 +1183,9 @@ const STYLES = {
         optionalProbability: 0.3,
       }],
     },
-    melodic: { monoInstruments: ["bass", "guitar", "marimba"], chordInstruments: ["pad", "organ", "stab", "horn"] },
+    melodic: { monoInstruments: ["bass", "guitar", "marimba", "woodwind"], chordInstruments: ["pad", "organ", "stab", "horn"] },
     melody: {
+      woodwind: { motifBars: 2, noteLengths: [[4,3],[6,3],[8,2],[3,1]], restProbability: 0.52, chordToneProbability: 0.78, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1],[5,1]], variationProbability: 0.35 },
       bass: { motifBars: 1, noteLengths: [[4,3],[3,2],[6,1]], restProbability: 0.25, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.25 },
       guitar: { motifBars: 2, noteLengths: [[2,4],[1,3],[4,1]], restProbability: 0.3, chordToneProbability: 0.7, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[6,1]], variationProbability: 0.4 , harmony: { shape: "third", probability: 0.3, minLen: 2 } },
       marimba: { motifBars: 1, noteLengths: [[1,3],[2,3],[3,1]], restProbability: 0.4, chordToneProbability: 0.8, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.3 , harmony: { shape: "third", probability: 0.3, minLen: 2 } },
@@ -1177,7 +1226,7 @@ const STYLES = {
     key: "E1",
     scale: "minor",
     progressions: [[0,4],[0,3],[0,5],[0,6,3,4],[0,6,5,6],[0,5,6,0]],
-    defaultFlavors: { kick: "gritty", snare: "fat", hihat: "metallic", bass: "wobble", stab: "square-chord", vocal: "ahh", fx: "impact" },
+    defaultFlavors: { kick: "gritty", snare: "fat", hihat: "metallic", bass: "wobble", stab: "square-chord", vocal: "ahh", fx: "impact" , lead: "hoover"},
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash", "fx"],
       main: {
@@ -1209,8 +1258,9 @@ const STYLES = {
         optionalProbability: 0.3,
       }],
     },
-    melodic: { monoInstruments: ["bass"], chordInstruments: ["stab", "vocal"] },
+    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["stab", "vocal"] },
     melody: {
+      lead: { motifBars: 2, noteLengths: [[2,3],[4,3],[1,2]], restProbability: 0.45, chordToneProbability: 0.8, chordTonePool: [[0,3],[4,2],[2,2],[7,1]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.4 },
       bass: { motifBars: 1, noteLengths: [[4,3],[8,2],[16,1]], restProbability: 0.3, chordToneProbability: 0.9, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1]], variationProbability: 0.2 },
     },
     chords: {
@@ -1321,7 +1371,7 @@ const STYLES = {
     key: "C2",
     scale: "minor",
     progressions: [[0,4],[0,3],[0,5],[0,6,3,4],[0,6,5,4],[0,5,6,4]],
-    defaultFlavors: { kick: "gritty", snare: "trapsnap", hihat: "metallic", perc: "cowbell", bass: "distorted", lead: "bell", vocal: "ahh", stab: "bell-chord" },
+    defaultFlavors: { kick: "gritty", snare: "trapsnap", hihat: "metallic", perc: "cowbell", bass: "distorted", lead: "bell", vocal: "ahh", stab: "bell-chord" , leadguitar: "fuzz"},
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc", "crash"],
       main: {
@@ -1359,8 +1409,9 @@ const STYLES = {
         hihatRollProbability: 0.4,
       }],
     },
-    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["vocal", "stab"] },
+    melodic: { monoInstruments: ["bass", "lead", "leadguitar"], chordInstruments: ["vocal", "stab"] },
     melody: {
+      leadguitar: { motifBars: 2, noteLengths: [[2,3],[3,3],[4,2],[6,1]], restProbability: 0.42, chordToneProbability: 0.7, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1],[6,1]], variationProbability: 0.4 },
       bass: { motifBars: 1, noteLengths: [[3,2],[4,3],[2,1]], restProbability: 0.3, chordToneProbability: 0.9, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1],[3,1]], variationProbability: 0.25 },
       lead: { motifBars: 1, noteLengths: [[2,3],[3,2],[6,1]], restProbability: 0.5, chordToneProbability: 0.6, chordTonePool: [[0,2],[2,2],[4,2]], passingTonePool: [[-1,1],[1,1],[6,1]], variationProbability: 0.4 , harmony: { shape: "fifth", probability: 0.35, minLen: 2 } },
     },
@@ -1387,7 +1438,7 @@ const STYLES = {
     key: "C2",
     scale: "minor",
     progressions: [[0,3],[0,5],[0,4],[0,5,3,4],[0,5,2,6],[0,6,5,6]],
-    defaultFlavors: { kick: "snappy", snare: "clap", hihat: "bright", bass: "sub", vocal: "ooh", stab: "square-chord" },
+    defaultFlavors: { kick: "snappy", snare: "clap", hihat: "bright", bass: "sub", vocal: "ooh", stab: "square-chord" , lead: "hoover"},
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat"],
       main: {
@@ -1419,8 +1470,9 @@ const STYLES = {
         optionalProbability: 0.3,
       }],
     },
-    melodic: { monoInstruments: ["bass"], chordInstruments: ["vocal", "stab"] },
+    melodic: { monoInstruments: ["bass", "lead"], chordInstruments: ["vocal", "stab"] },
     melody: {
+      lead: { motifBars: 2, noteLengths: [[2,3],[4,3],[1,2]], restProbability: 0.45, chordToneProbability: 0.8, chordTonePool: [[0,3],[4,2],[2,2],[7,1]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.4 },
       bass: { motifBars: 1, noteLengths: [[4,3],[8,2]], restProbability: 0.3, chordToneProbability: 0.9, chordTonePool: [[0,6],[4,1]], passingTonePool: [[-2,1]], variationProbability: 0.2 },
     },
     chords: {
@@ -1661,7 +1713,7 @@ const STYLES = {
     key: "C2",
     scale: "minor",
     progressions: [[0,3,4,0],[0,5,3,4],[0,3],[0,4,3,0],[0,5,2,6],[3,6,0,0]],
-    defaultFlavors: { kick: "deep", snare: "rimshot", hihat: "dark", perc: "shaker", bass: "logdrum", piano: "rhodes", pad: "warm", vocal: "ooh", stab: "organ-chord" },
+    defaultFlavors: { kick: "deep", snare: "rimshot", hihat: "dark", perc: "shaker", bass: "logdrum", piano: "rhodes", pad: "warm", vocal: "ooh", stab: "organ-chord" , woodwind: "sopranosax"},
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "perc"],
       main: {
@@ -1695,8 +1747,9 @@ const STYLES = {
         optionalProbability: 0.3,
       }],
     },
-    melodic: { monoInstruments: ["bass"], chordInstruments: ["piano", "pad", "vocal", "stab"] },
+    melodic: { monoInstruments: ["bass", "woodwind"], chordInstruments: ["piano", "pad", "vocal", "stab"] },
     melody: {
+      woodwind: { motifBars: 2, noteLengths: [[4,3],[6,3],[8,2],[3,1]], restProbability: 0.52, chordToneProbability: 0.78, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1],[5,1]], variationProbability: 0.35 },
       // The log drum IS the lead voice in amapiano - more active and
       // syncopated than a typical bassline, it fills the space the sparse
       // kick leaves open.
@@ -1882,7 +1935,7 @@ const STYLES = {
     // Cross-stick, not a full snare: neo-soul's backbeat is almost always
     // the stick laid across the head tapping the rim - the dry woody
     // "tock" that leaves room for the Rhodes and keeps the pocket soft.
-    defaultFlavors: { kick: "lofi", snare: "rimclick", hihat: "analog", perc: "shaker", bass: "pluck", piano: "rhodes", pad: "choir", guitar: "jazz", organ: "drawbar", vocal: "ooh" },
+    defaultFlavors: { kick: "lofi", snare: "rimclick", hihat: "analog", perc: "shaker", bass: "pluck", piano: "rhodes", pad: "choir", guitar: "jazz", organ: "drawbar", vocal: "ooh" , leadguitar: "cleantone"},
     drums: {
       instruments: ["kick", "snare", "hihat", "perc"],
       main: {
@@ -1913,8 +1966,9 @@ const STYLES = {
         optionalProbability: 0.3,
       }],
     },
-    melodic: { monoInstruments: ["bass", "guitar"], chordInstruments: ["piano", "pad", "organ", "vocal"] },
+    melodic: { monoInstruments: ["bass", "guitar", "leadguitar"], chordInstruments: ["piano", "pad", "organ", "vocal"] },
     melody: {
+      leadguitar: { motifBars: 2, noteLengths: [[2,3],[3,3],[4,2],[6,1]], restProbability: 0.42, chordToneProbability: 0.7, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1],[6,1]], variationProbability: 0.4 },
       bass: { motifBars: 2, noteLengths: [[3,2],[4,3],[6,2]], restProbability: 0.35, chordToneProbability: 0.85, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.3 },
       guitar: { motifBars: 2, noteLengths: [[2,3],[3,2],[4,2]], restProbability: 0.45, chordToneProbability: 0.7, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.4 , harmony: { shape: "seventh", probability: 0.55, minLen: 2 } },
     },

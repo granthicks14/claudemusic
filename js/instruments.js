@@ -75,6 +75,15 @@ const INSTRUMENT_PROFILE = {
   // Tenor sax concert range is roughly Ab2 to E5, and it is a wind
   // instrument: exactly one note at a time, always.
   sax:      { range: [44, 79],  sweet: [48, 74], voices: 1, voicing: "mono",    sustain: true,  role: "melody" },
+  // The rest of the woodwind family, as one track. The pool spans a
+  // concert flute at the top (C4 up) down to a bassoon and a bass
+  // clarinet, so the track's range is the union; each individual flavor
+  // then sets its own character. Like the sax, all of them are wind
+  // instruments - strictly one note at a time.
+  woodwind: { range: [46, 91],  sweet: [55, 84], voices: 1, voicing: "mono",    sustain: true,  role: "melody" },
+  // Lead guitar sits an octave up from where rhythm guitar is voiced -
+  // solos live on the top strings and up the neck, not in open position.
+  leadguitar: { range: [52, 88], sweet: [59, 84], voices: 1, voicing: "mono",  sustain: true,  role: "melody" },
 };
 
 // ---------------------------------------------------------------------------

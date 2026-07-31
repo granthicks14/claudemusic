@@ -345,6 +345,41 @@ Kits went from 165 to **220**, and every one of them was researched before it wa
 *(Bug found by that regression: clicking a **drum** track's name opened a piano roll for it, and the roll's note renderer read `note.degrees[0]` off a drum hit — which is just `true` — and threw. Drum lanes carry no pitch at all, so their names no longer open a roll.)*
 
 
+## Six genres had no solo voice at all
+
+Before adding anything, I checked which genres actually had a melodic lead — a solo line, as opposed to chords and a bass. Six did not: **rock, drill, dubstep, Jersey club, amapiano and neo-soul**. Rock had a rhythm guitar and nothing to play over it. That measurement decided what got built.
+
+### Woodwind — the saxophone's siblings
+
+A new mono track, and the family splits on a single acoustic fact. A **conical** bore (saxophone, oboe, bassoon, English horn) supports the complete harmonic series — every integer multiple is present, which is why those instruments sound rich and reedy. A **cylindrical** bore closed at one end — the clarinet — only supports the **odd** harmonics; the even ones are physically absent. That missing half of the spectrum is exactly why a clarinet sounds hollow and woody next to an oboe, and why it over-blows to a twelfth instead of an octave. Flutes are open at both ends and edge-blown rather than reed-driven, so they get the full series but with very weak upper partials and a much larger proportion of breath noise — the air jet splitting on the edge is a large part of what you actually hear, and leaving it out is most of why synthesised flutes sound like sine waves.
+
+Twelve kits: **Concert Flute**, **Alto Flute**, **Recorder**, **Shakuhachi**, **Bansuri**, **Clarinet**, **Bass Clarinet**, **Oboe**, **English Horn**, **Bassoon**, **Soprano Sax**, **Duduk** (an Armenian double reed with an exceptionally large reed for its bore, which is why it is so dark and breathy despite being a double reed).
+
+Placement is idiomatic, not decorative: amapiano is built on **live sax and flute over the log drum** — the genre's "private school" strain uses live guitar, saxophone, violin and trumpet — and dark flute and duduk lines are a UK drill signature.
+
+### Lead Guitar — a separate performance from rhythm guitar
+
+On real records these are two different tracks: rhythm sits in open position holding the harmony, the lead plays single notes up the neck through a hotter amp. The program only had one guitar, so rock could never have both. Lead guitar is now its own mono track, voiced an octave above rhythm because solos live on the top strings.
+
+Seven kits: **Overdrive**, **Fuzz**, **Wah** (a resonant bandpass swept by the player's foot — the sweep *is* the instrument; a static wah is just a honk), **Feedback Sustain** (fed enough energy that the string does not decay at all, which is how a note gets held forever on a record), **Octave Lead**, **Clean Lead**, and **Pinch Harmonics** (the picking hand damps the string at a node so the fundamental is genuinely cancelled and a high partial speaks instead — a squeal, not a note).
+
+The two lines are also *phrased* differently, not just voiced differently: a wind player breathes, so woodwind parts get long note values and a 52% rest probability and land at 6–8 notes per four bars. A lead guitarist does not, so lead guitar runs denser at 10–13.
+
+## Nine more classic synths
+
+- **Hoover** — originally a preset called "What The" on the Roland Alpha Juno, written by Eric Persing *as a joke*, and then used on Human Resource's "Dominator", The Prodigy's "Charly" and most of early-90s hardcore and jungle. Four things make it: a **PWM sawtooth** (a saw with flat segments of varying width cut into it — the Alpha Juno's unusual oscillator, which no other synth of the era had), that PWM run at a high rate for the rasp, a sub-oscillator, and a fast up-then-down **pitch envelope**, which is the discordant swoop everyone actually recognises. All four are implemented.
+- **MS-20** — Korg's filter is a **Sallen-Key** design rather than a Moog-style transistor ladder. It self-oscillates in both lowpass and highpass and avoids the volume drop the ladder suffers when resonance is pushed, which is why it stays aggressive instead of thinning out. The sound is the filter screaming, not the oscillator.
+- **D-50** — Roland's **LA synthesis**. Memory was expensive in 1987, so rather than sample a whole instrument they sampled only the **attack transient** — the hardest part of a sound to program — and let ordinary subtractive synthesis carry the sustain. A short 8-bit-ish burst spliced onto a synth body is literally the architecture, and it is why D-50 patches sound simultaneously synthetic and oddly real.
+- **Prophet-5** — **poly-mod**: oscillator B and the filter envelope routed into oscillator A's frequency, giving a hard, brassy, slightly unstable sweep no simple saw stack has.
+- **OB-Xa** — two discrete voice boards per key in unison. Thicker and blunter than the Prophet; the "Jump" brass sound.
+- **CZ Phase Distortion** — Casio's trick: instead of filtering a rich wave, the oscillator's own **read rate** through the wavetable is warped. The giveaway is that brightness sweeps while level stays completely flat, which no analog filter does.
+- **Jupiter-8** — stacks every voice in unison with per-voice detune, so one key is eight oscillators spread apart.
+- **Polysix** — smaller and softer; its character is mostly its onboard ensemble chorus, so it runs through the same three-tap ensemble as the Solina at lower depth.
+- **PPG Wave** — a **wavetable** synth. Its oscillator scans a table of very different single-cycle waveforms, so the harmonics do not just roll off, they *rearrange* — movement no filter sweep can imitate, plus the grit of 8-bit ROMs.
+
+**Totals:** 248 kits across 17 melodic and 8 drum tracks. Every one is triggered through an `OfflineAudioContext` and measured — none silent, none broken, none clipping. Across 19 genres × 6 shuffles played live, 184 distinct kits actually sounded with zero console errors, and every genre now has a solo lead voice.
+
+
 ## The reel is as long as your beat
 
 The reel used to run for a fixed 15, 30, or 60 seconds regardless of what the beat actually was, which is the wrong unit entirely: a 4-bar loop got chopped mid-phrase, and a full song got truncated a third of the way in. **Length is now derived from the pattern**, so a video always contains a whole number of loops and never cuts off in the middle of a bar.

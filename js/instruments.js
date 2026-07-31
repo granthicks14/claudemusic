@@ -84,6 +84,10 @@ const INSTRUMENT_PROFILE = {
   // Lead guitar sits an octave up from where rhythm guitar is voiced -
   // solos live on the top strings and up the neck, not in open position.
   leadguitar: { range: [52, 88], sweet: [59, 84], voices: 1, voicing: "mono",  sustain: true,  role: "melody" },
+  // A talkbox is limited by the player's mouth, which is a small, fixed
+  // resonator - push far outside a singing range and the vowels stop
+  // reading as vowels. So it lives where a voice lives.
+  talkbox:  { range: [45, 76],  sweet: [50, 72], voices: 1, voicing: "mono",    sustain: true,  role: "hook" },
 };
 
 // ---------------------------------------------------------------------------

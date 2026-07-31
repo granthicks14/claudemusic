@@ -1,6 +1,6 @@
 const STEPS_PER_BAR = 16;
 
-const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14, arp: 18, autolead: 14, sax: 14, woodwind: 17, leadguitar: 14 };
+const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14, arp: 18, autolead: 14, sax: 14, woodwind: 17, leadguitar: 14, talkbox: 14 };
 
 const FLAVOR_POOLS = {
   kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "909", "linn", "707", "606", "dmx", "sp1200", "lm1", "rz1", "hr16", "r8"],
@@ -41,6 +41,9 @@ const FLAVOR_POOLS = {
   // Six genres had no solo voice at all; rock in particular had a rhythm
   // guitar and nothing to play over it.
   leadguitar: ["overdrive", "fuzz", "wah", "sustain", "octave", "cleantone", "harmonics"],
+  // A talkbox is an INSTRUMENT shaped by a mouth, which is the opposite
+  // of a vocoder (a voice shaped by an instrument) - see playTalkboxVoice.
+  talkbox: ["roger", "gfunk", "robot", "bright"],
   fx: ["riser", "siren", "impact"],
 };
 
@@ -150,6 +153,10 @@ const FLAVOR_GENRES = {
   octave: ["neosoul", "rnb", "lofi", "amapiano"],
   cleantone: ["neosoul", "rnb", "lofi", "amapiano", "afrobeats"],
   harmonics: ["rock", "phonk", "dubstep"],
+  roger: ["rnb", "neosoul", "hiphop", "house", "rap"],
+  gfunk: ["hiphop", "rnb", "phonk", "rap"],
+  robot: ["house", "techno", "rnb", "jerseyclub"],
+  bright: ["house", "rnb", "neosoul", "ukgarage"],
 };
 
 // A flavor is available to a genre if it is universal, or if that genre is
@@ -197,6 +204,7 @@ const FLAVOR_TAGS = {
   sax: { smooth: "warm", breathy: "dark" , alto: "bright", bari: "dark"},
   woodwind: { flute: "bright", altoflute: "warm", clarinet: "warm", bassclarinet: "dark", oboe: "bright", englishhorn: "warm", bassoon: "dark", sopranosax: "bright", shakuhachi: "warm", bansuri: "warm", duduk: "dark", recorder: "bright" },
   leadguitar: { overdrive: "warm", fuzz: "dark", wah: "bright", sustain: "warm", octave: "bright", cleantone: "bright", harmonics: "bright" },
+  talkbox: { roger: "warm", gfunk: "warm", robot: "dark", bright: "bright" },
   fx: { riser: "bright", siren: "dark", impact: "dark" },
 };
 
@@ -2497,9 +2505,144 @@ function pickFillType() {
   return pickWeighted([["tomRun", 3], ["snareRush", 2], ["hatLift", 1.2], ["cut", 1]]);
 }
 
-function resolveGenerationStyle(style) {
+// ---------------------------------------------------------------------------
+// Which instruments play, decided per generation
+// ---------------------------------------------------------------------------
+// Until now a genre's instrumentation was FIXED. R&B had a saxophone on
+// every single beat it ever produced; drill always had a woodwind; techno
+// always had an arp. Only the *timbre* shuffled - the kit changed, the
+// instrument never did. Measured across 30 generations of each of the 19
+// genres, every genre played exactly the same solo instrument 100% of the
+// time, and twelve of them had only one solo instrument in existence.
+//
+// That is why beats in a genre started sounding like each other: the ear
+// latches onto whatever is carrying the top line, and it was always the
+// same thing. Changing the saxophone's reed does not fix that. Replacing
+// the saxophone with a Rhodes solo, a flute, a lead guitar or a talkbox
+// does.
+//
+// Each genre now declares a POOL of solo voices that genuinely belong in
+// it, and each generation draws one or two. Weights keep the genre's
+// signature voice most likely without making it inevitable.
+const SOLO_POOLS = {
+  hiphop:    [["lead", 3], ["sax", 2], ["woodwind", 2], ["leadguitar", 2], ["kalimba", 1], ["marimba", 1], ["talkbox", 1]],
+  trap:      [["lead", 3], ["woodwind", 3], ["kalimba", 2], ["autolead", 2], ["marimba", 1]],
+  house:     [["lead", 3], ["sax", 2], ["woodwind", 2], ["arp", 2], ["marimba", 1], ["talkbox", 1]],
+  rock:      [["leadguitar", 4], ["lead", 1], ["woodwind", 1]],
+  reggaeton: [["lead", 3], ["woodwind", 2], ["marimba", 2], ["leadguitar", 1]],
+  lofi:      [["lead", 2], ["sax", 2], ["woodwind", 3], ["marimba", 2], ["kalimba", 2], ["leadguitar", 2]],
+  drill:     [["woodwind", 3], ["lead", 2], ["autolead", 1]],
+  afrobeats: [["woodwind", 3], ["marimba", 2], ["kalimba", 2], ["sax", 2], ["leadguitar", 2], ["lead", 1]],
+  dubstep:   [["lead", 4], ["arp", 2], ["woodwind", 1]],
+  // The genre this was reported on. A saxophone is one of R&B's voices,
+  // not its only one - vibraphone, flute, clean lead guitar and talkbox
+  // all carry top lines on real records.
+  rnb:       [["sax", 3], ["woodwind", 3], ["leadguitar", 2], ["marimba", 2], ["lead", 2], ["talkbox", 2]],
+  phonk:     [["lead", 3], ["leadguitar", 2], ["woodwind", 2], ["autolead", 2]],
+  jerseyclub:[["lead", 3], ["arp", 2], ["autolead", 2]],
+  dnb:       [["arp", 3], ["lead", 3], ["woodwind", 1]],
+  synthwave: [["lead", 3], ["arp", 3], ["leadguitar", 2]],
+  rap:       [["autolead", 3], ["lead", 2], ["sax", 2], ["woodwind", 2], ["talkbox", 1]],
+  amapiano:  [["woodwind", 3], ["sax", 3], ["lead", 2], ["marimba", 2], ["kalimba", 1], ["leadguitar", 2]],
+  ukgarage:  [["lead", 3], ["arp", 2], ["sax", 2], ["woodwind", 2]],
+  techno:    [["arp", 3], ["lead", 3]],
+  neosoul:   [["leadguitar", 3], ["sax", 3], ["woodwind", 2], ["lead", 1], ["marimba", 2], ["talkbox", 1]],
+};
+
+// Any instrument can now be drawn into any genre's solo slot, so every one
+// of them needs a sensible melodic profile even where the genre never
+// wrote one. These are written from how each instrument is actually
+// played: wind players breathe (long notes, lots of rest), mallet and
+// plucked instruments cannot sustain so they move (short notes, little
+// rest), an arp is continuous motion by definition.
+const DEFAULT_MELODY = {
+  lead:      { motifBars: 2, noteLengths: [[2,3],[4,3],[3,1]], restProbability: 0.42, chordToneProbability: 0.78, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.38 },
+  sax:       { motifBars: 2, noteLengths: [[4,3],[6,3],[8,2]], restProbability: 0.5, chordToneProbability: 0.75, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.35, harmony: { shape: "third", probability: 0.4, minLen: 3 } },
+  woodwind:  { motifBars: 2, noteLengths: [[4,3],[6,3],[8,2],[3,1]], restProbability: 0.52, chordToneProbability: 0.78, chordTonePool: [[0,2],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1],[5,1]], variationProbability: 0.35 },
+  leadguitar:{ motifBars: 2, noteLengths: [[2,3],[3,3],[4,2],[6,1]], restProbability: 0.42, chordToneProbability: 0.7, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1],[6,1]], variationProbability: 0.4 },
+  autolead:  { motifBars: 2, noteLengths: [[3,3],[4,3],[6,2]], restProbability: 0.5, chordToneProbability: 0.82, chordTonePool: [[0,3],[2,2],[4,2]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.3 },
+  arp:       { motifBars: 1, noteLengths: [[1,4],[2,3]], restProbability: 0.15, chordToneProbability: 0.9, chordTonePool: [[0,3],[2,3],[4,3],[7,2]], passingTonePool: [[1,1]], variationProbability: 0.45 },
+  kalimba:   { motifBars: 2, noteLengths: [[2,3],[1,2],[4,2]], restProbability: 0.4, chordToneProbability: 0.85, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1]], variationProbability: 0.4 },
+  marimba:   { motifBars: 2, noteLengths: [[2,3],[1,2],[4,2]], restProbability: 0.38, chordToneProbability: 0.82, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.4 },
+  // A talkbox line is a HOOK - short, repeated, heavily rest-separated,
+  // and almost entirely chord tones, because it is standing in for a
+  // sung phrase rather than for an instrumental solo.
+  talkbox:   { motifBars: 2, noteLengths: [[3,3],[4,3],[6,2],[2,1]], restProbability: 0.52, chordToneProbability: 0.88, chordTonePool: [[0,4],[2,2],[4,2]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.28 },
+  guitar:    { motifBars: 2, noteLengths: [[2,3],[4,3],[3,1]], restProbability: 0.45, chordToneProbability: 0.75, chordTonePool: [[0,3],[2,2],[4,2]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.35 },
+};
+
+// Draw this generation's solo voices. One most of the time, two often
+// enough that beats have a call-and-response pair - but never so many
+// that the top of the mix turns into a crowd.
+function pickSoloInstruments(style) {
+  const pool = (SOLO_POOLS[style.id] || []).filter(([inst]) => {
+    // A genre can only field an instrument it has a melodic profile for,
+    // either its own or the shared default.
+    return (style.melody && style.melody[inst]) || DEFAULT_MELODY[inst];
+  });
+  if (!pool.length) return (style.melodic.monoInstruments || []).filter((i) => i !== "bass");
+  const picked = [];
+  const remaining = pool.slice();
+  const count = Math.random() < 0.42 && remaining.length > 1 ? 2 : 1;
+  for (let n = 0; n < count && remaining.length; n++) {
+    const total = remaining.reduce((a, [, w]) => a + w, 0);
+    let r = Math.random() * total;
+    let idx = 0;
+    for (let i = 0; i < remaining.length; i++) {
+      r -= remaining[i][1];
+      if (r <= 0) { idx = i; break; }
+    }
+    picked.push(remaining[idx][0]);
+    remaining.splice(idx, 1);
+  }
+  return picked;
+}
+
+// Chordal parts vary too, for the same reason: a genre that always fields
+// piano AND pad AND strings AND organ AND horn sounds like one arrangement
+// every time. The first two are kept (they carry the harmony) and the
+// rest are each rolled for, so the supporting cast changes shape.
+function pickChordInstruments(style) {
+  const all = style.melodic.chordInstruments || [];
+  if (all.length <= 2) return all.slice();
+  const kept = all.slice(0, 2);
+  for (const inst of all.slice(2)) {
+    if (Math.random() < 0.55) kept.push(inst);
+  }
+  return kept;
+}
+
+// Instrumentation is a creative decision, not something to optimise.
+// It is planned ONCE per "Generate", above the best-of-N candidate search,
+// and every candidate then shares it. Planning it per candidate instead
+// let the scorer choose the line-up - and because the scorer rewards
+// interplay it simply always picked the busiest option, which quietly
+// undid most of the variety this is here to create.
+function planInstrumentation(style) {
+  const solos = pickSoloInstruments(style);
+  const melody = { ...style.melody };
+  for (const inst of solos) {
+    if (!melody[inst]) melody[inst] = DEFAULT_MELODY[inst];
+  }
+  // The rhythm guitar is a chordal/riff role, not a solo one, so it stays
+  // wherever the genre put it rather than competing for the solo slot.
+  const keptMono = (style.melodic.monoInstruments || []).filter((i) => i === "bass" || i === "guitar");
+  return {
+    melody,
+    melodic: {
+      ...style.melodic,
+      monoInstruments: [...keptMono, ...solos.filter((i) => !keptMono.includes(i))],
+      chordInstruments: pickChordInstruments(style),
+    },
+  };
+}
+
+function resolveGenerationStyle(style, plan) {
+  const p = plan || planInstrumentation(style);
   return {
     ...style,
+    melody: p.melody,
+    melodic: p.melodic,
     drums: { ...style.drums, main: mutateGroove(pickDrumMain(style), TRESILLO_GENRES.has(style.id)) },
     progression: pickProgression(style),
     fillType: pickFillType(),
@@ -2523,8 +2666,8 @@ function buildBarContextsFromChords(chords, barCount, baseOctave = 2) {
   return contexts;
 }
 
-function generateVariationOnce(rawStyle, bars) {
-  const style = resolveGenerationStyle(rawStyle);
+function generateVariationOnce(rawStyle, bars, plan) {
+  const style = resolveGenerationStyle(rawStyle, plan);
   const structure = buildStructure(bars);
   const totalSteps = bars * STEPS_PER_BAR;
   const customChords = rawStyle.customChords;
@@ -2582,7 +2725,7 @@ function generateVariationOnce(rawStyle, bars) {
     }
   }
 
-  return { instruments, structure, barRootDegrees, barChordContexts, automation };
+  return { instruments, structure, barRootDegrees, barChordContexts, automation, genStyle: style };
 }
 
 // ---- Full-song arrangement ----
@@ -2714,8 +2857,8 @@ function totalSongBars(style) {
   return (style ? sectionsForStyle(style) : SONG_SECTIONS).reduce((s, sec) => s + sec.bars, 0);
 }
 
-function generateSongVariationOnce(rawStyle) {
-  const style = resolveGenerationStyle(rawStyle);
+function generateSongVariationOnce(rawStyle, plan) {
+  const style = resolveGenerationStyle(rawStyle, plan);
   const barMetas = expandSongSections(sectionsForStyle(style));
   const bars = barMetas.length;
   const totalSteps = bars * STEPS_PER_BAR;
@@ -2855,7 +2998,7 @@ function generateSongVariationOnce(rawStyle) {
       else automation[inst] = [{ step: 0, value: 0.78 }];
     }
   }
-  return { instruments, structure, barRootDegrees, automation, filterAutomation };
+  return { instruments, structure, barRootDegrees, automation, filterAutomation, genStyle: style };
 }
 
 // ---- Intentionality: compose several candidates, keep the best one ----
@@ -2952,6 +3095,7 @@ function scoreVariation(style, v) {
   // grid is not a beat. Target a moderate fill with real space in it.
   let onsets = 0, slots = 0;
   for (const k of Object.keys(inst)) {
+    if (!Array.isArray(inst[k])) continue;
     for (const x of inst[k]) { slots++; if (x) onsets++; }
   }
   if (slots) {
@@ -3061,7 +3205,7 @@ function scoreVariation(style, v) {
 // context, parts end up fitting each other rather than merely being
 // individually acceptable.
 function refineVariation(style, v, barRootDegrees, totalSteps, passes = 2) {
-  const mono = (style.melodic.monoInstruments || []).filter((i) => style.melody[i]);
+  const mono = (style.melodic.monoInstruments || []).filter((i) => style.melody[i] && Array.isArray(v.instruments[i]));
   if (!mono.length) return v;
   let bestScore = scoreVariation(style, v);
   const registerPlan = planRegisterJitters(mono);
@@ -3089,21 +3233,27 @@ function refineVariation(style, v, barRootDegrees, totalSteps, passes = 2) {
 // "Generate" feel slow - a full beat is only array math, so this stays
 // well inside a single frame.
 function generateVariation(rawStyle, bars) {
+  const plan = planInstrumentation(rawStyle);
   let best = null, bestScore = -Infinity;
   for (let i = 0; i < 12; i++) {
-    const cand = generateVariationOnce(rawStyle, bars);
-    const sc = scoreVariation(rawStyle, cand);
+    const cand = generateVariationOnce(rawStyle, bars, plan);
+    // Each candidate now picks its own instrumentation, so it must be
+    // scored and refined against the instruments it actually used - not
+    // against the genre's nominal list, which may name parts this
+    // candidate does not have.
+    const sc = scoreVariation(cand.genStyle || rawStyle, cand);
     if (sc > bestScore) { bestScore = sc; best = cand; }
   }
-  return refineVariation(rawStyle, best, best.barRootDegrees, bars * STEPS_PER_BAR, 2);
+  return refineVariation(best.genStyle || rawStyle, best, best.barRootDegrees, bars * STEPS_PER_BAR, 2);
 }
 
 function generateSongVariation(rawStyle) {
+  const plan = planInstrumentation(rawStyle);
   let best = null, bestScore = -Infinity;
   for (let i = 0; i < 6; i++) {
-    const cand = generateSongVariationOnce(rawStyle);
-    const sc = scoreVariation(rawStyle, cand);
+    const cand = generateSongVariationOnce(rawStyle, plan);
+    const sc = scoreVariation(cand.genStyle || rawStyle, cand);
     if (sc > bestScore) { bestScore = sc; best = cand; }
   }
-  return refineVariation(rawStyle, best, best.barRootDegrees, best.structure.length * STEPS_PER_BAR, 1);
+  return refineVariation(best.genStyle || rawStyle, best, best.barRootDegrees, best.structure.length * STEPS_PER_BAR, 1);
 }

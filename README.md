@@ -380,6 +380,48 @@ The two lines are also *phrased* differently, not just voiced differently: a win
 **Totals:** 248 kits across 17 melodic and 8 drum tracks. Every one is triggered through an `OfflineAudioContext` and measured — none silent, none broken, none clipping. Across 19 genres × 6 shuffles played live, 184 distinct kits actually sounded with zero console errors, and every genre now has a solo lead voice.
 
 
+## Why every beat in a genre sounded the same
+
+Reported about R&B: the saxophone was the thing you noticed every time, and it made each beat feel like the last one. Measuring it showed the problem was not R&B's and not the saxophone's — **it was every genre**.
+
+Instrumentation was **fixed per genre**. Only the *timbre* shuffled. Across 30 generations of each of the 19 genres:
+
+| | before |
+|---|---|
+| Genres that played the identical solo instrument in 100% of generations | **19 of 19** |
+| Genres with only one solo instrument in existence | **12 of 19** |
+| Average distinct solo instruments per genre | **1.4** |
+
+R&B had `monoInstruments: ["bass", "sax"]`. There was no mechanism by which it could ever produce anything else. Changing the saxophone's reed cannot fix that; the ear latches onto whatever carries the top line, and it was always the same thing.
+
+**Instrumentation is now chosen per generation.** Each genre declares a weighted **pool** of solo voices that genuinely belong in it, and each generation draws one or two. Chordal parts vary too — the first two are kept because they carry the harmony, and the rest are each rolled for, so the supporting cast changes shape as well.
+
+Every instrument also needed a melodic profile for genres that had never written one, so there is now a shared `DEFAULT_MELODY` table written from how each instrument is actually played: wind players breathe (long notes, lots of rest), mallet and plucked instruments cannot sustain so they move, an arp is continuous motion by definition.
+
+**After (60 generations per genre):**
+
+| | before | after |
+|---|---|---|
+| Genres locked to one solo instrument | 19 of 19 | **0 of 19** |
+| Average distinct solo instruments per genre | 1.4 | **4.5** |
+| Share of generations using the most-common voice | 100% | **50%** |
+| Distinct track line-ups per 8 generations (measured in the browser) | 1 | **5.8** |
+
+R&B specifically went from *saxophone, 100% of the time* to six voices sharing the top line — woodwind 30%, lead guitar 30%, sax 25%, vibraphone 22%, talkbox 18%, synth lead 15% — and **8 different track line-ups across 8 generations**.
+
+*(Two bugs found while building this. The refinement pass took the genre's **nominal** instrument list rather than the line-up the chosen candidate actually used, so it tried to refine parts that did not exist and wrote `undefined` into the pattern, which then crashed the scorer. And instrumentation was initially planned per candidate inside the best-of-12 search — which meant the **scorer** was choosing the line-up, and because it rewards interplay it simply always picked the busiest option, quietly undoing most of the variety. Instrumentation is a creative decision, not something to optimise, so it is now planned once, above the search, and every candidate shares it.)*
+
+*(One edge case the change introduces, now handled: a piano roll or automation lane can be left open on a track the next generation does not have. Those panels close themselves rather than render an editor for a part that no longer exists.)*
+
+### Talk Box
+
+Added as part of this, because R&B and funk needed a top-line voice that was missing entirely. The talkbox and the vocoder are constantly confused and they are **opposites**: a vocoder makes a *voice* sound like an instrument by analysing it and reimposing its spectrum on a synth; a talkbox makes an *instrument* sound like a voice, mechanically — a horn driver sends the synth's audio up a plastic tube into the player's mouth, the player silently shapes vowels, and a microphone in front of their mouth picks up the result.
+
+So the right model is not a vocoder bank. It is a synth tone through resonant formant filters that **move**, because the player is continuously changing vowel while the note sustains — a static formant filter sounds like a wah pedal left in one position, which is the mistake that makes fake talkboxes sound wrong. Roger Troutman of Zapp, the definitive user, fed his through a Minimoog and later a DX100, which is why the underlying tone is a fat analog lead rather than anything vocal. Four kits sweep different vowel paths: **Zapp** ("ee"→"oh"), **G-Funk** (the wider "aw"→"ee" drawl), **Robot** (deliberately narrow and static), **Bright** ("ah"→"ee" up high).
+
+**252 kits total.** All rendered offline — none silent, none clipping. 19 genres × 8 generations played live with zero console errors.
+
+
 ## The reel is as long as your beat
 
 The reel used to run for a fixed 15, 30, or 60 seconds regardless of what the beat actually was, which is the wrong unit entirely: a 4-bar loop got chopped mid-phrase, and a full song got truncated a third of the way in. **Length is now derived from the pattern**, so a video always contains a whole number of loops and never cuts off in the middle of a bar.

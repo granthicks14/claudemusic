@@ -1,15 +1,15 @@
-const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "marimba", "arp", "autolead", "sax", "woodwind", "leadguitar", "fx"];
+const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "marimba", "arp", "autolead", "sax", "woodwind", "leadguitar", "talkbox", "fx"];
 
 const DEFAULT_TRACK_VOLUME = {
   kick: 1, snare: 0.9, hihat: 0.6, openhat: 0.6, tom: 0.85, perc: 0.55, crash: 0.8,
   bass: 0.9, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.55, horn: 0.7,
-  organ: 0.6, vocal: 0.65, kalimba: 0.7, marimba: 0.65, arp: 0.55, autolead: 0.75, sax: 0.7, woodwind: 0.7, leadguitar: 0.7, fx: 0.6,
+  organ: 0.6, vocal: 0.65, kalimba: 0.7, marimba: 0.65, arp: 0.55, autolead: 0.75, sax: 0.7, woodwind: 0.7, leadguitar: 0.7, talkbox: 0.72, fx: 0.6,
 };
 
 const BASE_VELOCITY = {
   kick: 1, snare: 0.9, hihat: 0.7, openhat: 0.7, tom: 0.85, perc: 0.6, crash: 0.9,
   bass: 0.8, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.6, horn: 0.75,
-  organ: 0.65, vocal: 0.7, kalimba: 0.75, marimba: 0.7, arp: 0.65, autolead: 0.8, sax: 0.75, woodwind: 0.72, leadguitar: 0.78, fx: 0.8,
+  organ: 0.65, vocal: 0.7, kalimba: 0.75, marimba: 0.7, arp: 0.65, autolead: 0.8, sax: 0.75, woodwind: 0.72, leadguitar: 0.78, talkbox: 0.8, fx: 0.8,
 };
 
 const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "fx"];
@@ -33,13 +33,13 @@ const DEFAULT_PAN = {
   kick: 0, snare: 0, bass: 0, lead: 0, autolead: 0, vocal: 0, fx: 0,
   hihat: 0.18, openhat: 0.22, perc: -0.26, tom: -0.14, crash: 0.3,
   piano: -0.2, pad: 0.12, stab: 0.28, guitar: -0.3, strings: 0.24,
-  horn: -0.22, organ: 0.2, kalimba: -0.24, marimba: 0.26, arp: -0.28, sax: -0.18, woodwind: 0.16, leadguitar: 0.26,
+  horn: -0.22, organ: 0.2, kalimba: -0.24, marimba: 0.26, arp: -0.28, sax: -0.18, woodwind: 0.16, leadguitar: 0.26, talkbox: 0,
 };
 
 const DEFAULT_REVERB_SEND = {
   kick: 0, bass: 0, snare: 0.22, hihat: 0.08, openhat: 0.15, tom: 0.2, perc: 0.15, crash: 0.35,
   piano: 0.22, lead: 0.28, pad: 0.4, stab: 0.22, guitar: 0.18, strings: 0.35, horn: 0.22,
-  organ: 0.28, vocal: 0.32, kalimba: 0.25, marimba: 0.28, arp: 0.3, autolead: 0.24, sax: 0.3, woodwind: 0.32, leadguitar: 0.26, fx: 0.45,
+  organ: 0.28, vocal: 0.32, kalimba: 0.25, marimba: 0.28, arp: 0.3, autolead: 0.24, sax: 0.3, woodwind: 0.32, leadguitar: 0.26, talkbox: 0.2, fx: 0.45,
 };
 
 class BeatEngine {
@@ -3925,6 +3925,109 @@ class BeatEngine {
     }
   }
 
+  // ---- Talk box -----------------------------------------------------
+  // The talkbox and the vocoder are constantly confused, and they are
+  // opposites. A vocoder makes a VOICE sound like an instrument, by
+  // analysing the voice and reimposing its spectrum on a synth. A talkbox
+  // makes an INSTRUMENT sound like a voice, mechanically: a horn driver
+  // sends the synth's audio up a plastic tube into the player's mouth,
+  // the player silently shapes vowels, and a microphone in front of their
+  // mouth picks up the result. There is no analysis and no carrier/
+  // modulator pair - just an instrument being filtered by a real mouth.
+  //
+  // So the right model is not a vocoder bank: it is a synth tone through
+  // two or three resonant bandpass formants that MOVE, because a player
+  // is continuously changing vowel while the note sustains. Roger
+  // Troutman of Zapp - the definitive user - fed his through a Minimoog
+  // and later a DX100, which is why the underlying tone is a fat,
+  // slightly buzzy analog lead rather than anything vocal.
+  playTalkboxVoice(time, freq, durationSeconds, vel, flavor) {
+    const ctx = this.ctx;
+    const dest = this.dest("talkbox");
+    const dur = Math.max(Math.min(durationSeconds, 1.6), 0.2);
+
+    // Formant pairs (F1, F2) for real vowels, in Hz. The word the
+    // "talking" seems to say is entirely which vowels get swept between.
+    const VOWELS = {
+      // "ee" -> "oh", the classic Zapp phrase shape
+      roger:  [[300, 2300], [450, 1000], [400, 800]],
+      // "aw" -> "ee", the wider G-funk drawl
+      gfunk:  [[600, 1000], [500, 1700], [320, 2200]],
+      // narrow and static-ish, so it reads mechanical rather than sung
+      robot:  [[400, 1300], [420, 1350], [400, 1300]],
+      // "ah" -> "ee" up high, cutting
+      bright: [[700, 1200], [400, 2400], [300, 2600]],
+    };
+    const path = VOWELS[flavor] || VOWELS.roger;
+
+    const out = ctx.createGain();
+    out.gain.setValueAtTime(0.0001, time);
+    out.gain.linearRampToValueAtTime(vel * 0.75, time + 0.02);
+    out.gain.setValueAtTime(vel * 0.75, time + dur * 0.82);
+    out.gain.exponentialRampToValueAtTime(0.001, time + dur + 0.05);
+    out.connect(dest);
+
+    // The synth being spoken through: a fat detuned analog lead.
+    const source = ctx.createGain();
+    source.gain.value = 0.5;
+    for (const [type, detune, lvl] of [["sawtooth", -7, 0.5], ["sawtooth", 6, 0.5], ["square", 0, 0.3]]) {
+      const osc = ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.value = freq;
+      osc.detune.value = detune;
+      const g = ctx.createGain();
+      g.gain.value = lvl;
+      osc.connect(g).connect(source);
+      osc.start(time);
+      osc.stop(time + dur + 0.1);
+    }
+    const sub = ctx.createOscillator();
+    sub.type = "sine";
+    sub.frequency.value = freq / 2;
+    const subG = ctx.createGain();
+    subG.gain.value = 0.25;
+    sub.connect(subG).connect(source);
+    sub.start(time);
+    sub.stop(time + dur + 0.1);
+
+    // The mouth. Two moving formants, swept across the vowel path over
+    // the length of the note - a static formant filter sounds like a
+    // wah pedal left in one position, which is exactly the mistake that
+    // makes fake talkboxes sound wrong.
+    [0, 1].forEach((band) => {
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.Q.value = band === 0 ? 9 : 12;
+      bp.frequency.setValueAtTime(path[0][band], time);
+      const mid = time + dur * 0.45;
+      bp.frequency.linearRampToValueAtTime(path[1][band], mid);
+      bp.frequency.linearRampToValueAtTime(path[2][band], time + dur);
+      const bg = ctx.createGain();
+      bg.gain.value = band === 0 ? 1 : 0.72;
+      source.connect(bp).connect(bg).connect(out);
+    });
+    // A third, fixed high formant keeps consonant-like brightness so the
+    // result reads as speech rather than as a filtered synth pad.
+    const bp3 = ctx.createBiquadFilter();
+    bp3.type = "bandpass";
+    bp3.frequency.value = 2900;
+    bp3.Q.value = 7;
+    const g3 = ctx.createGain();
+    g3.gain.value = 0.3;
+    source.connect(bp3).connect(g3).connect(out);
+
+    // A real talkbox is a horn driver being pushed hard up a tube, and it
+    // distorts. Clean talkbox does not exist.
+    const drive = ctx.createWaveShaper();
+    drive.curve = this.makeDistortionCurve(flavor === "robot" ? 16 : 9);
+    const tube = ctx.createBiquadFilter();
+    tube.type = "bandpass";
+    tube.frequency.value = 1500;
+    tube.Q.value = 0.6;   // the plastic tube's own narrow response
+    out.disconnect();
+    out.connect(drive).connect(tube).connect(dest);
+  }
+
   playMarimbaVoice(time, freq, durationSeconds, vel, flavor) {
     const ctx = this.ctx;
     const dest = this.dest("marimba");
@@ -5619,6 +5722,7 @@ class BeatEngine {
             else if (inst === "sax") this.playSaxVoice(t, hf, noteDur, lvl, flavors.sax);
             else if (inst === "woodwind") this.playWoodwindVoice(t, hf, noteDur, lvl, flavors.woodwind);
             else if (inst === "leadguitar") this.playLeadGuitarVoice(t, hf, noteDur, lvl, flavors.leadguitar);
+            else if (inst === "talkbox") this.playTalkboxVoice(t, hf, noteDur, lvl, flavors.talkbox);
           });
           continue;
         }
@@ -5647,6 +5751,7 @@ class BeatEngine {
         else if (inst === "sax") this.playSaxVoice(t, freq, noteDur, vel, flavors.sax);
         else if (inst === "woodwind") this.playWoodwindVoice(t, freq, noteDur, vel, flavors.woodwind);
         else if (inst === "leadguitar") this.playLeadGuitarVoice(t, freq, noteDur, vel, flavors.leadguitar);
+        else if (inst === "talkbox") this.playTalkboxVoice(t, freq, noteDur, vel, flavors.talkbox);
       }
     }
   }

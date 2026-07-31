@@ -14,6 +14,10 @@ const BASE_VELOCITY = {
 
 const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "fx"];
 
+// Guitar flavors that strum chords (rhythm guitar) versus play single
+// picked lines (lead guitar) - see playGuitarChord.
+const GUITAR_STRUM_FLAVORS = new Set(["power", "muted", "acoustic", "twelvestring", "funk"]);
+
 const DEFAULT_REVERB_SEND = {
   kick: 0, bass: 0, snare: 0.22, hihat: 0.08, openhat: 0.15, tom: 0.2, perc: 0.15, crash: 0.35,
   piano: 0.22, lead: 0.28, pad: 0.4, stab: 0.22, guitar: 0.18, strings: 0.35, horn: 0.22,
@@ -484,6 +488,47 @@ class BeatEngine {
     };
     const p = presets[flavor] || presets.crisp;
 
+    if (flavor === "rimclick") {
+      // Cross-stick (rim click): the stick lies across the head and taps
+      // the rim - a dry, woody "tock" with almost no snare-wire noise.
+      // The ballad/neo-soul/bossa backbeat staple, and nothing like a
+      // full snare hit: two short tones (a bright rim click plus a lower
+      // wood body) and only a whisper of noise.
+      const click = ctx.createOscillator();
+      click.type = "triangle";
+      click.frequency.setValueAtTime(1700, time);
+      const clickGain = ctx.createGain();
+      clickGain.gain.setValueAtTime(vel * 0.7, time);
+      clickGain.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+      click.connect(clickGain).connect(this.dest("snare"));
+      click.start(time);
+      click.stop(time + 0.035);
+
+      const body = ctx.createOscillator();
+      body.type = "sine";
+      body.frequency.setValueAtTime(760, time);
+      body.frequency.exponentialRampToValueAtTime(520, time + 0.05);
+      const bodyGain = ctx.createGain();
+      bodyGain.gain.setValueAtTime(vel * 0.5, time);
+      bodyGain.gain.exponentialRampToValueAtTime(0.001, time + 0.06);
+      body.connect(bodyGain).connect(this.dest("snare"));
+      body.start(time);
+      body.stop(time + 0.07);
+
+      const wisp = ctx.createBufferSource();
+      wisp.buffer = this.makeNoiseBuffer(0.04);
+      const wispHp = ctx.createBiquadFilter();
+      wispHp.type = "highpass";
+      wispHp.frequency.value = 4000;
+      const wispGain = ctx.createGain();
+      wispGain.gain.setValueAtTime(vel * 0.12, time);
+      wispGain.gain.exponentialRampToValueAtTime(0.001, time + 0.04);
+      wisp.connect(wispHp).connect(wispGain).connect(this.dest("snare"));
+      wisp.start(time);
+      wisp.stop(time + 0.045);
+      return;
+    }
+
     if (flavor === "clap") {
       const offsets = [0, 0.012, 0.026];
       for (const off of offsets) {
@@ -577,6 +622,41 @@ class BeatEngine {
         osc.start(time);
         osc.stop(time + decay + 0.02);
       }
+      return;
+    }
+
+    if (flavor === "ride") {
+      // A ride cymbal is the one cymbal the app never had: unlike a hat's
+      // short hiss, a ride SUSTAINS - a strong strike "ping" (inharmonic
+      // partial cluster) rides on top of a long shimmering wash, which is
+      // why jazz and rock drummers can play time on it continuously.
+      const decay = open ? 2.2 : 1.3;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.35, time);
+      gain.gain.exponentialRampToValueAtTime(0.01, time + decay);
+      const hp2 = ctx.createBiquadFilter();
+      hp2.type = "highpass";
+      hp2.frequency.value = 2800;
+      hp2.connect(gain).connect(this.dest(trackKey));
+      for (const ratio of [1, 1.34, 1.94, 2.61, 3.42]) {
+        const osc = ctx.createOscillator();
+        osc.type = "triangle";
+        osc.frequency.value = 840 * ratio;
+        osc.connect(hp2);
+        osc.start(time);
+        osc.stop(time + decay + 0.05);
+      }
+      const wash = ctx.createBufferSource();
+      wash.buffer = this.makeNoiseBuffer(1.8);
+      const washHp = ctx.createBiquadFilter();
+      washHp.type = "highpass";
+      washHp.frequency.value = 6500;
+      const washGain = ctx.createGain();
+      washGain.gain.setValueAtTime(vel * 0.15, time);
+      washGain.gain.exponentialRampToValueAtTime(0.01, time + decay * 0.7);
+      wash.connect(washHp).connect(washGain).connect(this.dest(trackKey));
+      wash.start(time);
+      wash.stop(time + decay * 0.7);
       return;
     }
 
@@ -735,6 +815,40 @@ class BeatEngine {
       osc.stop(time + 0.12);
       return;
     }
+    if (flavor === "woodblock") {
+      // A struck hollow wood block: a very short, dry, pitched "tok" with
+      // no sustain and no metallic ring. The Latin/orchestral percussion
+      // staple (and the classic drum-machine woodblock). Distinct from the
+      // clave here by being lower, rounder, and rendered as a filtered
+      // pitched body rather than a bare square wave - a real block has a
+      // strong fundamental plus one inharmonic overtone.
+      const strike = ctx.createBufferSource();
+      strike.buffer = this.makeNoiseBuffer(0.006);
+      const strikeBp = ctx.createBiquadFilter();
+      strikeBp.type = "bandpass";
+      strikeBp.frequency.value = 3200;
+      const strikeGain = ctx.createGain();
+      strikeGain.gain.setValueAtTime(vel * 0.35, time);
+      strikeGain.gain.exponentialRampToValueAtTime(0.001, time + 0.007);
+      strike.connect(strikeBp).connect(strikeGain).connect(this.dest("perc"));
+      strike.start(time);
+      strike.stop(time + 0.01);
+
+      const base = 1150 + Math.random() * 90;
+      for (const [ratio, level, decay] of [[1, 1, 0.055], [2.7, 0.3, 0.03]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(base * ratio, time);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(vel * 0.6 * level, time);
+        g.gain.exponentialRampToValueAtTime(0.001, time + decay);
+        osc.connect(g).connect(this.dest("perc"));
+        osc.start(time);
+        osc.stop(time + decay + 0.01);
+      }
+      return;
+    }
+
     if (flavor === "triangle") {
       const osc = ctx.createOscillator();
       osc.type = "sine";
@@ -1234,6 +1348,25 @@ class BeatEngine {
 
       this.pluckString(time, freq, durationSeconds, vel * 0.85, this.dest("bass"), { damp: 0.42, feedback: 0.965, pluckNoise: 0.015, brightness: 0.7, sustain: 0.45 });
       return;
+    } else if (flavor === "slap") {
+      // Slap bass (Larry Graham's invention, the funk signature): the
+      // thumb knocks the string against the frets, so the note leads with
+      // a hard percussive metallic "thwack" before the string speaks -
+      // modeled as a bright high-passed knock transient over a bright,
+      // lightly-damped physical string.
+      const knock = ctx.createBufferSource();
+      knock.buffer = this.makeNoiseBuffer(0.012);
+      const knockHp = ctx.createBiquadFilter();
+      knockHp.type = "highpass";
+      knockHp.frequency.value = 3200;
+      const knockGain = ctx.createGain();
+      knockGain.gain.setValueAtTime(vel * 0.5, time);
+      knockGain.gain.exponentialRampToValueAtTime(0.001, time + 0.012);
+      knock.connect(knockHp).connect(knockGain).connect(this.dest("bass"));
+      knock.start(time);
+      knock.stop(time + 0.015);
+      this.pluckString(time, freq, durationSeconds, vel, this.dest("bass"), { damp: 0.1, feedback: 0.978, pluckNoise: 0.018, brightness: 1.6, sustain: 0.5 });
+      return;
     } else if (flavor === "303") {
       // Roland TB-303 "Bassline" (1981) - the acid house machine, one of
       // the most-cloned circuits in electronic music. Its identity is a
@@ -1432,10 +1565,44 @@ class BeatEngine {
     }, cleanupMs);
   }
 
+  // Real rhythm guitar on records is strummed CHORDS, not a single string
+  // per note - that mismatch ("one string that lasts a second") was the
+  // whole reason generated guitars read as fake. Two research-grounded
+  // details make a strum read as a strum:
+  // - The strings don't sound simultaneously: a pick sweeps across them,
+  //   so each string starts ~8-16ms after the previous one (a full strum
+  //   spreads ~30-60ms), with a slight velocity taper - and most strums
+  //   in a groove are downstrums, with occasional upstrums (reversed
+  //   string order) mixed in.
+  // - Voicing depends on style: rock power chords are root/fifth/octave
+  //   (deliberately third-free, which is why they work over anything and
+  //   survive heavy distortion), while acoustic/funk strums voice the
+  //   actual diatonic triad handed in from the scale.
+  playGuitarChord(time, freqs, durationSeconds, vel, flavor) {
+    let strings;
+    if (flavor === "power") {
+      // Each power-flavored string already adds its own fifth internally,
+      // so striking root + octave yields the classic f/1.5f/2f/3f stack.
+      strings = [freqs[0], freqs[0] * 2];
+    } else if (flavor === "muted") {
+      strings = [freqs[0], freqs[0] * 1.4983, freqs[0] * 2];
+    } else {
+      strings = freqs;
+    }
+    const gap = flavor === "funk" ? 0.007 : 0.013;
+    const order = Math.random() < 0.8 ? strings : [...strings].reverse();
+    order.forEach((f, i) => {
+      const t = time + i * gap * (0.9 + Math.random() * 0.2);
+      this.playGuitarVoice(t, f, durationSeconds, vel * 0.85 * (1 - i * 0.09), flavor);
+    });
+  }
+
   playGuitarVoice(time, freq, durationSeconds, vel, flavor) {
     const ctx = this.ctx;
     const dest = this.dest("guitar");
-    const dur = Math.min(durationSeconds, flavor === "muted" ? 0.18 : 1.2);
+    // Held chords should ring like a real strummed guitar does, not get
+    // clipped at ~1 second regardless of the note length.
+    const dur = Math.min(durationSeconds, flavor === "muted" ? 0.18 : 2.2);
 
     if (flavor === "power") {
       // A real power chord is a plucked root+fifth pair run into an
@@ -1977,16 +2144,17 @@ class BeatEngine {
   playKalimbaVoice(time, freq, durationSeconds, vel, flavor) {
     const ctx = this.ctx;
     const dest = this.dest("kalimba");
-    const dur = Math.min(durationSeconds, flavor === "musicbox" ? 0.9 : flavor === "steeldrum" ? 1.1 : 0.6);
+    const dur = Math.min(durationSeconds, flavor === "musicbox" ? 0.9 : flavor === "steeldrum" ? 1.1 : flavor === "glock" ? 1.6 : 0.6);
 
-    // A short noise "pluck" transient for the thumb-against-tine attack.
+    // A short noise "pluck" transient for the thumb-against-tine attack -
+    // for the glockenspiel it's a harder, brighter metal-mallet strike.
     const click = ctx.createBufferSource();
     click.buffer = this.makeNoiseBuffer(0.015);
     const clickFilter = ctx.createBiquadFilter();
     clickFilter.type = "highpass";
-    clickFilter.frequency.value = 3000;
+    clickFilter.frequency.value = flavor === "glock" ? 6000 : 3000;
     const clickGain = ctx.createGain();
-    clickGain.gain.setValueAtTime(vel * 0.3, time);
+    clickGain.gain.setValueAtTime(vel * (flavor === "glock" ? 0.45 : 0.3), time);
     clickGain.gain.exponentialRampToValueAtTime(0.001, time + 0.015);
     click.connect(clickFilter).connect(clickGain).connect(dest);
     click.start(time);
@@ -1997,6 +2165,13 @@ class BeatEngine {
         ? [{ ratio: 1, level: 1 }, { ratio: 2.76, level: 0.35 }, { ratio: 5.4, level: 0.15 }]
         : flavor === "steeldrum"
         ? [{ ratio: 1, level: 1 }, { ratio: 2.01, level: 0.5 }, { ratio: 3.01, level: 0.3 }, { ratio: 4.16, level: 0.18 }]
+        // Glockenspiel: struck metal bars, sounding an octave up with a
+        // very strong inharmonic partial near the 3rd mode - that high
+        // sparkle over a long ring is why it cuts through a full mix in
+        // pop/orchestral arrangements ("Sgt. Pepper", Springsteen's
+        // "Born to Run") without adding any weight.
+        : flavor === "glock"
+        ? [{ ratio: 2, level: 1 }, { ratio: 5.4, level: 0.45 }, { ratio: 8.9, level: 0.2 }]
         : [{ ratio: 1, level: 1 }, { ratio: 3.4, level: 0.4 }];
 
     for (const p of partials) {
@@ -2598,6 +2773,52 @@ class BeatEngine {
       return;
     }
 
+    if (flavor === "whistle") {
+      // A whistled melody is almost a pure sine - a human whistle has
+      // barely any harmonics at all, which is why it reads as so "clean"
+      // next to any synth lead. What sells it as a person rather than a
+      // test tone is the performance: a small pitch scoop up into each
+      // note, and vibrato that FADES IN as the note is held (a whistler
+      // can't apply vibrato instantly). The pop-whistle-hook sound of
+      // "Young Folks," "Moves Like Jagger," or "Wind of Change."
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq * 0.94, time);
+      osc.frequency.exponentialRampToValueAtTime(freq, time + 0.07);
+      const vibrato = ctx.createOscillator();
+      vibrato.frequency.value = 5.2;
+      const vibratoGain = ctx.createGain();
+      vibratoGain.gain.setValueAtTime(0.0001, time);
+      vibratoGain.gain.linearRampToValueAtTime(freq * 0.011, time + Math.min(dur, 0.3));
+      vibrato.connect(vibratoGain).connect(osc.frequency);
+      // A trace of breath noise under the tone - the air actually moving.
+      const breath = ctx.createBufferSource();
+      breath.buffer = this.makeNoiseBuffer(dur + 0.05);
+      const breathBp = ctx.createBiquadFilter();
+      breathBp.type = "bandpass";
+      breathBp.frequency.value = freq * 2;
+      breathBp.Q.value = 1.5;
+      const breathGain = ctx.createGain();
+      breathGain.gain.setValueAtTime(0.0001, time);
+      breathGain.gain.linearRampToValueAtTime(vel * 0.05, time + 0.05);
+      breathGain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      breath.connect(breathBp).connect(breathGain).connect(dest);
+      breath.start(time);
+      breath.stop(time + dur + 0.05);
+
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * 0.75, time + 0.04);
+      gain.gain.setValueAtTime(vel * 0.75, time + Math.max(0.04, dur - 0.06));
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      osc.connect(gain).connect(dest);
+      osc.start(time);
+      osc.stop(time + dur + 0.05);
+      vibrato.start(time);
+      vibrato.stop(time + dur + 0.05);
+      return;
+    }
+
     if (flavor === "chip") {
       const osc = ctx.createOscillator();
       osc.type = "square";
@@ -2969,7 +3190,18 @@ class BeatEngine {
         const vel = this.jitterVel(BASE_VELOCITY[inst]) * autoMul;
         if (inst === "bass") this.playBass(t, freq, noteDur, vel, flavors.bass);
         else if (inst === "lead") this.playLeadVoice(t, freq, noteDur, vel, flavors.lead);
-        else if (inst === "guitar") this.playGuitarVoice(t, freq, noteDur, vel, flavors.guitar);
+        else if (inst === "guitar") {
+          // Rhythm-guitar flavors strum a real voicing built from the
+          // scale (diatonic triad above the melody degree); lead-style
+          // flavors (clean/jazz/nylon) stay single-line, the way picked
+          // highlife lines and jazz solos actually are.
+          if (GUITAR_STRUM_FLAVORS.has(flavors.guitar)) {
+            const chordFreqs = [val.degree, val.degree + 2, val.degree + 4].map((d) => this.freqForDegree(d, step));
+            this.playGuitarChord(t, chordFreqs, noteDur, vel, flavors.guitar);
+          } else {
+            this.playGuitarVoice(t, freq, noteDur, vel, flavors.guitar);
+          }
+        }
         else if (inst === "kalimba") this.playKalimbaVoice(t, freq, noteDur, vel, flavors.kalimba);
         else if (inst === "marimba") this.playMarimbaVoice(t, freq, noteDur, vel, flavors.marimba);
         else if (inst === "arp") this.playArpVoice(t, freq, noteDur, vel, flavors.arp);

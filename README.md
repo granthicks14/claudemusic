@@ -245,6 +245,30 @@ A few smaller genre-authenticity refinements from the same pass:
 - **Juno-106 pad** — the Roland Juno-106's signature isn't really its oscillator (a plain analog saw); it's the built-in BBD (bucket-brigade device) chorus circuit almost every classic Juno pad patch was run through, which is what actually gives it that lush, wide, shimmering character. Modeled as the real DSP a chorus circuit uses — a short delay line whose delay time is itself slowly modulated by an LFO, mixed back in with the dry signal — rather than just another detuned oscillator faking "width." New Pad flavor, and Synthwave's new default.
 - **Vocoder** — a real vocoder imposes a filter bank derived from a spoken "modulator" signal onto a synthesized carrier tone; without an actual speech input to analyze, the classic *synthesized* vocoder hit (Herbie Hancock, Zapp, Daft Punk-adjacent) is approximated with a buzzy square-wave carrier — harmonically richer and more mechanical than the vocal instrument's sawtooth — through a coarser bank of more, narrower fixed-frequency bands, and, like Auto Lead, deliberately no vibrato at all. New Vocal flavor.
 
+## Guitars that strum chords, the way records actually sound
+
+Direct feedback: the guitars sounded terrible — "just one string that lasts one second." That was literally true of the code. Every guitar note played exactly **one** physically-modeled string, clipped at 1.2 seconds, no matter what. But listen to how guitar is actually used on records: rhythm guitar is *strummed chords*, not one note at a time. Fixed with two research-grounded details that make a strum read as a strum:
+
+- **Strings don't sound simultaneously.** A pick sweeps across them, so each string starts ~8–16ms after the previous one (a full strum spreads roughly 30–60ms), with a slight velocity taper across the sweep — and most strums in a groove are downstrums, with occasional upstrums (reversed string order) mixed in. That tiny stagger is the single biggest cue that a human is playing.
+- **Voicing depends on style.** Rock power chords are root/fifth/octave — deliberately third-free, which is exactly why they work over any chord quality and stay clear under heavy distortion — while acoustic and funk strums voice the real diatonic triad from the scale.
+
+Rhythm flavors (power, acoustic, muted, twelve-string, funk) now strum; lead flavors (clean, jazz, nylon) correctly stay single-line, the way picked highlife lines and jazz solos actually are. Held chords also ring up to 2.2s instead of being cut at 1.2s. Measured result: a **twelve-string now sounds 12 real physical strings** spread across 25ms, a power chord rings 4, and an acoustic strum 6 — where all of them used to be a single string.
+
+## Six more kits, chosen for what each genre actually needs
+
+- **Ride cymbal** — the one cymbal the app never had, and it isn't a hi-hat variant: where a hat is a short hiss, a ride *sustains* — a strike "ping" (an inharmonic partial cluster) riding on a long shimmering wash, which is exactly why drummers can play continuous time on it. New Hi-Hat flavor.
+- **Cross-stick** — the stick lies across the head and taps the rim: a dry, woody "tock" with almost no snare-wire noise. The ballad/neo-soul/bossa backbeat staple, and now **Neo-Soul's default snare**, because that genre's backbeat is a rim click far more often than a full snare.
+- **Slap bass** — Larry Graham's invention and the funk signature: the thumb knocks the string against the frets, so the note leads with a hard percussive metallic thwack *before* the string speaks. New Bass flavor.
+- **Whistle** — a human whistle is nearly a pure sine with almost no harmonics. What sells it as a person rather than a test tone is the performance: a pitch scoop into each note and vibrato that **fades in** as the note is held (a whistler can't apply vibrato instantly), plus a trace of breath noise. The pop whistle-hook sound. New Lead flavor.
+- **Woodblock** — a short, dry, pitched "tok" with no sustain and no metallic ring: a strong fundamental plus one inharmonic overtone, distinct from the existing clave by being lower and rounder. New Percussion flavor.
+- **Glockenspiel** — struck metal bars sounding an octave up with a very strong inharmonic partial near the third mode. That high sparkle over a long ring is why it cuts through a dense mix without adding any weight. New Kalimba-family flavor.
+
+## Draw notes of any length right in the channel rack
+
+The rack used to place exactly one **one-step** note per click, so building from scratch there could never produce a longer note — you had to open the piano roll for any real note length. It now behaves the way a DAW's step area does: **press and drag right on a melodic lane to draw a note and set its length**, or drag across a drum lane to paint a run of hits (FL Studio's paint gesture). Clicking an existing note or hit still deletes it.
+
+*(Bug found and fixed while building this: every edit re-renders the step grid, which replaces the lane element — so holding a reference to that node meant measuring a **detached** element mid-drag. Its zero-size rect sent the computed step to infinity, stretching every drag to the end of the pattern: an 8%-wide drag produced a 64-step note and painted 45 hits. The gesture now captures the lane geometry once at mousedown, giving the correct 6-step note and 8 hits.)*
+
 ## Instruments that work *together*: ensemble register planning and a featured voice
 
 Direct feedback: beats didn't feel like the instruments were working together — some parts (the bass especially) sounded goofy against the rest. Root-caused to three concrete things, all fixed:

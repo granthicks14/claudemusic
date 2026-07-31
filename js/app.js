@@ -68,6 +68,7 @@ const FLAVOR_LABELS = {
   dx7ep: "DX7 E.Piano", juno: "Juno-106", vocoder: "Vocoder",
   "303": "TB-303", mellotron: "Mellotron", clav: "Clavinet",
   true808: "True 808", orchhit: "Orch Hit",
+  ride: "Ride", rimclick: "Cross-Stick", woodblock: "Woodblock", slap: "Slap", whistle: "Whistle", glock: "Glockenspiel",
 };
 function flavorLabel(key) {
   if (FLAVOR_LABELS[key]) return FLAVOR_LABELS[key];
@@ -531,20 +532,92 @@ stepGrid.addEventListener("click", (e) => {
     return;
   }
 
+  // A plain click on empty lane space is handled by the mousedown/drag
+  // handler below (which covers both the click case and the drag case);
+  // suppressing it here avoids placing the note twice.
+});
+
+// ---- Drag to draw in the channel rack ----
+// The rack used to place exactly one one-step note per click, so building
+// a beat from scratch there could never produce a note longer than a
+// single step - you had to open the piano roll to get any real note
+// length. Now the rack behaves the way a DAW's step area does: press and
+// drag right across a melodic lane to draw a note of that length, or drag
+// across a drum lane to paint a run of hits (FL Studio's "paint" gesture).
+let rackDrag = null;
+
+// The lane's geometry is captured once at mousedown and reused for the
+// whole gesture: every edit re-renders the step grid, which replaces the
+// lane element, so holding the node itself would leave us measuring a
+// detached element (a zero-size rect, which sends the computed step to
+// infinity and stretches every drag to the end of the pattern).
+function stepFromX(geom, clientX) {
+  return Math.max(0, Math.min(geom.steps - 1, Math.floor(((clientX - geom.left) / geom.width) * geom.steps)));
+}
+
+stepGrid.addEventListener("mousedown", (e) => {
+  if (e.button !== 0) return;
+  // Existing notes/hits and every header control keep their own behavior.
+  if (e.target.closest(".note-bar") || e.target.closest(".hit-mark") || e.target.closest(".track-header")) return;
   const lane = e.target.closest(".rack-lane");
-  if (lane) {
-    const steps = selectedBars * STEPS_PER_BAR;
-    const rect = lane.getBoundingClientRect();
-    const step = Math.max(0, Math.min(steps - 1, Math.floor(((e.clientX - rect.left) / rect.width) * steps)));
-    const track = lane.dataset.track;
-    if (!currentPattern.instruments[track][step]) {
-      currentPattern.instruments[track][step] = DRUM_ORDER.includes(track) ? true : defaultNoteFor(track, step);
-      renderStepGrid();
-      if (openPianoRollInst === track) renderPianoRoll();
-      if (engine.isPlaying) engine.updatePattern(currentPattern);
-    }
-    return;
+  if (!lane) return;
+  e.preventDefault();
+
+  const track = lane.dataset.track;
+  const rect = lane.getBoundingClientRect();
+  const geom = { left: rect.left, width: rect.width, steps: selectedBars * STEPS_PER_BAR };
+  if (!geom.width) return;
+  const startStep = stepFromX(geom, e.clientX);
+  const isDrum = DRUM_ORDER.includes(track);
+
+  if (isDrum) {
+    if (!currentPattern.instruments[track][startStep]) currentPattern.instruments[track][startStep] = true;
+  } else {
+    if (currentPattern.instruments[track][startStep]) return;
+    currentPattern.instruments[track][startStep] = defaultNoteFor(track, startStep);
   }
+  rackDrag = { track, geom, isDrum, startStep };
+  renderStepGrid();
+  if (openPianoRollInst === track) renderPianoRoll();
+  if (engine.isPlaying) engine.updatePattern(currentPattern);
+});
+
+window.addEventListener("mousemove", (e) => {
+  if (!rackDrag) return;
+  const steps = rackDrag.geom.steps;
+  const step = stepFromX(rackDrag.geom, e.clientX);
+  const arr = currentPattern.instruments[rackDrag.track];
+
+  if (rackDrag.isDrum) {
+    // Paint hits across every step the pointer has swept over.
+    const lo = Math.min(rackDrag.startStep, step);
+    const hi = Math.max(rackDrag.startStep, step);
+    let changed = false;
+    for (let s = lo; s <= hi; s++) {
+      if (!arr[s]) { arr[s] = true; changed = true; }
+    }
+    if (!changed) return;
+  } else {
+    // Stretch the note being drawn out to the pointer, clamped so it
+    // never runs past the pattern or over an existing note.
+    const note = arr[rackDrag.startStep];
+    if (!note) return;
+    let len = Math.max(1, step - rackDrag.startStep + 1);
+    for (let s = rackDrag.startStep + 1; s < rackDrag.startStep + len; s++) {
+      if (s >= steps || arr[s]) { len = s - rackDrag.startStep; break; }
+    }
+    len = Math.max(1, Math.min(len, steps - rackDrag.startStep));
+    if (note.len === len) return;
+    note.len = len;
+  }
+  renderStepGrid();
+  if (openPianoRollInst === rackDrag.track) renderPianoRoll();
+  if (engine.isPlaying) engine.updatePattern(currentPattern);
+});
+
+window.addEventListener("mouseup", () => {
+  if (!rackDrag) return;
+  rackDrag = null;
 });
 
 stepGrid.addEventListener("input", (e) => {

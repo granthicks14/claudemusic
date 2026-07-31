@@ -4,13 +4,13 @@ const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, st
 
 const FLAVOR_POOLS = {
   kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "909", "linn", "707", "606", "dmx", "sp1200"],
-  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn", "707", "dmx", "sp1200"],
-  hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909", "707", "606"],
-  perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78", "talkingdrum"],
+  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn", "707", "dmx", "sp1200", "rimclick"],
+  hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909", "707", "606", "ride"],
+  perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78", "talkingdrum", "woodblock"],
   tom: ["acoustic", "simmons"],
-  bass: ["warm", "synth", "808", "true808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog", "303"],
+  bass: ["warm", "synth", "808", "true808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog", "303", "slap"],
   piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord", "dx7ep", "clav"],
-  lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm"],
+  lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm", "whistle"],
   pad: ["warm", "ensemble", "airy", "glass", "choir", "dark", "juno"],
   stab: ["pluck-chord", "square-chord", "bell-chord", "brass-chord", "organ-chord", "string-chord", "orchhit"],
   guitar: ["clean", "power", "muted", "nylon", "acoustic", "jazz", "funk", "twelvestring"],
@@ -18,7 +18,7 @@ const FLAVOR_POOLS = {
   horn: ["brass", "soft", "muted", "sax", "trumpetstab", "section", "clarinet", "frenchhorn", "oboe"],
   organ: ["drawbar", "gospel", "church", "combo"],
   vocal: ["ooh", "ahh", "ay", "oh", "choir", "vocoder"],
-  kalimba: ["kalimba", "musicbox", "steeldrum"],
+  kalimba: ["kalimba", "musicbox", "steeldrum", "glock"],
   marimba: ["marimba", "vibraphone"],
   arp: ["arp", "pulse"],
   // A real mono hook instrument for the "Auto-Tune hook" modern rap/trap
@@ -41,14 +41,14 @@ const FLAVOR_POOLS = {
 // applied to a shuffle, so "Generate Beat" lands on a beat that sounds like
 // one production instead of several unrelated instruments stacked together.
 const FLAVOR_TAGS = {
-  kick: { boombap: "warm", "808": "dark", fourfloor: "bright", acoustic: "warm", lofi: "warm", deep: "dark", snappy: "bright", click: "bright", punch: "bright", subkick: "dark", gritty: "dark", roomy: "warm", "909": "bright", linn: "warm", "707": "bright", "606": "dark", dmx: "dark", sp1200: "warm" },
-  snare: { crisp: "bright", clap: "bright", fat: "warm", rimshot: "bright", trapsnap: "bright", brush: "warm", gated: "dark", acoustic: "warm", ghost: "dark", layered: "dark", "909snare": "bright", linn: "warm", "707": "bright", dmx: "dark", sp1200: "warm" },
-  hihat: { bright: "bright", dark: "dark", vinyl: "warm", metallic: "bright", analog: "warm", tape: "warm", sizzle: "bright", lofi808: "dark", "909": "bright", "707": "bright", "606": "dark" },
-  perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright", timpani: "dark", cr78: "warm", talkingdrum: "warm" },
+  kick: { boombap: "warm", "808": "dark", fourfloor: "bright", acoustic: "warm", lofi: "warm", deep: "dark", snappy: "bright", click: "bright", punch: "bright", subkick: "dark", gritty: "dark", roomy: "warm", "909": "bright", linn: "warm", "707": "bright", "606": "dark", dmx: "dark", sp1200: "warm", rimclick: "warm" },
+  snare: { crisp: "bright", clap: "bright", fat: "warm", rimshot: "bright", trapsnap: "bright", brush: "warm", gated: "dark", acoustic: "warm", ghost: "dark", layered: "dark", "909snare": "bright", linn: "warm", "707": "bright", dmx: "dark", sp1200: "warm", rimclick: "warm" },
+  hihat: { bright: "bright", dark: "dark", vinyl: "warm", metallic: "bright", analog: "warm", tape: "warm", sizzle: "bright", lofi808: "dark", "909": "bright", "707": "bright", "606": "dark", ride: "bright" },
+  perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright", timpani: "dark", cr78: "warm", talkingdrum: "warm", woodblock: "bright" },
   tom: { acoustic: "warm", simmons: "bright" },
-  bass: { warm: "warm", synth: "bright", "808": "dark", true808: "dark", hard808: "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm", moog: "warm", "303": "bright" },
+  bass: { warm: "warm", synth: "bright", "808": "dark", true808: "dark", hard808: "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm", moog: "warm", "303": "bright", slap: "bright" },
   piano: { electric: "bright", pluck: "bright", grand: "warm", rhodes: "warm", wurlitzer: "warm", upright: "warm", celesta: "bright", toy: "bright", harpsichord: "bright", dx7ep: "bright", clav: "bright" },
-  lead: { square: "bright", saw: "bright", bell: "bright", flute: "warm", supersaw: "bright", pluck: "bright", sine: "warm", chip: "bright", brasslead: "warm", fm: "bright" },
+  lead: { square: "bright", saw: "bright", bell: "bright", flute: "warm", supersaw: "bright", pluck: "bright", sine: "warm", chip: "bright", brasslead: "warm", fm: "bright", whistle: "bright" },
   pad: { warm: "warm", ensemble: "warm", airy: "bright", glass: "bright", choir: "warm", dark: "dark", juno: "warm" },
   stab: { "pluck-chord": "bright", "square-chord": "bright", "bell-chord": "bright", "brass-chord": "warm", "organ-chord": "warm", "string-chord": "warm", orchhit: "dark" },
   guitar: { clean: "bright", power: "dark", muted: "dark", nylon: "warm", acoustic: "warm", jazz: "warm", funk: "bright", twelvestring: "bright" },
@@ -56,7 +56,7 @@ const FLAVOR_TAGS = {
   horn: { brass: "bright", soft: "warm", muted: "dark", sax: "warm", trumpetstab: "bright", section: "bright", clarinet: "warm", frenchhorn: "warm", oboe: "bright" },
   organ: { drawbar: "warm", gospel: "dark", church: "dark", combo: "bright" },
   vocal: { ooh: "warm", ahh: "warm", ay: "bright", oh: "warm", choir: "warm", vocoder: "bright" },
-  kalimba: { kalimba: "warm", musicbox: "bright", steeldrum: "bright" },
+  kalimba: { kalimba: "warm", musicbox: "bright", steeldrum: "bright", glock: "bright" },
   marimba: { marimba: "warm", vibraphone: "bright" },
   arp: { arp: "bright", pulse: "warm" },
   autolead: { hard: "bright", moody: "dark" },
@@ -1675,7 +1675,10 @@ const STYLES = {
     key: "F2",
     scale: "major",
     progressions: [[0, 2, 5, 4], [3, 2, 0, 4], [0, 5, 1, 4], [2, 5, 0, 3]],
-    defaultFlavors: { kick: "lofi", snare: "rimshot", hihat: "analog", perc: "shaker", bass: "pluck", piano: "rhodes", pad: "choir", guitar: "jazz", organ: "drawbar", vocal: "ooh" },
+    // Cross-stick, not a full snare: neo-soul's backbeat is almost always
+    // the stick laid across the head tapping the rim - the dry woody
+    // "tock" that leaves room for the Rhodes and keeps the pocket soft.
+    defaultFlavors: { kick: "lofi", snare: "rimclick", hihat: "analog", perc: "shaker", bass: "pluck", piano: "rhodes", pad: "choir", guitar: "jazz", organ: "drawbar", vocal: "ooh" },
     drums: {
       instruments: ["kick", "snare", "hihat", "perc"],
       main: {

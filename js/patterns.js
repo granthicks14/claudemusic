@@ -218,6 +218,21 @@ function generateMotif(lengthSteps, params, feel = "authored") {
 function transformMotif(motif, mode) {
   if (mode === "transposeUp") return motif.map((e) => (e.degreeOffset === null ? e : { ...e, degreeOffset: e.degreeOffset + 2 }));
   if (mode === "transposeDown") return motif.map((e) => (e.degreeOffset === null ? e : { ...e, degreeOffset: e.degreeOffset - 2 }));
+  // Two of the four original transforms only moved pitch, so a loop's
+  // rhythmic surface almost never changed bar to bar (measured 86-100%
+  // onset similarity). These two vary the rhythm instead: "thin" drops a
+  // note to open up space, "displace" nudges the phrase off its grid
+  // position - both standard ways a player varies a repeated figure.
+  if (mode === "thin") {
+    const sounding = motif.filter((e) => e.degreeOffset !== null);
+    if (sounding.length < 3) return motif;
+    const victim = sounding[1 + Math.floor(Math.random() * (sounding.length - 2))];
+    return motif.map((e) => (e === victim ? { ...e, degreeOffset: null } : e));
+  }
+  if (mode === "displace") {
+    const shift = Math.random() < 0.5 ? 1 : 2;
+    return motif.map((e) => ({ ...e, offset: e.offset + shift }));
+  }
   if (mode === "invert") {
     const reversed = [...motif].reverse();
     let pos = 0;
@@ -255,18 +270,37 @@ function planRegisterJitters(monoInstruments) {
   for (const inst of monoInstruments) {
     if (inst === "bass") {
       plan[inst] = 0;
-    } else if (melodicIdx === 0) {
-      plan[inst] = pickWeighted([[0, 3], [7, 1]]);
-      melodicIdx++;
-    } else {
-      plan[inst] = pickWeighted([[-7, 1], [0, 3]]);
-      melodicIdx++;
+      continue;
     }
+    // Jitter direction is home-register aware. Instruments that already
+    // live high (lead at 21, arp at 18) must never be pushed higher -
+    // that was sending leads to ~2.5-2.8kHz, well above where any real
+    // hook sits - while low-homed voices must not sink toward the bass.
+    const home = REGISTER[inst] || 14;
+    if (home >= 18) plan[inst] = pickWeighted([[0, 4], [-7, 1]]);
+    else if (home <= 7) plan[inst] = pickWeighted([[0, 4], [7, 1]]);
+    else plan[inst] = melodicIdx === 0 ? pickWeighted([[0, 4], [7, 1]]) : pickWeighted([[0, 4], [-7, 1]]);
+    melodicIdx++;
   }
   return plan;
 }
 
-function generateMonoMelody(register, structure, barRootDegrees, params, totalSteps, registerJitter = 0) {
+// Real hooks are singable because they stay inside roughly one octave -
+// corpus-wide, vocal and instrumental hooks span about 12-19 semitones.
+// Independently reasonable systems here (register jitter, the answer-
+// phrase octave drop, motif transposition) stacked multiplicatively and
+// scattered melodies across 26-38 semitones, so no phrase read as a
+// single idea. Folding by whole octaves keeps each note's scale identity
+// (and therefore the harmony) exactly intact while pulling outliers back
+// into a singable window.
+function foldIntoSpan(offset, halfSpan) {
+  let o = offset;
+  while (o > halfSpan) o -= 7;
+  while (o < -halfSpan) o += 7;
+  return o;
+}
+
+function generateMonoMelody(register, structure, barRootDegrees, params, totalSteps, registerJitter = 0, isBass = false) {
   const effectiveRegister = register + registerJitter;
 
   const arr = new Array(totalSteps).fill(null);
@@ -283,7 +317,7 @@ function generateMonoMelody(register, structure, barRootDegrees, params, totalSt
   while (chunkStart < totalSteps) {
     let motifToUse = motif;
     if (chunkIndex > 0 && Math.random() < params.variationProbability) {
-      const modes = ["transposeUp", "transposeDown", "invert", "truncate"];
+      const modes = ["transposeUp", "transposeDown", "invert", "truncate", "thin", "displace"];
       motifToUse = transformMotif(motif, modes[Math.floor(Math.random() * modes.length)]);
     }
     // Antecedent-consequent phrasing (standard "period" form in tonal
@@ -304,10 +338,12 @@ function generateMonoMelody(register, structure, barRootDegrees, params, totalSt
     // sometimes dropped an octave for contrast, and always resolves its
     // final note back to the tonic - the classic call-response pairing
     // that makes a phrase feel finished rather than just looping.
+    // The octave drop is a real call/response device, but at 50% it was
+    // one of three systems all widening the range at once - kept as a
+    // deliberate occasional contrast instead of a coin flip.
+    let phraseOctave = 0;
     if (chunkIndex % 2 === 1) {
-      if (Math.random() < 0.5) {
-        motifToUse = motifToUse.map((e) => (e.degreeOffset === null ? e : { ...e, degreeOffset: e.degreeOffset - 7 }));
-      }
+      if (Math.random() < 0.28) phraseOctave = -7;
       for (let i = motifToUse.length - 1; i >= 0; i--) {
         if (motifToUse[i].degreeOffset !== null) {
           motifToUse = motifToUse.map((e, idx) => (idx === i ? { ...e, degreeOffset: 0 } : e));
@@ -315,6 +351,9 @@ function generateMonoMelody(register, structure, barRootDegrees, params, totalSt
         }
       }
     }
+    // A bass line can roam a little wider than a hook and still read as
+    // one part; a melody is held to about an octave and a bit.
+    const halfSpan = isBass ? 5 : 4;
     for (const ev of motifToUse) {
       if (ev.degreeOffset === null) continue;
       const stepPos = chunkStart + ev.offset;
@@ -322,13 +361,22 @@ function generateMonoMelody(register, structure, barRootDegrees, params, totalSt
       const barIdx = Math.floor(stepPos / STEPS_PER_BAR);
       const barRoot = barRootDegrees[barIdx];
       const dur = Math.min(ev.duration, totalSteps - stepPos);
-      arr[stepPos] = { degree: barRoot + effectiveRegister + ev.degreeOffset, len: dur };
+      const folded = foldIntoSpan(ev.degreeOffset, halfSpan);
+      arr[stepPos] = { degree: barRoot + effectiveRegister + phraseOctave + folded, len: dur };
     }
     chunkStart += motifLen;
     chunkIndex++;
   }
 
-  if (structure[0] === "intro") thinRange(arr, 0, STEPS_PER_BAR, 0.3);
+  // A real intro layers in across the bar rather than being almost
+  // silent throughout - notes get progressively more likely to survive
+  // as the bar approaches the downbeat of bar 2.
+  if (structure[0] === "intro") {
+    for (let i = 0; i < STEPS_PER_BAR; i++) {
+      const keep = 0.2 + 0.55 * (i / (STEPS_PER_BAR - 1));
+      if (arr[i] && Math.random() > keep) arr[i] = null;
+    }
+  }
   return arr;
 }
 
@@ -374,7 +422,8 @@ function applyChorusHook(melody, inst, style, barMetas, barRootDegrees) {
         continue;
       }
       const dur = Math.min(ev.duration, hookLen - hookStep, melody.length - globalStep);
-      melody[globalStep] = { degree: barRoot + effectiveRegister + ev.degreeOffset, len: dur };
+      const folded = foldIntoSpan(ev.degreeOffset, inst === "bass" ? 5 : 4);
+      melody[globalStep] = { degree: barRoot + effectiveRegister + folded, len: dur };
     }
   }
 }
@@ -655,17 +704,20 @@ const STYLES = {
         },
         optionalProbability: 0.3,
       },
+      // The 2-and-4 backbeat is close to inviolable in rock, so both
+      // grooves keep it; the variation lives in the kick pattern, the
+      // straight-16th hats, and optional ghost-note snares instead.
       mainVariants: [{
         core: {
           kick:  [1,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
-          snare: [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
           hihat: [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
           tom:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
           perc:  [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
         },
         optional: {
           kick:  [0,0,1,0, 0,1,0,0, 0,0,1,0, 0,0,0,1],
-          snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 0,0,0,0],
+          snare: [0,0,0,0, 0,0,0,1, 0,0,1,0, 0,0,0,0],
           perc:  [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
         },
         optionalProbability: 0.3,
@@ -912,11 +964,12 @@ const STYLES = {
           snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
           hihat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
           openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-          perc:    [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+          perc:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
         },
         optional: {
           hihat:   [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
           openhat: [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+          perc:    [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
         },
         optionalProbability: 0.3,
       },
@@ -926,11 +979,12 @@ const STYLES = {
           snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
           hihat:   [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
           openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-          perc:    [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+          perc:    [1,0,1,1, 0,1,1,0, 1,0,1,1, 0,1,1,0],
         },
         optional: {
           hihat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
           openhat: [0,0,0,1, 0,0,0,0, 0,0,0,1, 0,0,0,0],
+          perc:    [0,1,0,0, 1,0,0,1, 0,1,0,0, 1,0,0,1],
         },
         optionalProbability: 0.3,
       }],
@@ -1240,7 +1294,7 @@ const STYLES = {
   dnb: {
     name: "Drum & Bass",
     description: "Fast syncopated breakbeat drums at ~172 BPM, a growling Reese bass.",
-    tempo: { min: 160, max: 176, default: 172 },
+    tempo: { min: 165, max: 178, default: 174 },
     swing: 0.02,
     humanize: { timingMs: 3, velocityJitter: 0.15 },
     key: "E1",
@@ -1467,7 +1521,7 @@ const STYLES = {
       main: {
         core: {
           kick:    [1,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
-          snare:   [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          snare:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 1,0,0,0],
           hihat:   [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
           openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
           perc:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
@@ -1483,10 +1537,10 @@ const STYLES = {
       mainVariants: [{
         core: {
           kick:    [1,0,0,0, 0,0,1,0, 0,0,0,0, 1,0,0,0],
-          snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          snare:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 1,0,0,0],
           hihat:   [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
           openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
-          perc:    [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+          perc:    [1,0,1,1, 0,1,1,0, 1,0,1,1, 0,1,1,0],
         },
         optional: {
           kick:    [0,0,1,0, 0,0,0,0, 0,1,0,0, 0,0,0,0],
@@ -1630,7 +1684,7 @@ const STYLES = {
       mainVariants: [{
         core: {
           kick:    [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
-          snare:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 1,0,0,0],
+          snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
           hihat:   [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
           openhat: [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
           perc:    [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,1,0,0],
@@ -1774,15 +1828,38 @@ function rollNoteTrack(core, optional, probability) {
 // whole-bar sustain, which is exactly what every pad in this app is -
 // an optional split into two half-bar chords with real harmonic motion
 // between them instead of one static block of sound.
+// Voice leading. Chords used to resolve to root position every single
+// time (always a plain stack of thirds), so a progression read as a
+// series of unrelated blocks being stamped down rather than one part
+// moving. Real keyboard and guitar players invert each chord so it sits
+// as close as possible to the previous one - common tones stay put and
+// the rest step by a note or two. Rotating the voicing (lifting the
+// lowest tones up an octave) and keeping whichever rotation moves least
+// is exactly that, and it never alters which notes are in the chord.
+function voiceLeadDegrees(degrees, prevLowest) {
+  if (prevLowest === null || prevLowest === undefined || degrees.length < 2) return degrees;
+  let best = degrees;
+  let bestCost = Infinity;
+  for (let rot = 0; rot < Math.min(degrees.length, 3); rot++) {
+    const cand = degrees.slice(rot).concat(degrees.slice(0, rot).map((d) => d + 7));
+    const cost = Math.abs(cand[0] - prevLowest);
+    if (cost < bestCost) { bestCost = cost; best = cand; }
+  }
+  return best;
+}
+
 function resolveChordBarTrack(instKey, cfg, barRootDegree, opts = {}) {
-  const { registerOffset = 0, voicingBonus = 0, splitMotion = null, anticipate = false } = opts;
+  const { registerOffset = 0, voicingBonus = 0, splitMotion = null, anticipate = false, prevLowest = null } = opts;
   const raw = rollNoteTrack(cfg.core, cfg.optional, cfg.optionalProbability);
   const register = REGISTER[instKey] + registerOffset;
+  let running = prevLowest;
   const resolved = raw.map((spec) => {
     if (!spec) return null;
     const root = barRootDegree + register + spec.degreeOffset;
     const size = Math.max(2, spec.size + voicingBonus);
-    return { degrees: chordDegrees(root, size), len: spec.len };
+    const led = voiceLeadDegrees(chordDegrees(root, size), running);
+    running = led[0];
+    return { degrees: led, len: spec.len };
   });
 
   if (splitMotion !== null) {
@@ -1850,11 +1927,15 @@ function buildStructure(bars) {
   return seq;
 }
 
-function buildDrumBar(style, variant) {
+// densityBoost shifts how many of the authored optional hits actually
+// land, so a chorus can genuinely be busier than its verse rather than
+// differing only in which instruments are switched on.
+function buildDrumBar(style, variant, densityBoost = 0) {
   const m = style.drums.main;
   const bar = {};
+  const prob = Math.max(0, Math.min(0.95, m.optionalProbability + densityBoost));
   for (const inst of style.drums.instruments) {
-    bar[inst] = rollTrack(m.core[inst], m.optional[inst], m.optionalProbability);
+    bar[inst] = rollTrack(m.core[inst], m.optional[inst], prob);
   }
   if (style.drums.instruments.includes("crash")) bar.crash = new Array(STEPS_PER_BAR).fill(false);
 
@@ -1869,8 +1950,12 @@ function buildDrumBar(style, variant) {
   }
 
   if (m.hihatRollSteps && bar.hihat && variant !== "intro") {
+    // Sparse trap-family genres have few optional hits to add, so their
+    // chorus energy comes the way it does on real records: more hi-hat
+    // rolls, not more instruments.
+    const rollProb = Math.max(0, Math.min(0.95, m.hihatRollProbability + densityBoost * 1.5));
     for (const step of m.hihatRollSteps) {
-      if (Math.random() < m.hihatRollProbability) bar.hihat[step] = "roll";
+      if (Math.random() < rollProb) bar.hihat[step] = "roll";
     }
   }
 
@@ -1916,7 +2001,7 @@ function buildDrumBar(style, variant) {
   return bar;
 }
 
-function buildChordBar(style, variant, barRootDegree, chordVariety) {
+function buildChordBar(style, variant, barRootDegree, chordVariety, prevLowest = {}) {
   const bar = {};
   const chordInstruments = style.melodic.chordInstruments || [];
   for (const inst of chordInstruments) {
@@ -1925,7 +2010,10 @@ function buildChordBar(style, variant, barRootDegree, chordVariety) {
       continue;
     }
     const v = (chordVariety && chordVariety[inst]) || {};
-    bar[inst] = resolveChordBarTrack(inst, style.chords[inst], barRootDegree, v);
+    bar[inst] = resolveChordBarTrack(inst, style.chords[inst], barRootDegree, { ...v, prevLowest: prevLowest[inst] });
+    for (let i = bar[inst].length - 1; i >= 0; i--) {
+      if (bar[inst][i]) { prevLowest[inst] = bar[inst][i].degrees[0]; break; }
+    }
     if (variant === "fill" && inst === "stab") {
       bar[inst][0] = { degrees: chordDegrees(barRootDegree + REGISTER.stab + (v.registerOffset || 0), 3 + (v.voicingBonus || 0)), len: 2 };
     }
@@ -2118,6 +2206,13 @@ function generateVariation(rawStyle, bars) {
   for (let i = 1; i < structure.length; i++) {
     if (structure[i - 1] === "fill" && drumBars[i].crash !== undefined) drumBars[i].crash[0] = true;
   }
+  // A loop always ends on its fill bar, so there is never a "next bar"
+  // inside the array for that fill to resolve onto - which meant the
+  // crash silently never fired in loop mode at all. Playback wraps, so
+  // the fill resolves onto bar 1's downbeat: put the crash there.
+  if (structure[structure.length - 1] === "fill" && drumBars[0].crash !== undefined) {
+    drumBars[0].crash[0] = true;
+  }
 
   const instruments = {};
   for (const inst of style.drums.instruments) {
@@ -2125,14 +2220,15 @@ function generateVariation(rawStyle, bars) {
   }
 
   const chordVariety = pickChordVariety(style);
-  const chordBars = structure.map((variant, i) => buildChordBar(style, variant, barRootDegrees[i], chordVariety));
+  const voiceState = {};
+  const chordBars = structure.map((variant, i) => buildChordBar(style, variant, barRootDegrees[i], chordVariety, voiceState));
   for (const inst of style.melodic.chordInstruments) {
     instruments[inst] = [].concat(...chordBars.map((b) => b[inst] || new Array(STEPS_PER_BAR).fill(null)));
   }
 
   const registerPlan = planRegisterJitters(style.melodic.monoInstruments);
   for (const inst of style.melodic.monoInstruments) {
-    instruments[inst] = generateMonoMelody(REGISTER[inst], structure, barRootDegrees, style.melody[inst], totalSteps, registerPlan[inst]);
+    instruments[inst] = generateMonoMelody(REGISTER[inst], structure, barRootDegrees, style.melody[inst], totalSteps, registerPlan[inst], inst === "bass");
   }
   declutterMonoCollisions(instruments, style.melodic.monoInstruments);
 
@@ -2254,7 +2350,9 @@ function layerFractionForBar(barMeta) {
   const { type, pos, len } = barMeta;
   const span = Math.max(len - 1, 1);
   if (type === "intro") return 0.2 + 0.6 * (pos / span);
-  if (type === "verse") return 0.7;
+  // Widened the verse/chorus gap: holding a couple of layers back in the
+  // verse is what makes the chorus feel like it opens up.
+  if (type === "verse") return 0.62;
   if (type === "chorus") return 1;
   if (type === "bridge") return pos < len / 2 ? 0.25 : 0.55;
   if (type === "outro") return 0.85 - 0.65 * (pos / span);
@@ -2283,9 +2381,16 @@ function generateSongVariation(rawStyle) {
 
   const drumVariant = barMetas.map((b) => (b.pos === b.len - 1 ? "fill" : "main"));
 
-  const drumBars = barMetas.map((_, i) => buildDrumBar(style, drumVariant[i]));
+  // Section energy: a chorus should be audibly bigger than its verse -
+  // measurement showed most genres lifting under 15%, and one where the
+  // chorus was actually quieter. Choruses now fire more of the authored
+  // optional hits and verses hold back, which is what a real arrangement
+  // does on top of simply switching layers in and out.
+  const sectionDensity = { intro: -0.12, verse: -0.08, chorus: 0.28, bridge: -0.14, outro: -0.1 };
+  const drumBars = barMetas.map((b, i) => buildDrumBar(style, drumVariant[i], sectionDensity[b.type] || 0));
   const chordVariety = pickChordVariety(style);
-  const chordBars = barMetas.map((_, i) => buildChordBar(style, drumVariant[i], barRootDegrees[i], chordVariety));
+  const voiceState = {};
+  const chordBars = barMetas.map((_, i) => buildChordBar(style, drumVariant[i], barRootDegrees[i], chordVariety, voiceState));
 
   const activeSets = barMetas.map((b) => {
     const count = Math.max(2, Math.round(layerFractionForBar(b) * totalInstruments));
@@ -2316,7 +2421,7 @@ function generateSongVariation(rawStyle) {
   }
   const registerPlan = planRegisterJitters(style.melodic.monoInstruments);
   for (const inst of style.melodic.monoInstruments) {
-    const melody = generateMonoMelody(REGISTER[inst], [], barRootDegrees, style.melody[inst], totalSteps, registerPlan[inst]);
+    const melody = generateMonoMelody(REGISTER[inst], [], barRootDegrees, style.melody[inst], totalSteps, registerPlan[inst], inst === "bass");
     applyChorusHook(melody, inst, style, barMetas, barRootDegrees);
     for (let i = 0; i < bars; i++) {
       if (activeSets[i].has(inst)) continue;
@@ -2340,5 +2445,19 @@ function generateSongVariation(rawStyle) {
 
   const structure = barMetas.map((b) => b.label);
   const automation = generateAutomation(style, barMetas);
+
+  // The same mix hierarchy loop mode uses - one clear featured melodic
+  // voice with the rest sitting behind it - applied on top of the
+  // arrangement curves instead of being overwritten by them, since a
+  // full song is exactly where an intentional lead matters most.
+  const supporting = style.melodic.monoInstruments.filter((i) => i !== "bass");
+  if (supporting.length > 1) {
+    const feature = supporting[Math.floor(Math.random() * supporting.length)];
+    for (const inst of supporting) {
+      if (inst === feature) continue;
+      if (automation[inst]) automation[inst] = automation[inst].map((pt) => ({ ...pt, value: pt.value * 0.78 }));
+      else automation[inst] = [{ step: 0, value: 0.78 }];
+    }
+  }
   return { instruments, structure, barRootDegrees, automation };
 }

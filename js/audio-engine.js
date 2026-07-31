@@ -18,6 +18,20 @@ const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash"
 // picked lines (lead guitar) - see playGuitarChord.
 const GUITAR_STRUM_FLAVORS = new Set(["power", "muted", "acoustic", "twelvestring", "funk"]);
 
+// Stereo placement. Everything used to sum dead-center mono, which makes
+// even a well-arranged mix sound crowded because every part competes for
+// the same spot in the image. Standard practice keeps the elements that
+// carry weight and identity up the middle - kick, snare, bass, lead vocal
+// - and spreads the supporting parts outward so each one has its own
+// space. Values are gentle; hard-panning would sound lopsided on
+// headphones.
+const DEFAULT_PAN = {
+  kick: 0, snare: 0, bass: 0, lead: 0, autolead: 0, vocal: 0, fx: 0,
+  hihat: 0.18, openhat: 0.22, perc: -0.26, tom: -0.14, crash: 0.3,
+  piano: -0.2, pad: 0.12, stab: 0.28, guitar: -0.3, strings: 0.24,
+  horn: -0.22, organ: 0.2, kalimba: -0.24, marimba: 0.26, arp: -0.28, sax: -0.18,
+};
+
 const DEFAULT_REVERB_SEND = {
   kick: 0, bass: 0, snare: 0.22, hihat: 0.08, openhat: 0.15, tom: 0.2, perc: 0.15, crash: 0.35,
   piano: 0.22, lead: 0.28, pad: 0.4, stab: 0.22, guitar: 0.18, strings: 0.35, horn: 0.22,
@@ -48,6 +62,7 @@ class BeatEngine {
     this.sidechainEnabled = false;
     this.reverbBus = null;
     this.reverbSends = {};
+    this.trackPanners = {};
     this.trackGains = {};
     this.trackState = {};
     this.automation = {};
@@ -134,7 +149,11 @@ class BeatEngine {
           node = hp;
         }
 
-        node.connect(DRUM_TRACKS.includes(t) ? this.masterGain : this.duckBus);
+        const pan = this.ctx.createStereoPanner();
+        pan.pan.value = DEFAULT_PAN[t] || 0;
+        node.connect(pan);
+        pan.connect(DRUM_TRACKS.includes(t) ? this.masterGain : this.duckBus);
+        this.trackPanners[t] = pan;
         this.trackGains[t] = g;
 
         const send = this.ctx.createGain();
@@ -264,6 +283,24 @@ class BeatEngine {
     const h = this.style.humanize;
     const v = base + (Math.random() * 2 - 1) * h.velocityJitter;
     return Math.max(0.35, Math.min(1.3, v));
+  }
+
+  // Metric accent. Velocity used to be pure random jitter with no idea
+  // where in the bar a hit landed, so a downbeat was no more likely to be
+  // loud than a passing 16th - which is most of why programmed drums read
+  // as machine-like. Real players (and any competent drum programmer)
+  // accent the metric hierarchy: the downbeat is strongest, the backbeat
+  // next, then the remaining quarters, with 8th- and 16th-note offbeats
+  // progressively softer. On a 16th-note hi-hat line that loud/soft
+  // alternation is essentially the entire difference between "grooving"
+  // and "buzzing."
+  metricAccent(step) {
+    const i = ((step % STEPS_PER_BAR) + STEPS_PER_BAR) % STEPS_PER_BAR;
+    if (i === 0) return 1.14;
+    if (i === 4 || i === 12) return 1.06;
+    if (i % 4 === 0) return 1.0;
+    if (i % 2 === 0) return 0.88;
+    return 0.78;
   }
 
   makeNoiseBuffer(seconds) {
@@ -1084,6 +1121,12 @@ class BeatEngine {
 
   playBass(time, freq, durationSeconds, vel, flavor) {
     const ctx = this.ctx;
+    // Bass lines could descend to ~23Hz, which is below what phones,
+    // laptops, and most speakers reproduce at all - the note vanishes
+    // while still eating headroom on the master. Anything under ~33Hz
+    // (roughly C1) is lifted an octave so it stays audible; real
+    // engineers do the same thing rather than let a sub note disappear.
+    while (freq < 33) freq *= 2;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
@@ -3153,7 +3196,10 @@ class BeatEngine {
 
       if (inst === "kick" || inst === "snare" || inst === "tom" || inst === "crash" || inst === "perc" || inst === "fx") {
         const t = this.jitterTime(time);
-        const vel = this.jitterVel(BASE_VELOCITY[inst]) * autoMul;
+        // Crashes and risers are deliberate one-off accents; they keep
+        // their own level rather than being scaled by bar position.
+        const accent = inst === "crash" || inst === "fx" ? 1 : this.metricAccent(step);
+        const vel = this.jitterVel(BASE_VELOCITY[inst] * accent) * autoMul;
         if (inst === "kick") this.playKick(t, vel, flavors.kick);
         else if (inst === "snare") this.playSnare(t, vel, flavors.snare);
         else if (inst === "tom") this.playTom(t, vel, flavors.tom);
@@ -3166,7 +3212,7 @@ class BeatEngine {
       if (inst === "hihat" || inst === "openhat") {
         const open = inst === "openhat";
         if (val === "roll") this.playHihatRoll(time, dur, open, flavors.hihat, inst);
-        else this.playHihat(this.jitterTime(time), this.jitterVel(BASE_VELOCITY[inst]) * autoMul, open, flavors.hihat, inst);
+        else this.playHihat(this.jitterTime(time), this.jitterVel(BASE_VELOCITY[inst] * this.metricAccent(step)) * autoMul, open, flavors.hihat, inst);
         continue;
       }
 
@@ -3176,7 +3222,7 @@ class BeatEngine {
       if (val.degrees) {
         for (const deg of val.degrees) {
           const freq = this.freqForDegree(deg, step);
-          const vel = this.jitterVel(BASE_VELOCITY[inst] * 0.85) * autoMul;
+          const vel = this.jitterVel(BASE_VELOCITY[inst] * 0.85 * (1 + (this.metricAccent(step) - 1) * 0.5)) * autoMul;
           if (inst === "piano") this.playPianoVoice(t, freq, noteDur, vel, flavors.piano);
           else if (inst === "pad") this.playPadVoice(t, freq, noteDur, vel, flavors.pad);
           else if (inst === "stab") this.playStabVoice(t, freq, noteDur, vel, flavors.stab);
@@ -3187,7 +3233,7 @@ class BeatEngine {
         }
       } else if (val.degree !== undefined) {
         const freq = this.freqForDegree(val.degree, step);
-        const vel = this.jitterVel(BASE_VELOCITY[inst]) * autoMul;
+        const vel = this.jitterVel(BASE_VELOCITY[inst] * (1 + (this.metricAccent(step) - 1) * 0.5)) * autoMul;
         if (inst === "bass") this.playBass(t, freq, noteDur, vel, flavors.bass);
         else if (inst === "lead") this.playLeadVoice(t, freq, noteDur, vel, flavors.lead);
         else if (inst === "guitar") {

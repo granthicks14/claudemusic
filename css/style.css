@@ -820,3 +820,16 @@ body {
   text-align: center;
   min-height: 1.2em;
 }
+
+/* The complexity dial sits with the transport controls but needs a bit
+   more room than the other fields, because its label carries a name. */
+.complexity-field {
+  min-width: 190px;
+}
+.complexity-field label {
+  white-space: nowrap;
+}
+#complexity-name {
+  color: var(--accent-2);
+  font-weight: 600;
+}

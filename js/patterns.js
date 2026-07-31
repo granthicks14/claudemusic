@@ -3,10 +3,10 @@ const STEPS_PER_BAR = 16;
 const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14, arp: 18, autolead: 14, sax: 14, woodwind: 17, leadguitar: 14, talkbox: 14 };
 
 const FLAVOR_POOLS = {
-  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "909", "linn", "707", "606", "dmx", "sp1200", "lm1", "rz1", "hr16", "r8"],
-  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn", "707", "dmx", "sp1200", "rimclick", "gatedverb", "lm1", "rz1", "hr16", "r8"],
-  hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909", "707", "606", "ride", "lm1", "rz1", "r8"],
-  perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78", "talkingdrum", "woodblock", "tabla", "cabasa", "guiro", "agogo", "vibraslap", "cajon", "djembe", "timbale"],
+  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "909", "linn", "707", "606", "dmx", "sp1200", "lm1", "rz1", "hr16", "r8", "drumulator", "drumtraks", "rx5", "cr8000", "kr55", "dr110", "mpc60"],
+  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn", "707", "dmx", "sp1200", "rimclick", "gatedverb", "lm1", "rz1", "hr16", "r8", "drumulator", "drumtraks", "rx5", "cr8000", "kr55", "dr110", "mpc60"],
+  hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909", "707", "606", "ride", "lm1", "rz1", "r8", "drumulator", "rx5", "cr8000", "kr55", "dr110", "mpc60"],
+  perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78", "talkingdrum", "woodblock", "tabla", "cabasa", "guiro", "agogo", "vibraslap", "cajon", "djembe", "timbale", "shekere", "ganza", "caxixi", "udu", "pandeiro", "tamborim", "repinique", "surdo", "bata", "cuica"],
   tom: ["acoustic", "simmons", "roto", "taiko"],
   bass: ["warm", "synth", "808", "true808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog", "303", "slap", "sh101", "fretless", "m1organbass"],
   piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord", "dx7ep", "clav", "m1piano", "cp70", "honkytonk"],
@@ -157,6 +157,25 @@ const FLAVOR_GENRES = {
   gfunk: ["hiphop", "rnb", "phonk", "rap"],
   robot: ["house", "techno", "rnb", "jerseyclub"],
   bright: ["house", "rnb", "neosoul", "ukgarage"],
+  // --- more documented drum machines
+  drumulator: ["hiphop", "lofi", "rap", "phonk", "house"],
+  drumtraks: ["synthwave", "rnb", "rock", "hiphop"],
+  rx5: ["synthwave", "house", "rnb", "techno", "dnb"],
+  cr8000: ["lofi", "house", "synthwave", "afrobeats"],
+  kr55: ["lofi", "rnb", "neosoul", "hiphop"],
+  dr110: ["techno", "house", "phonk", "lofi"],
+  mpc60: ["hiphop", "rap", "lofi", "rnb", "neosoul", "drill"],
+  // --- layering percussion, for the denser end of the complexity dial
+  shekere: ["afrobeats", "amapiano", "house", "neosoul"],
+  ganza: ["afrobeats", "house", "reggaeton", "amapiano"],
+  caxixi: ["afrobeats", "lofi", "neosoul", "amapiano"],
+  udu: ["afrobeats", "amapiano", "lofi", "neosoul"],
+  pandeiro: ["afrobeats", "house", "reggaeton", "neosoul"],
+  tamborim: ["afrobeats", "house", "reggaeton", "amapiano"],
+  repinique: ["afrobeats", "reggaeton", "house"],
+  surdo: ["afrobeats", "reggaeton", "amapiano", "dnb"],
+  bata: ["afrobeats", "amapiano", "house"],
+  cuica: ["afrobeats", "house", "reggaeton"],
 };
 
 // A flavor is available to a genre if it is universal, or if that genre is
@@ -182,10 +201,10 @@ function poolForGenre(inst, styleId) {
 // applied to a shuffle, so "Generate Beat" lands on a beat that sounds like
 // one production instead of several unrelated instruments stacked together.
 const FLAVOR_TAGS = {
-  kick: { boombap: "warm", "808": "dark", fourfloor: "bright", acoustic: "warm", lofi: "warm", deep: "dark", snappy: "bright", click: "bright", punch: "bright", subkick: "dark", gritty: "dark", roomy: "warm", "909": "bright", linn: "warm", "707": "bright", "606": "dark", dmx: "dark", sp1200: "warm", rimclick: "warm" , lm1: "warm", rz1: "dark", hr16: "warm", r8: "warm"},
-  snare: { crisp: "bright", clap: "bright", fat: "warm", rimshot: "bright", trapsnap: "bright", brush: "warm", gated: "dark", acoustic: "warm", ghost: "dark", layered: "dark", "909snare": "bright", linn: "warm", "707": "bright", dmx: "dark", sp1200: "warm", rimclick: "warm", gatedverb: "bright" , lm1: "warm", rz1: "bright", hr16: "warm", r8: "warm"},
-  hihat: { bright: "bright", dark: "dark", vinyl: "warm", metallic: "bright", analog: "warm", tape: "warm", sizzle: "bright", lofi808: "dark", "909": "bright", "707": "bright", "606": "dark", ride: "bright" , lm1: "warm", rz1: "bright", r8: "bright"},
-  perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright", timpani: "dark", cr78: "warm", talkingdrum: "warm", woodblock: "bright" , tabla: "warm", cabasa: "bright", guiro: "bright", agogo: "bright", vibraslap: "bright", cajon: "warm", djembe: "warm", timbale: "bright"},
+  kick: { boombap: "warm", "808": "dark", fourfloor: "bright", acoustic: "warm", lofi: "warm", deep: "dark", snappy: "bright", click: "bright", punch: "bright", subkick: "dark", gritty: "dark", roomy: "warm", "909": "bright", linn: "warm", "707": "bright", "606": "dark", dmx: "dark", sp1200: "warm", rimclick: "warm" , lm1: "warm", rz1: "dark", hr16: "warm", r8: "warm", drumulator: "dark", drumtraks: "warm", rx5: "bright", cr8000: "warm", kr55: "warm", dr110: "bright", mpc60: "warm"},
+  snare: { crisp: "bright", clap: "bright", fat: "warm", rimshot: "bright", trapsnap: "bright", brush: "warm", gated: "dark", acoustic: "warm", ghost: "dark", layered: "dark", "909snare": "bright", linn: "warm", "707": "bright", dmx: "dark", sp1200: "warm", rimclick: "warm", gatedverb: "bright" , lm1: "warm", rz1: "bright", hr16: "warm", r8: "warm", drumulator: "dark", drumtraks: "bright", rx5: "bright", cr8000: "bright", kr55: "warm", dr110: "bright", mpc60: "warm"},
+  hihat: { bright: "bright", dark: "dark", vinyl: "warm", metallic: "bright", analog: "warm", tape: "warm", sizzle: "bright", lofi808: "dark", "909": "bright", "707": "bright", "606": "dark", ride: "bright" , lm1: "warm", rz1: "bright", r8: "bright", drumulator: "dark", rx5: "bright", cr8000: "bright", kr55: "warm", dr110: "bright", mpc60: "warm"},
+  perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright", timpani: "dark", cr78: "warm", talkingdrum: "warm", woodblock: "bright" , tabla: "warm", cabasa: "bright", guiro: "bright", agogo: "bright", vibraslap: "bright", cajon: "warm", djembe: "warm", timbale: "bright", shekere: "warm", ganza: "bright", caxixi: "warm", udu: "dark", pandeiro: "bright", tamborim: "bright", repinique: "bright", surdo: "dark", bata: "warm", cuica: "bright"},
   tom: { acoustic: "warm", simmons: "bright" , roto: "bright", taiko: "dark"},
   bass: { warm: "warm", synth: "bright", "808": "dark", true808: "dark", hard808: "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm", moog: "warm", "303": "bright", slap: "bright" , sh101: "bright", fretless: "warm", m1organbass: "bright"},
   piano: { electric: "bright", pluck: "bright", grand: "warm", rhodes: "warm", wurlitzer: "warm", upright: "warm", celesta: "bright", toy: "bright", harpsichord: "bright", dx7ep: "bright", clav: "bright" , m1piano: "bright", cp70: "bright", honkytonk: "warm"},
@@ -490,8 +509,20 @@ function harmonyForNote(cfg, stepInBar, noteLen) {
   return Math.random() < chance ? shape : null;
 }
 
-function generateMonoMelody(register, structure, barRootDegrees, params, totalSteps, registerJitter = 0, isBass = false) {
+function generateMonoMelody(register, structure, barRootDegrees, rawParams, totalSteps, registerJitter = 0, isBass = false) {
   const effectiveRegister = register + registerJitter;
+  // Complexity shapes the LINE too, not just the drums: a simple setting
+  // rests more, repeats more and stays on chord tones; a complex one
+  // moves more, varies its motif more, and uses more passing tones. The
+  // bass is deliberately left alone - a bassline that will not hold still
+  // stops being a foundation, at any complexity.
+  const cx = complexityProfile();
+  const params = isBass ? rawParams : {
+    ...rawParams,
+    restProbability: Math.max(0.05, Math.min(0.85, rawParams.restProbability + cx.restBias)),
+    variationProbability: Math.max(0, Math.min(0.9, rawParams.variationProbability + cx.variationBoost)),
+    chordToneProbability: Math.max(0.35, Math.min(0.98, rawParams.chordToneProbability - cx.passingToneBoost)),
+  };
 
   const arr = new Array(totalSteps).fill(null);
   const motifLen = params.motifBars * STEPS_PER_BAR;
@@ -2147,6 +2178,7 @@ const CHORD_COLOR = {
 const DEFAULT_CHORD_COLOR = { extend: [[0, 5], [1, 1]], sus: 0.03 };
 
 function pickChordVariety(style) {
+  const cx = complexityProfile();
   const variety = {};
   for (const inst of style.melodic.chordInstruments || []) {
     // Low-homed chordal instruments (pad/organ/guitar sit at register 7)
@@ -2156,10 +2188,13 @@ function pickChordVariety(style) {
     const lowHomed = REGISTER[inst] <= 7;
     variety[inst] = {
       registerOffset: lowHomed ? pickWeighted([[0, 3], [7, 1]]) : pickWeighted([[-7, 1], [0, 3], [7, 1]]),
-      voicingBonus: pickWeighted((CHORD_COLOR[style.id] || DEFAULT_CHORD_COLOR).extend),
+      // Complexity adds chord extensions on top of the genre's own
+      // profile: triads at the bottom of the dial, 7ths in the middle,
+      // 9ths and 11ths at the top.
+      voicingBonus: pickWeighted((CHORD_COLOR[style.id] || DEFAULT_CHORD_COLOR).extend) + cx.extensionBonus,
       sus: Math.random() < (CHORD_COLOR[style.id] || DEFAULT_CHORD_COLOR).sus,
-      splitMotion: Math.random() < 0.45 ? pickWeighted([[4, 1], [-3, 1], [3, 1], [-4, 1]]) : null,
-      anticipate: Math.random() < 0.22,
+      splitMotion: Math.random() < cx.splitMotionProbability ? pickWeighted([[4, 1], [-3, 1], [3, 1], [-4, 1]]) : null,
+      anticipate: Math.random() < cx.anticipateProbability,
     };
   }
   return variety;
@@ -2183,10 +2218,157 @@ function buildStructure(bars) {
 // densityBoost shifts how many of the authored optional hits actually
 // land, so a chorus can genuinely be busier than its verse rather than
 // differing only in which instruments are switched on.
+// ---------------------------------------------------------------------------
+// Beat complexity, 1-10
+// ---------------------------------------------------------------------------
+// "Complexity" is easy to fake badly - just add more notes - and that
+// produces clutter, not sophistication. What actually separates a simple
+// beat from an intricate one is measurable, and it is mostly SYNCOPATION:
+// where onsets sit relative to the metric grid, not how many there are.
+//
+// The measure used here is Longuet-Higgins & Lee (1984), the standard
+// formal model of rhythmic syncopation. It works from the metric weight
+// hierarchy every listener implicitly carries for a 4/4 bar: the downbeat
+// is the strongest position, the half-bar next, then the remaining
+// quarters, then the 8ths, and the 16ths weakest. A syncopation is a
+// note-then-rest pair where the NOTE lands on a weak position and the
+// following REST sits on a STRONGER one - the listener expected the
+// strong position to be marked, and it was not. Each such pair scores the
+// difference between the two weights, and the bar's syncopation is the
+// sum.
+//
+// (The published weight tables sit behind servers that refuse automated
+// fetches, so the values below are the standard binary-subdivision
+// hierarchy the accessible literature describes rather than a table
+// transcribed from a page I could read: level 0 for the downbeat, then
+// one level down per binary subdivision.)
+const METRIC_WEIGHT = (() => {
+  // 16 pulses: 0 -> 0, 8 -> -1, 4/12 -> -2, even -> -3, odd -> -4.
+  const w = new Array(STEPS_PER_BAR);
+  for (let i = 0; i < STEPS_PER_BAR; i++) {
+    if (i % 16 === 0) w[i] = 0;
+    else if (i % 8 === 0) w[i] = -1;
+    else if (i % 4 === 0) w[i] = -2;
+    else if (i % 2 === 0) w[i] = -3;
+    else w[i] = -4;
+  }
+  return w;
+})();
+
+// LHL syncopation score for one lane over any number of bars.
+function syncopationScore(track) {
+  if (!track || !track.length) return 0;
+  let total = 0;
+  for (let i = 0; i < track.length; i++) {
+    if (!track[i]) continue;
+    // Find the rest that follows this onset, and compare metric weights.
+    const wNote = METRIC_WEIGHT[i % STEPS_PER_BAR];
+    for (let k = 1; k <= 8; k++) {
+      const j = i + k;
+      if (j >= track.length) break;
+      if (track[j]) break;                       // not a rest - no pair
+      const wRest = METRIC_WEIGHT[j % STEPS_PER_BAR];
+      if (wRest > wNote) { total += wRest - wNote; break; }
+    }
+  }
+  return total;
+}
+
+function patternSyncopation(instruments, lanes) {
+  let total = 0, bars = 0;
+  for (const lane of lanes) {
+    const t = instruments[lane];
+    if (!Array.isArray(t)) continue;
+    total += syncopationScore(t);
+    bars = Math.max(bars, t.length / STEPS_PER_BAR);
+  }
+  return bars ? total / bars : 0;
+}
+
+// The single knob, 1 (nursery-rhyme simple) to 10 (dense and intricate).
+// Everything below is derived from it, so the setting moves the whole
+// arrangement coherently instead of just turning up one parameter.
+let BEAT_COMPLEXITY = 5;
+function setBeatComplexity(n) {
+  BEAT_COMPLEXITY = Math.max(1, Math.min(10, Math.round(n)));
+}
+
+function complexityProfile(c = BEAT_COMPLEXITY) {
+  const t = (c - 1) / 9;   // 0 at simplest, 1 at most complex
+  return {
+    level: c,
+    t,
+    // Target LHL syncopation per bar, summed across the drum lanes. At 1
+    // the beat should sit almost entirely on the grid; at 10 it should
+    // be pushing against it constantly.
+    syncTarget: 1 + t * 16,
+    // Fraction of the grid that carries an onset, across all drums.
+    densityTarget: 0.13 + t * 0.26,
+    // The finest subdivision allowed to carry an onset. Simple beats are
+    // simple partly because they do not use 16ths at all. A hard bucket
+    // per subdivision made whole pairs of levels identical (1 and 2 were
+    // indistinguishable, so were 3 and 4), so the coarsening is graded:
+    // each level also has a probability that an off-grid hit survives,
+    // which fills in the steps between subdivisions.
+    minStep: c <= 2 ? 4 : c <= 4 ? 2 : 1,
+    offGridKeep: c === 1 ? 0 : c === 2 ? 0.3 : c === 3 ? 0.12 : c === 4 ? 0.45 : 1,
+    ghostProbability: 0.04 + t * 0.34,
+    rollBoost: (t - 0.4) * 0.5,
+    // Harmony: triads at the bottom, 7ths in the middle, 9ths and 11ths
+    // at the top. This is the same axis jazz uses to describe harmonic
+    // sophistication, so it belongs on a complexity control.
+    extensionBonus: t < 0.25 ? 0 : t < 0.5 ? 1 : t < 0.75 ? 2 : 3,
+    // Chords per bar. Faster harmonic rhythm is one of the clearest
+    // markers of a more worked-out arrangement.
+    splitMotionProbability: 0.1 + t * 0.65,
+    anticipateProbability: 0.05 + t * 0.45,
+    // Melody
+    restBias: 0.22 - t * 0.34,        // more complex = fewer rests
+    variationBoost: -0.1 + t * 0.35,
+    passingToneBoost: t * 0.22,
+    // How many voices are in play at once.
+    soloPairProbability: 0.12 + t * 0.6,
+    chordKeepProbability: 0.3 + t * 0.5,
+    percLayerProbability: t * 0.75,
+  };
+}
+
+// Quantise a drum lane up to the coarsest subdivision this complexity
+// allows. At complexity 1-2 that removes every 8th and 16th offbeat,
+// which is what actually makes a beat read as simple - not fewer hits,
+// but hits only in obvious places.
+function applyComplexityGrid(track, minStep, keep = 0) {
+  if (minStep <= 1 || !Array.isArray(track)) return track;
+  for (let i = 0; i < track.length; i++) {
+    if (track[i] && i % minStep !== 0 && Math.random() >= keep) track[i] = false;
+  }
+  return track;
+}
+
+// Push an onset off a strong position onto the weak one just before it.
+// This is the actual mechanism by which syncopation is created, and doing
+// it deliberately is very different from randomly adding notes: the total
+// number of onsets does not change at all, only where they sit.
+function syncopateTrack(track, amount) {
+  if (!Array.isArray(track) || amount <= 0) return track;
+  for (let i = track.length - 1; i >= 1; i--) {
+    if (!track[i] || track[i] === "ghost") continue;
+    const w = METRIC_WEIGHT[i % STEPS_PER_BAR];
+    // Only strong positions are worth displacing - moving a 16th offbeat
+    // achieves nothing.
+    if (w > -3 && !track[i - 1] && Math.random() < amount) {
+      track[i - 1] = track[i];
+      track[i] = false;
+    }
+  }
+  return track;
+}
+
 function buildDrumBar(style, variant, densityBoost = 0) {
+  const cx = complexityProfile();
   const m = style.drums.main;
   const bar = {};
-  const prob = Math.max(0, Math.min(0.95, m.optionalProbability + densityBoost));
+  const prob = Math.max(0, Math.min(0.95, m.optionalProbability + densityBoost + (cx.t - 0.5) * 0.45));
   for (const inst of style.drums.instruments) {
     bar[inst] = rollTrack(m.core[inst], m.optional[inst], prob);
   }
@@ -2206,7 +2388,7 @@ function buildDrumBar(style, variant, densityBoost = 0) {
     // Sparse trap-family genres have few optional hits to add, so their
     // chorus energy comes the way it does on real records: more hi-hat
     // rolls, not more instruments.
-    const rollProb = Math.max(0, Math.min(0.95, m.hihatRollProbability + densityBoost * 1.5));
+    const rollProb = Math.max(0, Math.min(0.95, m.hihatRollProbability + densityBoost * 1.5 + cx.rollBoost));
     for (const step of m.hihatRollSteps) {
       if (Math.random() < rollProb) bar.hihat[step] = "roll";
     }
@@ -2218,7 +2400,34 @@ function buildDrumBar(style, variant, densityBoost = 0) {
   // stiff. Placed only on weak 16ths, and never on top of a real hit.
   if (bar.snare && variant !== "intro" && GHOST_GENRES.has(style.id)) {
     for (const g of [2, 6, 10, 14, 7, 15]) {
-      if (!bar.snare[g] && Math.random() < 0.2) bar.snare[g] = "ghost";
+      if (!bar.snare[g] && Math.random() < cx.ghostProbability) bar.snare[g] = "ghost";
+    }
+  }
+
+  // ---- Complexity shaping -------------------------------------------
+  // Order matters. Coarsen to the allowed grid FIRST, so that a simple
+  // setting really has nothing on the offbeats; then displace onsets to
+  // create syncopation, which is what makes a complex setting complex.
+  // The kick and snare keep their downbeat and backbeat anchors at every
+  // level - a beat whose pulse cannot be found is not complex, it is
+  // just broken.
+  if (variant !== "intro") {
+    for (const inst of Object.keys(bar)) {
+      if (inst === "crash") continue;
+      applyComplexityGrid(bar[inst], cx.minStep, cx.offGridKeep);
+    }
+    if (cx.minStep > 1) {
+      // Coarsening can strip the backbeat if it sat on an odd step; put
+      // the genre's anchors back.
+      if (bar.kick && m.core.kick) for (let i = 0; i < STEPS_PER_BAR; i += 4) if (m.core.kick[i]) bar.kick[i] = true;
+      if (bar.snare && m.core.snare) for (let i = 0; i < STEPS_PER_BAR; i += 4) if (m.core.snare[i]) bar.snare[i] = true;
+    }
+    const syncAmount = Math.max(0, (cx.t - 0.45) * 0.55);
+    if (syncAmount > 0) {
+      for (const inst of Object.keys(bar)) {
+        if (inst === "kick" || inst === "crash") continue;   // keep the pulse findable
+        syncopateTrack(bar[inst], syncAmount);
+      }
     }
   }
 
@@ -2583,7 +2792,8 @@ function pickSoloInstruments(style) {
   if (!pool.length) return (style.melodic.monoInstruments || []).filter((i) => i !== "bass");
   const picked = [];
   const remaining = pool.slice();
-  const count = Math.random() < 0.42 && remaining.length > 1 ? 2 : 1;
+  const cx = complexityProfile();
+  const count = Math.random() < cx.soloPairProbability && remaining.length > 1 ? 2 : 1;
   for (let n = 0; n < count && remaining.length; n++) {
     const total = remaining.reduce((a, [, w]) => a + w, 0);
     let r = Math.random() * total;
@@ -2605,9 +2815,10 @@ function pickSoloInstruments(style) {
 function pickChordInstruments(style) {
   const all = style.melodic.chordInstruments || [];
   if (all.length <= 2) return all.slice();
+  const cx = complexityProfile();
   const kept = all.slice(0, 2);
   for (const inst of all.slice(2)) {
-    if (Math.random() < 0.55) kept.push(inst);
+    if (Math.random() < cx.chordKeepProbability) kept.push(inst);
   }
   return kept;
 }
@@ -3022,6 +3233,36 @@ function scoreVariation(style, v) {
   const mono = style.melodic.monoInstruments || [];
   const chordal = style.melodic.chordInstruments || [];
   let score = 0;
+
+  // 0. COMPLEXITY TARGET. The best-of-N search is the program's one real
+  // chance to be deliberate, so the complexity setting is not just a set
+  // of generation probabilities - it is something the search actively
+  // aims at. Candidates are measured with the Longuet-Higgins & Lee
+  // syncopation model and by onset density, and scored on how close they
+  // land to what was asked for. Without this the dial would only nudge
+  // the odds; with it, the program keeps looking until it finds a beat
+  // that actually is that complex.
+  {
+    const cx = complexityProfile();
+    const drumLanes = (style.drums.instruments || []).filter((d) => d !== "crash" && d !== "fx");
+    const sync = patternSyncopation(inst, drumLanes);
+    // Normalised distance from target, scored on a curve so near misses
+    // are cheap and being wildly off is expensive.
+    const syncErr = Math.abs(sync - cx.syncTarget) / 14;
+    score += 26 * Math.max(0, 1 - syncErr * syncErr);
+
+    let onsets = 0, slots = 0;
+    for (const d of drumLanes) {
+      const t = inst[d];
+      if (!Array.isArray(t)) continue;
+      for (const x of t) { slots++; if (x) onsets++; }
+    }
+    if (slots) {
+      const density = onsets / slots;
+      const densErr = Math.abs(density - cx.densityTarget) / 0.22;
+      score += 18 * Math.max(0, 1 - densErr * densErr);
+    }
+  }
 
   // 1. HARMONIC COHERENCE - the single most important criterion. A note
   // sounding on a strong beat should belong to the chord underneath it;

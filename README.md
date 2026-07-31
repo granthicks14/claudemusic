@@ -422,6 +422,69 @@ So the right model is not a vocoder bank. It is a synth tone through resonant fo
 **252 kits total.** All rendered offline — none silent, none clipping. 19 genres × 8 generations played live with zero console errors.
 
 
+## Beat complexity, 1–10
+
+A slider in the transport, from **1 Skeletal** to **10 Maximal**.
+
+"Complexity" is easy to fake badly — just add more notes — and that produces clutter, not sophistication. What actually separates a simple beat from an intricate one is measurable, and it is mostly **syncopation**: *where* onsets sit relative to the metric grid, not how many there are.
+
+### The measure
+
+The model used is **Longuet-Higgins & Lee (1984)**, the standard formal measure of rhythmic syncopation. It works from the metric weight hierarchy every listener implicitly carries for a 4/4 bar — the downbeat strongest, then the half-bar, then the remaining quarters, then the 8ths, the 16ths weakest. A syncopation is a **note-then-rest pair where the note lands on a weak position and the following rest sits on a stronger one**: the listener expected the strong position to be marked and it was not. Each pair scores the difference between the two weights, and the bar's syncopation is the sum.
+
+*(Sourcing note: the published weight tables are behind servers that refuse automated fetches, so the values encoded are the standard binary-subdivision hierarchy the accessible literature describes — level 0 for the downbeat, one level down per subdivision — rather than a table transcribed from a page I could read.)*
+
+### What the dial moves
+
+One knob, derived coherently across the whole arrangement rather than turning up a single parameter:
+
+- **Subdivision** — at 1 nothing lands off the quarter-note grid at all. This is what actually makes a beat read as simple: not fewer hits, but hits only in obvious places. The coarsening is *graded* (each level also has a probability that an off-grid hit survives) because hard buckets per subdivision made whole pairs of levels identical.
+- **Deliberate syncopation** — onsets are *displaced* off strong positions onto the weak step before. The onset count does not change at all, only where the hits sit. The kick keeps its anchor at every level: a beat whose pulse cannot be found is not complex, it is broken.
+- **Harmony** — triads at the bottom of the dial, 7ths in the middle, 9ths and 11ths at the top, plus faster harmonic rhythm and more anticipation.
+- **Melody** — simple settings rest more, repeat more and stay on chord tones; complex ones move more, vary the motif more and use more passing tones. The bass is deliberately exempt — a bassline that will not hold still stops being a foundation at any complexity.
+- **Layers** — how likely a second solo voice is, and how much of the supporting chordal cast is kept.
+
+### It is a target, not just a bias
+
+The best-of-12 candidate search is the program's one real chance to be deliberate, so the setting is not merely a set of generation probabilities — **the scorer aims at it**. Every candidate is measured with the LHL model and by onset density and scored on how close it lands to what was asked for. Without this the dial would only nudge the odds; with it, the program keeps looking until it finds a beat that genuinely is that complex.
+
+### Measured, 19 genres × 6 generations at each level
+
+| Level | LHL sync/bar | Drum density | Drum onsets/bar | Melodic notes/bar | Chord tones/hit |
+|---|---|---|---|---|---|
+| 1 | 2.4 | 0.127 | 9.1 | 9.8 | 3.60 |
+| 2 | 4.6 | 0.168 | 12.0 | 10.1 | 3.65 |
+| 3 | 5.2 | 0.205 | 14.7 | 10.7 | 3.73 |
+| 4 | 6.7 | 0.232 | 16.6 | 10.8 | 4.47 |
+| 5 | 8.6 | 0.279 | 20.0 | 11.4 | 4.41 |
+| 6 | 9.4 | 0.296 | 21.2 | 11.3 | 4.97 |
+| 7 | 10.4 | 0.305 | 21.8 | 11.9 | 4.96 |
+| 8 | 11.9 | 0.312 | 22.3 | 12.7 | 5.12 |
+| 9 | 12.4 | 0.318 | 22.7 | 13.6 | 5.11 |
+| 10 | 13.4 | 0.334 | 23.9 | 13.4 | 5.15 |
+
+Every level is distinct and every measure moves monotonically. Syncopation spans 5.6×, chord density goes from plain triads to 9ths and 11ths.
+
+Complexity changes the composition rather than a playback parameter, so it takes effect on the next **Generate Beat** — regenerating instantly would throw away hand edits.
+
+*(Bug found by the complexity work: the chord fitter lifted a too-close voice by an octave without re-sorting, so the lifted note could end up above the next one. The following comparison then came out negative and was silently treated as clear. Bigger chords at high complexity made it show up. The clarity pass now re-sorts and repeats until nothing moves — 0 violations at complexity 1, 5 and 10.)*
+
+## Thirty more kits
+
+**Seven more documented drum machines.** The E-mu **Drumulator** (1983) was the SP-12's direct ancestor and the reason early E-mu gear sounds crunchy. Sequential's **DrumTraks** (1984) was its tunable rival with a notably deep kick. The Yamaha **RX5** (1986) was clean 12-bit PCM aimed at studios. Roland's **CR-8000** (1981) is pure analog CompuRhythm, closer to a CR-78 than a 909. The Korg **KR-55** (1979) is a preset analog box with a soft round kick. The Boss **DR-110** (1983) is tiny, with almost no low end. The Akai **MPC60** (1988) — Roger Linn's design after the LinnDrum — is the machine golden-era hip-hop was built on.
+
+**Ten layering percussion instruments**, added specifically to serve the complexity dial: a genuinely intricate beat is built from several interlocking parts at different densities, and that needs instruments that can carry a fast subdivision without fighting the kit for the same frequencies.
+
+- **Shekere / ganzá / caxixi** — three shaken vessels distinguished by what rattles against what: hard beads on a hard gourd (loud, low-mid, with a thump when struck), metal shot in a metal tube (bright, continuous), seeds in a woven basket (dry, dark).
+- **Udu** — a clay pot with a side hole, so a Helmholtz resonator. Striking the hole changes the effective air volume and therefore the pitch, which is why one hand can play a two-note bass melody on it.
+- **Pandeiro / tamborim** — both Brazilian, both fast-wrist, both essential to samba's interlocking layers. The tamborim is a 6" frame drum hit with a plastic stick: extremely high, extremely dry, no jingles at all.
+- **Repinique / surdo** — the two ends of a samba bateria: the huge low drum that carries the pulse, and the high metal-shelled drum that calls the changes.
+- **Batá** — a double-headed hourglass drum played on both ends at once, so a single stroke is genuinely two pitches, which is why batá patterns sound like conversation.
+- **Cuíca** — a friction drum: a stick inside the shell is rubbed and drags the head with it, and the player changes pitch by pressing from outside. It squeaks and slides.
+
+**282 kits total.** All rendered through an `OfflineAudioContext` — none silent, none clipping. 19 genres generated and played at complexity 1, 5 and 10 with zero console errors, plus song mode and scratch mode.
+
+
 ## The reel is as long as your beat
 
 The reel used to run for a fixed 15, 30, or 60 seconds regardless of what the beat actually was, which is the wrong unit entirely: a 4-bar loop got chopped mid-phrase, and a full song got truncated a third of the way in. **Length is now derived from the pattern**, so a video always contains a whole number of loops and never cuts off in the middle of a bar.

@@ -8,6 +8,9 @@ const tempoSlider = document.getElementById("tempo-slider");
 const tempoValue = document.getElementById("tempo-value");
 const masterSlider = document.getElementById("master-slider");
 const swingSlider = document.getElementById("swing-slider");
+const complexitySlider = document.getElementById("complexity-slider");
+const complexityValue = document.getElementById("complexity-value");
+const complexityName = document.getElementById("complexity-name");
 const swingValue = document.getElementById("swing-value");
 const sidechainBtn = document.getElementById("sidechain-btn");
 const shuffleStatus = document.getElementById("shuffle-status");
@@ -98,6 +101,10 @@ const FLAVOR_LABELS = {
   overdrive: "Overdrive", fuzz: "Fuzz", wah: "Wah", sustain: "Feedback Sustain",
   octave: "Octave Lead", cleantone: "Clean Lead", harmonics: "Pinch Harmonics",
   // More classic synths.
+  drumulator: "Drumulator", drumtraks: "DrumTraks", rx5: "Yamaha RX5", cr8000: "CR-8000",
+  kr55: "Korg KR-55", dr110: "Boss DR-110", mpc60: "MPC60",
+  shekere: "Shekere", ganza: "Ganzá", caxixi: "Caxixi", udu: "Udu", pandeiro: "Pandeiro",
+  tamborim: "Tamborim", repinique: "Repinique", surdo: "Surdo", bata: "Batá", cuica: "Cuíca",
   roger: "Zapp Talkbox", gfunk: "G-Funk Talkbox", robot: "Robot Talkbox", bright: "Bright Talkbox",
   hoover: "Hoover", ms20: "MS-20", d50: "D-50", prophet: "Prophet-5", obxa: "OB-Xa",
   phasedist: "CZ Phase Dist", jupiter8: "Jupiter-8", polysix: "Polysix", ppgwave: "PPG Wave",
@@ -106,6 +113,16 @@ function flavorLabel(key) {
   if (FLAVOR_LABELS[key]) return FLAVOR_LABELS[key];
   return key.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+// What each rung of the complexity dial actually sounds like, so the
+// number is not just a number. These track the measured behaviour: at 1
+// nothing lands off the quarter-note grid at all; by 5 the beat is on
+// 16ths with real syncopation; at 10 it is displacing hits constantly and
+// voicing 9ths and 11ths.
+const COMPLEXITY_NAMES = {
+  1: "Skeletal", 2: "Simple", 3: "Steady", 4: "Grooving", 5: "Balanced",
+  6: "Busy", 7: "Intricate", 8: "Dense", 9: "Complex", 10: "Maximal",
+};
 
 const STYLE_ACCENTS = {
   hiphop: "#ff6b6b", trap: "#a55eea", house: "#26de81", rock: "#fd9644", reggaeton: "#fed330", lofi: "#45aaf2",
@@ -220,6 +237,7 @@ function rollTempoKeySwing(baseStyle) {
 }
 
 function selectStyle(id) {
+  complexityName.textContent = " — " + COMPLEXITY_NAMES[Number(complexitySlider.value)];
   selectedStyleId = id;
   baseStyle = STYLES[id];
   activeStyle = Object.assign({}, baseStyle, { key: baseStyle.key });
@@ -2194,6 +2212,17 @@ tempoSlider.addEventListener("input", () => {
   tempoValue.textContent = tempoSlider.value;
   engine.updateTempo(Number(tempoSlider.value));
   refreshReelDurations();
+});
+
+complexitySlider.addEventListener("input", () => {
+  const n = Number(complexitySlider.value);
+  setBeatComplexity(n);
+  complexityValue.textContent = n;
+  complexityName.textContent = " — " + COMPLEXITY_NAMES[n];
+  // Complexity changes the composition itself, not a playback parameter,
+  // so it only takes effect on the next generated beat. Regenerating
+  // immediately would throw away edits the user has made by hand.
+  shuffleStatus.textContent = `Complexity ${n} (${COMPLEXITY_NAMES[n]}) — hit Generate Beat to hear it.`;
 });
 
 swingSlider.addEventListener("input", () => {

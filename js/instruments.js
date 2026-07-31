@@ -221,19 +221,32 @@ function fitChordToInstrument(midis, inst) {
   out = out.filter((m) => m >= lo && m <= hi);
   if (out.length < 2) return out;
 
-  // 3. Low interval limit, from the bottom up. If the bottom two voices
-  //    are too close for that pitch, lift the upper one an octave; if that
+  // 3. Low interval limit, from the bottom up. If two adjacent voices are
+  //    too close for that pitch, lift the upper one an octave; if that
   //    puts it out of range, drop it entirely.
-  const fixed = [out[0]];
-  for (let i = 1; i < out.length; i++) {
-    let m = out[i];
-    const below = fixed[fixed.length - 1];
-    if (!intervalIsClear(below, m - below)) {
-      const lifted = m + 12;
-      if (lifted <= hi && !fixed.includes(lifted)) m = lifted;
-      else continue;
+  //
+  //    Lifting a voice can push it above the next one, which breaks the
+  //    bottom-up ordering the check depends on - the following comparison
+  //    then comes out negative and is silently treated as clear. So the
+  //    list is re-sorted and the pass repeated until nothing more moves.
+  let fixed = out;
+  for (let pass = 0; pass < 4; pass++) {
+    const next = [fixed[0]];
+    let changed = false;
+    for (let i = 1; i < fixed.length; i++) {
+      let m = fixed[i];
+      const below = next[next.length - 1];
+      const gap = m - below;
+      if (gap > 0 && !intervalIsClear(below, gap)) {
+        const lifted = m + 12;
+        if (lifted <= hi && !next.includes(lifted)) { m = lifted; changed = true; }
+        else { changed = true; continue; }
+      }
+      if (!next.includes(m)) next.push(m);
+      else changed = true;
     }
-    if (!fixed.includes(m)) fixed.push(m);
+    fixed = next.sort((a, b) => a - b);
+    if (!changed) break;
   }
   return fixed;
 }

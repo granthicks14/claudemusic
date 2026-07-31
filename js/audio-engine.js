@@ -423,6 +423,24 @@ class BeatEngine {
       rz1: { startFreq: 108, endFreq: 46, decay: 0.26 },
       hr16: { startFreq: 126, endFreq: 56, decay: 0.31 },
       r8: { startFreq: 138, endFreq: 50, decay: 0.44 },
+      // Seven more documented machines. The E-mu Drumulator (1983) was
+      // the SP-12's direct ancestor - cheap 8-bit samples, and the reason
+      // early E-mu gear sounds crunchy. Sequential's DrumTraks (1984) was
+      // its tunable rival with a notably deep kick. The Yamaha RX5 (1986)
+      // was a clean 12-bit PCM machine aimed at studios. Roland's CR-8000
+      // (1981) is pure analog CompuRhythm, closer to a CR-78 than a 909.
+      // The Korg KR-55 (1979) is a preset analog box with a soft, round
+      // kick. The Boss DR-110 (1983) is a tiny analog machine with almost
+      // no low end at all. The Akai MPC60 (1988) - Roger Linn's design
+      // after the LinnDrum - is the 12-bit machine golden-era hip-hop was
+      // built on, punchier and cleaner than an SP-1200.
+      drumulator: { startFreq: 112, endFreq: 44, decay: 0.27 },
+      drumtraks: { startFreq: 120, endFreq: 40, decay: 0.38 },
+      rx5: { startFreq: 132, endFreq: 58, decay: 0.25 },
+      cr8000: { startFreq: 96, endFreq: 42, decay: 0.35 },
+      kr55: { startFreq: 92, endFreq: 46, decay: 0.3 },
+      dr110: { startFreq: 150, endFreq: 82, decay: 0.13 },
+      mpc60: { startFreq: 124, endFreq: 48, decay: 0.3 },
     };
     const p = presets[flavor] || presets.boombap;
     const jitter = 0.92 + Math.random() * 0.16;
@@ -444,6 +462,15 @@ class BeatEngine {
       const shaper = ctx.createWaveShaper();
       shaper.curve = this.makeDistortionCurve(flavor === "gritty" ? 22 : 6);
       osc.connect(shaper).connect(gain).connect(this.dest("kick"));
+    } else if (flavor === "drumulator" || flavor === "mpc60") {
+      // Both are 12-bit-era samplers; the Drumulator is the grittier of
+      // the two, the MPC60 the cleaner and punchier.
+      const crush = ctx.createWaveShaper();
+      crush.curve = this.makeBitcrushCurve(flavor === "drumulator" ? 28 : 44);
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = flavor === "drumulator" ? 7500 : 11000;
+      osc.connect(crush).connect(lp).connect(gain).connect(this.dest("kick"));
     } else if (flavor === "rz1") {
       // The RZ-1's charm is its converters, not its samples: 12-bit
       // quantisation and a low sample rate. Same crush + band-limit pair
@@ -625,6 +652,13 @@ class BeatEngine {
       rz1: { noiseHp: 2400, noiseDecay: 0.14, toneFreq: 260, toneDecay: 0.09 },
       hr16: { noiseHp: 1100, noiseDecay: 0.29, toneFreq: 178, toneDecay: 0.2 },
       r8: { noiseHp: 1300, noiseDecay: 0.3, toneFreq: 190, toneDecay: 0.22 },
+      drumulator: { noiseHp: 1400, noiseDecay: 0.19, toneFreq: 200, toneDecay: 0.12 },
+      drumtraks: { noiseHp: 1600, noiseDecay: 0.22, toneFreq: 215, toneDecay: 0.14 },
+      rx5: { noiseHp: 1900, noiseDecay: 0.2, toneFreq: 230, toneDecay: 0.12 },
+      cr8000: { noiseHp: 2100, noiseDecay: 0.11, toneFreq: 280, toneDecay: 0.07 },
+      kr55: { noiseHp: 1700, noiseDecay: 0.15, toneFreq: 250, toneDecay: 0.09 },
+      dr110: { noiseHp: 2800, noiseDecay: 0.09, toneFreq: 320, toneDecay: 0.05 },
+      mpc60: { noiseHp: 1150, noiseDecay: 0.25, toneFreq: 186, toneDecay: 0.17 },
     };
     const p = presets[flavor] || presets.crisp;
 
@@ -791,6 +825,12 @@ class BeatEngine {
       lm1: { hp: 6000, lp: 11500, peak: 7500 },
       rz1: { hp: 7500, lp: 9000 },
       r8: { hp: 6800, lp: 14000, peak: 8500 },
+      drumulator: { hp: 7200, lp: 9500 },
+      rx5: { hp: 7800, lp: 13500, peak: 9000 },
+      cr8000: { hp: 8600, lp: 12000 },
+      kr55: { hp: 7000, lp: 11000, peak: 8000 },
+      dr110: { hp: 9200, lp: null },
+      mpc60: { hp: 6400, lp: 12500, peak: 7800 },
     };
     const decay = open ? 0.32 + Math.random() * 0.1 : 0.05 + Math.random() * 0.02;
 
@@ -1436,6 +1476,189 @@ class BeatEngine {
       stick.connect(hp3).connect(stg).connect(this.dest("perc"));
       stick.start(time);
       stick.stop(time + 0.02);
+      return;
+    }
+
+    // ---- Layering percussion ------------------------------------------
+    // These exist mainly to serve the complexity dial: a genuinely
+    // intricate beat is built from several interlocking parts at
+    // different densities, and that needs instruments that can carry a
+    // fast subdivision without fighting the kit for the same frequencies.
+    if (flavor === "shekere" || flavor === "ganza" || flavor === "caxixi") {
+      // Three shaken vessels, distinguished by what is rattling and
+      // against what. A shekere is a beaded net around a dried gourd -
+      // hard beads on a hard shell, so it is loud and low-mid heavy with
+      // a real thump when it is struck rather than shaken. A ganzá is
+      // metal shot in a metal tube - bright and continuous. A caxixi is
+      // seeds in a woven basket with a hard gourd bottom - dry and dark.
+      const bands = flavor === "shekere" ? [1400, 3200] : flavor === "ganza" ? [5200, 8500] : [2600, 4200];
+      const dur = flavor === "ganza" ? 0.1 : 0.075;
+      const n = ctx.createBufferSource();
+      n.buffer = this.makeNoiseBuffer(dur + 0.03);
+      const bp2 = ctx.createBiquadFilter();
+      bp2.type = "bandpass";
+      bp2.frequency.value = bands[0] + Math.random() * (bands[1] - bands[0]);
+      bp2.Q.value = 0.9;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vel * 0.45, time);
+      g.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      n.connect(bp2).connect(g).connect(this.dest("perc"));
+      n.start(time);
+      n.stop(time + dur + 0.02);
+      if (flavor === "shekere") {
+        // The gourd body being struck by the beads.
+        const body = ctx.createOscillator();
+        body.type = "sine";
+        body.frequency.setValueAtTime(190, time);
+        body.frequency.exponentialRampToValueAtTime(130, time + 0.06);
+        const bg = ctx.createGain();
+        bg.gain.setValueAtTime(vel * 0.35, time);
+        bg.gain.exponentialRampToValueAtTime(0.001, time + 0.07);
+        body.connect(bg).connect(this.dest("perc"));
+        body.start(time);
+        body.stop(time + 0.08);
+      }
+      return;
+    }
+    if (flavor === "udu") {
+      // A clay pot with a side hole: a Helmholtz resonator. Striking the
+      // hole changes the effective volume of air and therefore the pitch,
+      // which is why an udu can play a two-note bass melody with a hand.
+      const open = Math.random() < 0.45;
+      const base = open ? 78 : 128;
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(base * 1.4, time);
+      osc.frequency.exponentialRampToValueAtTime(base, time + 0.05);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vel * 0.9, time);
+      g.gain.exponentialRampToValueAtTime(0.001, time + 0.3);
+      osc.connect(g).connect(this.dest("perc"));
+      osc.start(time);
+      osc.stop(time + 0.32);
+      const slap = ctx.createBufferSource();
+      slap.buffer = this.makeNoiseBuffer(0.02);
+      const lp2 = ctx.createBiquadFilter();
+      lp2.type = "lowpass";
+      lp2.frequency.value = 2200;
+      const sg = ctx.createGain();
+      sg.gain.setValueAtTime(vel * 0.3, time);
+      sg.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
+      slap.connect(lp2).connect(sg).connect(this.dest("perc"));
+      slap.start(time);
+      slap.stop(time + 0.025);
+      return;
+    }
+    if (flavor === "pandeiro" || flavor === "tamborim") {
+      // Both Brazilian, both played with a fast wrist, and both essential
+      // to samba's interlocking layers. A pandeiro is a tambourine with a
+      // tunable head and dry jingles - head tone plus a short jingle
+      // rattle. A tamborim is a tiny 6" frame drum hit with a plastic
+      // stick: extremely high, extremely dry, no jingles at all.
+      const isPandeiro = flavor === "pandeiro";
+      const head = ctx.createOscillator();
+      head.type = "sine";
+      const hz = isPandeiro ? 300 : 620;
+      head.frequency.setValueAtTime(hz, time);
+      head.frequency.exponentialRampToValueAtTime(hz * 0.7, time + 0.05);
+      const hg = ctx.createGain();
+      hg.gain.setValueAtTime(vel * (isPandeiro ? 0.5 : 0.7), time);
+      hg.gain.exponentialRampToValueAtTime(0.001, time + (isPandeiro ? 0.08 : 0.05));
+      head.connect(hg).connect(this.dest("perc"));
+      head.start(time);
+      head.stop(time + 0.1);
+      const rattle = ctx.createBufferSource();
+      rattle.buffer = this.makeNoiseBuffer(isPandeiro ? 0.09 : 0.02);
+      const hp2 = ctx.createBiquadFilter();
+      hp2.type = "highpass";
+      hp2.frequency.value = isPandeiro ? 5000 : 6500;
+      const rg = ctx.createGain();
+      rg.gain.setValueAtTime(vel * (isPandeiro ? 0.4 : 0.22), time);
+      rg.gain.exponentialRampToValueAtTime(0.001, time + (isPandeiro ? 0.09 : 0.025));
+      rattle.connect(hp2).connect(rg).connect(this.dest("perc"));
+      rattle.start(time);
+      rattle.stop(time + 0.1);
+      return;
+    }
+    if (flavor === "repinique" || flavor === "surdo") {
+      // The two ends of a samba bateria. A surdo is the huge low drum
+      // that carries the pulse - almost pure low fundamental with a long
+      // decay. A repinique is a high tuned metal-shelled drum that cuts
+      // through everything and calls the changes.
+      const isSurdo = flavor === "surdo";
+      const base = isSurdo ? 68 : 340;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * (isSurdo ? 1.05 : 0.7), time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + (isSurdo ? 0.55 : 0.18));
+      gain.connect(this.dest("perc"));
+      for (const [ratio, lvl] of isSurdo ? [[1, 1], [1.7, 0.2]] : [[1, 1], [1.6, 0.45], [2.3, 0.2]]) {
+        const osc = ctx.createOscillator();
+        osc.type = isSurdo ? "sine" : "triangle";
+        osc.frequency.setValueAtTime(base * ratio, time);
+        osc.frequency.exponentialRampToValueAtTime(base * ratio * 0.82, time + (isSurdo ? 0.3 : 0.1));
+        const g = ctx.createGain();
+        g.gain.value = lvl;
+        osc.connect(g).connect(gain);
+        osc.start(time);
+        osc.stop(time + (isSurdo ? 0.6 : 0.2));
+      }
+      const stick = ctx.createBufferSource();
+      stick.buffer = this.makeNoiseBuffer(0.015);
+      const f = ctx.createBiquadFilter();
+      f.type = isSurdo ? "lowpass" : "highpass";
+      f.frequency.value = isSurdo ? 1200 : 3800;
+      const sg2 = ctx.createGain();
+      sg2.gain.setValueAtTime(vel * (isSurdo ? 0.3 : 0.4), time);
+      sg2.gain.exponentialRampToValueAtTime(0.001, time + 0.015);
+      stick.connect(f).connect(sg2).connect(this.dest("perc"));
+      stick.start(time);
+      stick.stop(time + 0.02);
+      return;
+    }
+    if (flavor === "bata") {
+      // A batá is a double-headed hourglass drum played on both ends at
+      // once, so a single stroke is genuinely two pitches - which is why
+      // batá patterns sound like conversation rather than like a beat.
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(vel * 0.8, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.25);
+      gain.connect(this.dest("perc"));
+      for (const [hz, lvl, off] of [[160, 1, 0], [420, 0.55, 0.006]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(hz * 1.25, time + off);
+        osc.frequency.exponentialRampToValueAtTime(hz, time + off + 0.06);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(lvl, time + off);
+        g.gain.exponentialRampToValueAtTime(0.001, time + off + 0.22);
+        osc.connect(g).connect(gain);
+        osc.start(time + off);
+        osc.stop(time + 0.28);
+      }
+      return;
+    }
+    if (flavor === "cuica") {
+      // A friction drum: a stick inside the shell is rubbed, dragging the
+      // head with it, and the player changes pitch by pressing the head
+      // from outside. It squeaks and slides, which is unlike anything
+      // else in a percussion rack.
+      const up = Math.random() < 0.5;
+      const base = 300 + Math.random() * 120;
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(up ? base : base * 1.8, time);
+      osc.frequency.exponentialRampToValueAtTime(up ? base * 1.8 : base, time + 0.16);
+      const bp2 = ctx.createBiquadFilter();
+      bp2.type = "bandpass";
+      bp2.frequency.value = 900;
+      bp2.Q.value = 3;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.linearRampToValueAtTime(vel * 0.5, time + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, time + 0.2);
+      osc.connect(bp2).connect(g).connect(this.dest("perc"));
+      osc.start(time);
+      osc.stop(time + 0.22);
       return;
     }
 

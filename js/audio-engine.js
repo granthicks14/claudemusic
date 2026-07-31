@@ -18,6 +18,10 @@ const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash"
 // picked lines (lead guitar) - see playGuitarChord.
 const GUITAR_STRUM_FLAVORS = new Set(["power", "muted", "acoustic", "twelvestring", "funk"]);
 
+// Distorted rock rhythm parts get double-tracked and hard-panned; an
+// acoustic strum or funk comp is normally a single centred performance.
+const GUITAR_DOUBLE_FLAVORS = new Set(["power", "muted"]);
+
 // Stereo placement. Everything used to sum dead-center mono, which makes
 // even a well-arranged mix sound crowded because every part competes for
 // the same spot in the image. Standard practice keeps the elements that
@@ -63,6 +67,8 @@ class BeatEngine {
     this.reverbBus = null;
     this.reverbSends = {};
     this.trackPanners = {};
+    this.trackFilters = {};
+    this.filterAutomation = {};
     this.trackGains = {};
     this.trackState = {};
     this.automation = {};
@@ -149,9 +155,20 @@ class BeatEngine {
           node = hp;
         }
 
+        // A per-track lowpass, wide open by default. In dance genres the
+        // filter sweep IS the arrangement - a resonant cutoff opening
+        // across 16 bars does the work that adding instruments does
+        // elsewhere - so tracks need a filter that automation can move.
+        const filt = this.ctx.createBiquadFilter();
+        filt.type = "lowpass";
+        filt.frequency.value = 20000;
+        filt.Q.value = 1.2;
+        node.connect(filt);
+        this.trackFilters[t] = filt;
+
         const pan = this.ctx.createStereoPanner();
         pan.pan.value = DEFAULT_PAN[t] || 0;
-        node.connect(pan);
+        filt.connect(pan);
         pan.connect(DRUM_TRACKS.includes(t) ? this.masterGain : this.duckBus);
         this.trackPanners[t] = pan;
         this.trackGains[t] = g;
@@ -274,15 +291,47 @@ class BeatEngine {
     if (this.masterGain) this.masterGain.gain.value = value;
   }
 
-  jitterTime(time) {
+  jitterTime(time, inst) {
     const h = this.style.humanize;
-    return time + (Math.random() * 2 - 1) * (h.timingMs / 1000);
+    // Per-instrument pocket. A single global humanize value can only
+    // make everything equally sloppy; real ensembles sit in different
+    // pockets at once - the Dilla/Questlove feel is drums dragging
+    // behind while the bass stays forward, which is a relationship
+    // between parts, not overall looseness.
+    const pocket = (this.style.pockets && inst && this.style.pockets[inst]) || 0;
+    return time + pocket / 1000 + (Math.random() * 2 - 1) * (h.timingMs / 1000);
   }
 
   jitterVel(base) {
     const h = this.style.humanize;
     const v = base + (Math.random() * 2 - 1) * h.velocityJitter;
     return Math.max(0.35, Math.min(1.3, v));
+  }
+
+  setFilterAutomation(track, points) {
+    this.filterAutomation[track] = points && points.length ? points : null;
+  }
+
+  // Reads the same kind of breakpoint curve the volume automation uses,
+  // but maps it exponentially onto cutoff frequency, because pitch and
+  // filter cutoff are both perceived logarithmically - a linear sweep
+  // sounds like it does nothing and then lurches.
+  applyFilterAutomation(track, step, time) {
+    const pts = this.filterAutomation[track];
+    const filt = this.trackFilters[track];
+    if (!pts || !filt) return;
+    let v = pts[0].value;
+    for (let i = 0; i < pts.length; i++) {
+      if (pts[i].step <= step) {
+        const nxt = pts[i + 1];
+        if (!nxt || nxt.step > step) {
+          v = nxt ? pts[i].value + (nxt.value - pts[i].value) * ((step - pts[i].step) / (nxt.step - pts[i].step)) : pts[i].value;
+          break;
+        }
+      }
+    }
+    const hz = 220 * Math.pow(90, Math.max(0, Math.min(1, v)));
+    filt.frequency.setTargetAtTime(hz, time, 0.02);
   }
 
   // Metric accent. Velocity used to be pure random jitter with no idea
@@ -524,6 +573,52 @@ class BeatEngine {
       sp1200: { noiseHp: 1000, noiseDecay: 0.21, toneFreq: 175, toneDecay: 0.15 },
     };
     const p = presets[flavor] || presets.crisp;
+
+    if (flavor === "gatedverb") {
+      // Gated reverb: a big bright reverb slammed shut by a noise gate
+      // before it can decay - discovered by accident at Townhouse
+      // Studios and immediately became THE 80s drum sound. The gate is
+      // the point: the tail must stop abruptly, not fade.
+      const noise = ctx.createBufferSource();
+      noise.buffer = this.makeNoiseBuffer(0.3);
+      const hp2 = ctx.createBiquadFilter();
+      hp2.type = "highpass";
+      hp2.frequency.value = 1400;
+      const g1 = ctx.createGain();
+      g1.gain.setValueAtTime(vel, time);
+      g1.gain.exponentialRampToValueAtTime(0.01, time + 0.14);
+      noise.connect(hp2).connect(g1).connect(this.dest("snare"));
+      noise.start(time);
+      noise.stop(time + 0.16);
+
+      const tone = ctx.createOscillator();
+      tone.type = "triangle";
+      tone.frequency.setValueAtTime(210, time);
+      const tg = ctx.createGain();
+      tg.gain.setValueAtTime(vel * 0.6, time);
+      tg.gain.exponentialRampToValueAtTime(0.01, time + 0.09);
+      tone.connect(tg).connect(this.dest("snare"));
+      tone.start(time);
+      tone.stop(time + 0.1);
+
+      // The gated tail: a dense burst held flat, then cut dead.
+      const tail = ctx.createBufferSource();
+      tail.buffer = this.makeNoiseBuffer(0.4);
+      const tailBp = ctx.createBiquadFilter();
+      tailBp.type = "bandpass";
+      tailBp.frequency.value = 1800;
+      tailBp.Q.value = 0.6;
+      const tailGain = ctx.createGain();
+      const gateLen = 0.19;
+      tailGain.gain.setValueAtTime(0.0001, time);
+      tailGain.gain.linearRampToValueAtTime(vel * 0.5, time + 0.012);
+      tailGain.gain.setValueAtTime(vel * 0.42, time + gateLen);
+      tailGain.gain.linearRampToValueAtTime(0.0001, time + gateLen + 0.008);
+      tail.connect(tailBp).connect(tailGain).connect(this.dest("snare"));
+      tail.start(time);
+      tail.stop(time + gateLen + 0.03);
+      return;
+    }
 
     if (flavor === "rimclick") {
       // Cross-stick (rim click): the stick lies across the head and taps
@@ -1119,6 +1214,24 @@ class BeatEngine {
     noise.stop(time + dur + 0.1);
   }
 
+  // A clean sine an octave down under a mangled mid-bass - standard
+  // bass-music layering so the sub stays solid no matter what the
+  // character layer is doing.
+  addSubLayer(time, freq, durationSeconds, vel) {
+    const ctx = this.ctx;
+    let f = freq / 2;
+    while (f < 33) f *= 2;
+    const sub = ctx.createOscillator();
+    sub.type = "sine";
+    sub.frequency.setValueAtTime(f, time);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vel, time);
+    g.gain.exponentialRampToValueAtTime(0.001, time + Math.max(durationSeconds, 0.2));
+    sub.connect(g).connect(this.dest("bass"));
+    sub.start(time);
+    sub.stop(time + Math.max(durationSeconds, 0.2) + 0.05);
+  }
+
   playBass(time, freq, durationSeconds, vel, flavor) {
     const ctx = this.ctx;
     // Bass lines could descend to ~23Hz, which is below what phones,
@@ -1337,12 +1450,21 @@ class BeatEngine {
     } else if (flavor === "reese") {
       // Classic drum & bass "Reese" bass: a stack of detuned sawtooths
       // beating against each other for a growling, dissonant texture.
-      gain.gain.setValueAtTime(vel * 0.7, time);
+      // Real bass-music production splits this into two layers: a clean
+      // sine sub carries the low end while the mangled mid-bass carries
+      // the character, and the mid layer is high-passed so the two never
+      // share the same octave. Without that split, the detuning
+      // phase-cancels in the sub and the low end goes soft.
+      gain.gain.setValueAtTime(vel * 0.55, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + durationSeconds);
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 150;
       const filter = ctx.createBiquadFilter();
       filter.type = "lowpass";
       filter.frequency.value = 1100;
-      filter.connect(gain).connect(this.dest("bass"));
+      filter.connect(hp).connect(gain).connect(this.dest("bass"));
+      this.addSubLayer(time, freq, durationSeconds, vel * 0.62);
       for (const detune of [-0.02, -0.007, 0.007, 0.02]) {
         const o = ctx.createOscillator();
         o.type = "sawtooth";
@@ -1365,9 +1487,13 @@ class BeatEngine {
       const lfoGain = ctx.createGain();
       lfoGain.gain.value = 1400;
       lfo.connect(lfoGain).connect(filter.frequency);
-      gain.gain.setValueAtTime(vel * 0.85, time);
+      gain.gain.setValueAtTime(vel * 0.7, time);
       gain.gain.exponentialRampToValueAtTime(0.001, time + durationSeconds);
-      osc.connect(filter).connect(gain).connect(this.dest("bass"));
+      const growlHp = ctx.createBiquadFilter();
+      growlHp.type = "highpass";
+      growlHp.frequency.value = 140;
+      osc.connect(filter).connect(growlHp).connect(gain).connect(this.dest("bass"));
+      this.addSubLayer(time, freq, durationSeconds, vel * 0.6);
       lfo.start(time);
       lfo.stop(time + durationSeconds + 0.05);
     } else if (flavor === "upright") {
@@ -1621,7 +1747,26 @@ class BeatEngine {
   //   (deliberately third-free, which is why they work over anything and
   //   survive heavy distortion), while acoustic/funk strums voice the
   //   actual diatonic triad handed in from the scale.
-  playGuitarChord(time, freqs, durationSeconds, vel, flavor) {
+  // Double-tracking is the foundation of a modern rock guitar sound:
+  // the player performs the same part twice and the two takes are panned
+  // hard left and right. The width comes from the small, unavoidable
+  // timing and pitch differences between two human performances - which
+  // is exactly why copying one track to both sides does NOT work. Two
+  // genuinely separate passes are rendered here, each with its own
+  // strum timing and detune, into opposite sides of the image.
+  playGuitarDoubled(time, freqs, durationSeconds, vel, flavor) {
+    const ctx = this.ctx;
+    for (const side of [-0.72, 0.72]) {
+      const pan = ctx.createStereoPanner();
+      pan.pan.value = side;
+      pan.connect(this.dest("guitar"));
+      const detune = 1 + (Math.random() * 2 - 1) * 0.0035;
+      const offset = Math.random() * 0.011;
+      this.playGuitarChord(time + offset, freqs.map((f) => f * detune), durationSeconds, vel * 0.72, flavor, pan);
+    }
+  }
+
+  playGuitarChord(time, freqs, durationSeconds, vel, flavor, destOverride) {
     let strings;
     if (flavor === "power") {
       // Each power-flavored string already adds its own fifth internally,
@@ -1636,13 +1781,13 @@ class BeatEngine {
     const order = Math.random() < 0.8 ? strings : [...strings].reverse();
     order.forEach((f, i) => {
       const t = time + i * gap * (0.9 + Math.random() * 0.2);
-      this.playGuitarVoice(t, f, durationSeconds, vel * 0.85 * (1 - i * 0.09), flavor);
+      this.playGuitarVoice(t, f, durationSeconds, vel * 0.85 * (1 - i * 0.09), flavor, destOverride);
     });
   }
 
-  playGuitarVoice(time, freq, durationSeconds, vel, flavor) {
+  playGuitarVoice(time, freq, durationSeconds, vel, flavor, destOverride) {
     const ctx = this.ctx;
-    const dest = this.dest("guitar");
+    const dest = destOverride || this.dest("guitar");
     // Held chords should ring like a real strummed guitar does, not get
     // clipped at ~1 second regardless of the note length.
     const dur = Math.min(durationSeconds, flavor === "muted" ? 0.18 : 2.2);
@@ -2151,6 +2296,33 @@ class BeatEngine {
     envelope.gain.linearRampToValueAtTime(vel, time + 0.02);
     envelope.gain.exponentialRampToValueAtTime(0.001, time + dur);
     envelope.connect(dest);
+
+    // Vocal stacking. A solo synthesized vowel sounds thin because real
+    // records almost never use one: a lead is doubled, then stacked with
+    // harmony parts and often an octave. Adding a quiet doubled voice
+    // (slightly detuned and delayed, the way a second take differs) and
+    // an octave-up whisper is what turns one voice into a section.
+    if (voiceCount === 1) {
+      const dbl = ctx.createOscillator();
+      dbl.type = "sawtooth";
+      dbl.frequency.setValueAtTime(freq * 1.006, time + 0.008);
+      const dblEnv = ctx.createGain();
+      dblEnv.gain.setValueAtTime(0.0001, time);
+      dblEnv.gain.linearRampToValueAtTime(vel * 0.4, time + 0.03);
+      dblEnv.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      dblEnv.connect(dest);
+      for (const fc of formants) {
+        const bp = ctx.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = fc * 1.02;
+        bp.Q.value = 11;
+        const g = ctx.createGain();
+        g.gain.value = 0.3;
+        dbl.connect(bp).connect(g).connect(dblEnv);
+      }
+      dbl.start(time);
+      dbl.stop(time + dur + 0.05);
+    }
 
     const levels = [1, 0.55, 0.3];
     for (let v = 0; v < voiceCount; v++) {
@@ -3195,13 +3367,15 @@ class BeatEngine {
       const autoMul = this.getAutomationMultiplier(inst, step);
 
       if (inst === "kick" || inst === "snare" || inst === "tom" || inst === "crash" || inst === "perc" || inst === "fx") {
-        const t = this.jitterTime(time);
+        const t = this.jitterTime(time, inst);
         // Crashes and risers are deliberate one-off accents; they keep
         // their own level rather than being scaled by bar position.
         const accent = inst === "crash" || inst === "fx" ? 1 : this.metricAccent(step);
         const vel = this.jitterVel(BASE_VELOCITY[inst] * accent) * autoMul;
         if (inst === "kick") this.playKick(t, vel, flavors.kick);
-        else if (inst === "snare") this.playSnare(t, vel, flavors.snare);
+        // Ghost notes - the quiet snare taps between the backbeats are
+        // most of what separates a real drummer from a grid pattern.
+        else if (inst === "snare") this.playSnare(t, val === "ghost" ? vel * 0.32 : vel, flavors.snare);
         else if (inst === "tom") this.playTom(t, vel, flavors.tom);
         else if (inst === "crash") this.playCrash(t, vel);
         else if (inst === "perc") this.playPerc(t, vel, flavors.perc);
@@ -3212,13 +3386,14 @@ class BeatEngine {
       if (inst === "hihat" || inst === "openhat") {
         const open = inst === "openhat";
         if (val === "roll") this.playHihatRoll(time, dur, open, flavors.hihat, inst);
-        else this.playHihat(this.jitterTime(time), this.jitterVel(BASE_VELOCITY[inst] * this.metricAccent(step)) * autoMul, open, flavors.hihat, inst);
+        else this.playHihat(this.jitterTime(time, inst), this.jitterVel(BASE_VELOCITY[inst] * this.metricAccent(step)) * autoMul, open, flavors.hihat, inst);
         continue;
       }
 
       // melodic
-      const t = this.jitterTime(time);
+      const t = this.jitterTime(time, inst);
       const noteDur = val.len * dur;
+      this.applyFilterAutomation(inst, step, time);
       if (val.degrees) {
         for (const deg of val.degrees) {
           const freq = this.freqForDegree(deg, step);
@@ -3243,7 +3418,8 @@ class BeatEngine {
           // highlife lines and jazz solos actually are.
           if (GUITAR_STRUM_FLAVORS.has(flavors.guitar)) {
             const chordFreqs = [val.degree, val.degree + 2, val.degree + 4].map((d) => this.freqForDegree(d, step));
-            this.playGuitarChord(t, chordFreqs, noteDur, vel, flavors.guitar);
+            if (GUITAR_DOUBLE_FLAVORS.has(flavors.guitar)) this.playGuitarDoubled(t, chordFreqs, noteDur, vel, flavors.guitar);
+            else this.playGuitarChord(t, chordFreqs, noteDur, vel, flavors.guitar);
           } else {
             this.playGuitarVoice(t, freq, noteDur, vel, flavors.guitar);
           }

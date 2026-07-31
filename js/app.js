@@ -257,8 +257,10 @@ scratchBtn.addEventListener("click", startFromScratch);
 
 function pushAutomationToEngine() {
   const automation = currentPattern.automation || {};
+  const filters = currentPattern.filterAutomation || {};
   for (const track of ALL_TRACKS) {
     engine.setAutomation(track, automation[track] || null);
+    engine.setFilterAutomation(track, filters[track] || null);
   }
 }
 
@@ -1411,7 +1413,7 @@ for (const btn of barsButtons) {
   btn.addEventListener("click", () => {
     if (btn.dataset.bars === "song") {
       arrangementMode = "song";
-      selectedBars = totalSongBars();
+      selectedBars = totalSongBars(activeStyle);
     } else {
       arrangementMode = "loop";
       selectedBars = Number(btn.dataset.bars);
@@ -1515,7 +1517,7 @@ function generateFromPrompt() {
 
   if (mood.long) {
     arrangementMode = "song";
-    selectedBars = totalSongBars();
+    selectedBars = totalSongBars(activeStyle);
     for (const b of barsButtons) b.classList.toggle("selected", b.dataset.bars === "song");
     notes.push("built out a full-length verse/chorus arrangement");
   }

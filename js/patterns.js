@@ -4,7 +4,7 @@ const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, st
 
 const FLAVOR_POOLS = {
   kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "909", "linn", "707", "606", "dmx", "sp1200"],
-  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn", "707", "dmx", "sp1200", "rimclick"],
+  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn", "707", "dmx", "sp1200", "rimclick", "gatedverb"],
   hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909", "707", "606", "ride"],
   perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78", "talkingdrum", "woodblock"],
   tom: ["acoustic", "simmons"],
@@ -42,7 +42,7 @@ const FLAVOR_POOLS = {
 // one production instead of several unrelated instruments stacked together.
 const FLAVOR_TAGS = {
   kick: { boombap: "warm", "808": "dark", fourfloor: "bright", acoustic: "warm", lofi: "warm", deep: "dark", snappy: "bright", click: "bright", punch: "bright", subkick: "dark", gritty: "dark", roomy: "warm", "909": "bright", linn: "warm", "707": "bright", "606": "dark", dmx: "dark", sp1200: "warm", rimclick: "warm" },
-  snare: { crisp: "bright", clap: "bright", fat: "warm", rimshot: "bright", trapsnap: "bright", brush: "warm", gated: "dark", acoustic: "warm", ghost: "dark", layered: "dark", "909snare": "bright", linn: "warm", "707": "bright", dmx: "dark", sp1200: "warm", rimclick: "warm" },
+  snare: { crisp: "bright", clap: "bright", fat: "warm", rimshot: "bright", trapsnap: "bright", brush: "warm", gated: "dark", acoustic: "warm", ghost: "dark", layered: "dark", "909snare": "bright", linn: "warm", "707": "bright", dmx: "dark", sp1200: "warm", rimclick: "warm", gatedverb: "bright" },
   hihat: { bright: "bright", dark: "dark", vinyl: "warm", metallic: "bright", analog: "warm", tape: "warm", sizzle: "bright", lofi808: "dark", "909": "bright", "707": "bright", "606": "dark", ride: "bright" },
   perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright", timpani: "dark", cr78: "warm", talkingdrum: "warm", woodblock: "bright" },
   tom: { acoustic: "warm", simmons: "bright" },
@@ -63,6 +63,18 @@ const FLAVOR_TAGS = {
   sax: { smooth: "warm", breathy: "dark" },
   fx: { riser: "bright", siren: "dark", impact: "dark" },
 };
+
+// Genres whose drum language actually uses ghost notes - a live-kit
+// idiom, not something an 808 pattern does.
+// Genres built on the 3+3+2 tresillo cell.
+// Genres where a filter sweep is a primary arrangement device.
+const FILTER_SWEEP_GENRES = new Set(["house", "techno", "dubstep", "dnb", "ukgarage", "synthwave"]);
+
+const DRUMS_SET = new Set(["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "fx"]);
+
+const TRESILLO_GENRES = new Set(["reggaeton", "afrobeats", "amapiano"]);
+
+const GHOST_GENRES = new Set(["rock", "rnb", "neosoul", "hiphop", "lofi", "dnb", "ukgarage"]);
 
 const FLAVOR_PALETTES = ["warm", "bright", "dark"];
 
@@ -454,6 +466,7 @@ const STYLES = {
     tempo: { min: 82, max: 96, default: 90 },
     swing: 0.15,
     humanize: { timingMs: 6, velocityJitter: 0.18 },
+    pockets: { snare: 8, hihat: 5 },
     key: "C2",
     scale: "minor",
     progressions: [[0, 3, 4, 3], [0, 5, 3, 4], [0, 6, 3, 4], [0, 3, 6, 2]],
@@ -806,6 +819,7 @@ const STYLES = {
     tempo: { min: 68, max: 84, default: 76 },
     swing: 0.18,
     humanize: { timingMs: 10, velocityJitter: 0.2 },
+    pockets: { snare: 12, hihat: 8, bass: -2 },
     key: "D2",
     scale: "dorian",
     progressions: [[0, 3, 4, 0], [0, 2, 3, 0], [0, 4, 3, 0], [0, 3]],
@@ -1363,7 +1377,7 @@ const STYLES = {
     // A Juno-106 chorus pad instead of a plain "warm" patch - that lush,
     // BBD-chorused analog pad is about as quintessentially 80s-synthwave
     // a texture as exists.
-    defaultFlavors: { kick: "linn", snare: "linn", hihat: "bright", bass: "synth", lead: "brasslead", pad: "juno", stab: "square-chord", arp: "arp" },
+    defaultFlavors: { kick: "linn", snare: "gatedverb", hihat: "bright", bass: "synth", lead: "brasslead", pad: "juno", stab: "square-chord", arp: "arp" },
     drums: {
       instruments: ["kick", "snare", "hihat", "openhat", "crash"],
       main: {
@@ -1726,6 +1740,10 @@ const STYLES = {
     tempo: { min: 80, max: 96, default: 88 },
     swing: 0.16,
     humanize: { timingMs: 14, velocityJitter: 0.2 },
+    // Drums drag behind while the bass stays forward - the "drunk"
+    // neo-soul pocket is this relationship between parts, not overall
+    // sloppiness.
+    pockets: { snare: 16, hihat: 10, kick: 4, bass: -3 },
     key: "F2",
     scale: "major",
     progressions: [[0, 2, 5, 4], [3, 2, 0, 4], [0, 5, 1, 4], [2, 5, 0, 3]],
@@ -1794,6 +1812,11 @@ const STYLES = {
     },
   },
 };
+
+// Each style carries its own key so downstream logic (ghost-note
+// idiom, filter sweeps, DJ-length intros) can ask which genre it is
+// without every call site having to thread the id through.
+for (const styleId of Object.keys(STYLES)) STYLES[styleId].id = styleId;
 
 function rollTrack(core, optional, probability) {
   const base = core || new Array(STEPS_PER_BAR).fill(0);
@@ -1959,6 +1982,16 @@ function buildDrumBar(style, variant, densityBoost = 0) {
     }
   }
 
+  // Ghost notes: quiet snare taps between the backbeats. Real drummers
+  // fill the space between 2 and 4 with these almost constantly; on a
+  // grid their absence is a big part of why programmed drums sound
+  // stiff. Placed only on weak 16ths, and never on top of a real hit.
+  if (bar.snare && variant !== "intro" && GHOST_GENRES.has(style.id)) {
+    for (const g of [2, 6, 10, 14, 7, 15]) {
+      if (!bar.snare[g] && Math.random() < 0.2) bar.snare[g] = "ghost";
+    }
+  }
+
   if (variant === "fill") {
     const type = style.fillType || "tomRun";
     if (type === "cut") {
@@ -2092,10 +2125,27 @@ function cloneGroove(m) {
   return g;
 }
 
-function mutateGroove(m) {
+function mutateGroove(m, tresilloAware = false) {
   const g = cloneGroove(m);
 
-  if (g.core.kick) {
+  // In Afro-Latin genres the kick doesn't just syncopate freely - it
+  // articulates the tresillo (3+3+2), the cell underlying dembow,
+  // habanera, and most Afro-diasporic dance rhythm. Mutating those
+  // kicks generically smears the very figure that defines the groove,
+  // so here mutation is constrained to positions inside the cell.
+  if (g.core.kick && tresilloAware) {
+    const kick = g.core.kick;
+    const cell = [0, 3, 6, 8, 11, 14];
+    if (Math.random() < 0.55) {
+      const present = cell.filter((i) => kick[i]);
+      const absent = cell.filter((i) => !kick[i] && i !== 0);
+      if (absent.length && Math.random() < 0.6) kick[absent[Math.floor(Math.random() * absent.length)]] = 1;
+      else if (present.length > 2) {
+        const drop = present.filter((i) => i !== 0);
+        if (drop.length) kick[drop[Math.floor(Math.random() * drop.length)]] = 0;
+      }
+    }
+  } else if (g.core.kick) {
     const kick = g.core.kick;
     // 1-2 kick edits per generation from {displace, add, remove}, all
     // restricted to syncopated (off-quarter) positions and guarded so the
@@ -2166,7 +2216,7 @@ function pickFillType() {
 function resolveGenerationStyle(style) {
   return {
     ...style,
-    drums: { ...style.drums, main: mutateGroove(pickDrumMain(style)) },
+    drums: { ...style.drums, main: mutateGroove(pickDrumMain(style), TRESILLO_GENRES.has(style.id)) },
     progression: pickProgression(style),
     fillType: pickFillType(),
   };
@@ -2189,7 +2239,7 @@ function buildBarContextsFromChords(chords, barCount, baseOctave = 2) {
   return contexts;
 }
 
-function generateVariation(rawStyle, bars) {
+function generateVariationOnce(rawStyle, bars) {
   const style = resolveGenerationStyle(rawStyle);
   const structure = buildStructure(bars);
   const totalSteps = bars * STEPS_PER_BAR;
@@ -2336,9 +2386,26 @@ function priorityInstrumentList(style) {
   return INSTRUMENT_PRIORITY.filter((i) => have.has(i));
 }
 
-function expandSongSections() {
+// House and techno are functional DJ music: the arrangement exists to
+// be mixed. Long drum-only intros and outros are what let another
+// record be beatmatched over the top, which is why club tracks are
+// built that way rather than opening on the hook.
+const DJ_GENRES = new Set(["house", "techno", "ukgarage"]);
+
+function sectionsForStyle(style) {
+  if (!DJ_GENRES.has(style.id)) return SONG_SECTIONS;
+  return [
+    { type: "intro", label: "DJ Intro", bars: 8 },
+    { type: "intro", label: "Intro", bars: 4 },
+    ...SONG_SECTIONS.filter((x) => x.type !== "intro" && x.type !== "outro"),
+    { type: "outro", label: "Outro", bars: 4 },
+    { type: "outro", label: "DJ Outro", bars: 8 },
+  ];
+}
+
+function expandSongSections(sections = SONG_SECTIONS) {
   const bars = [];
-  for (const section of SONG_SECTIONS) {
+  for (const section of sections) {
     for (let i = 0; i < section.bars; i++) {
       bars.push({ type: section.type, label: section.label, pos: i, len: section.bars });
     }
@@ -2359,13 +2426,13 @@ function layerFractionForBar(barMeta) {
   return 0.7;
 }
 
-function totalSongBars() {
-  return SONG_SECTIONS.reduce((s, sec) => s + sec.bars, 0);
+function totalSongBars(style) {
+  return (style ? sectionsForStyle(style) : SONG_SECTIONS).reduce((s, sec) => s + sec.bars, 0);
 }
 
-function generateSongVariation(rawStyle) {
+function generateSongVariationOnce(rawStyle) {
   const style = resolveGenerationStyle(rawStyle);
-  const barMetas = expandSongSections();
+  const barMetas = expandSongSections(sectionsForStyle(style));
   const bars = barMetas.length;
   const totalSteps = bars * STEPS_PER_BAR;
   const customChords = rawStyle.customChords;
@@ -2443,8 +2510,53 @@ function generateSongVariation(rawStyle) {
     }
   }
 
+  // PRE-CHORUS DROP-OUT. One beat of near-silence immediately before the
+  // chorus makes the return feel far bigger than it measures - the
+  // cheapest and most reliable arrangement trick there is. Everything
+  // cuts for the last beat of the bar before each chorus, leaving only
+  // whatever riser is building underneath.
+  for (let i = 1; i < bars; i++) {
+    if (barMetas[i].type !== "chorus" || barMetas[i].pos !== 0) continue;
+    const cutStart = (i - 1) * STEPS_PER_BAR + 12;
+    for (const inst of Object.keys(instruments)) {
+      if (inst === "fx") continue;
+      for (let st = cutStart; st < i * STEPS_PER_BAR; st++) {
+        instruments[inst][st] = DRUMS_SET.has(inst) ? false : null;
+      }
+    }
+  }
+
   const structure = barMetas.map((b) => b.label);
   const automation = generateAutomation(style, barMetas);
+
+  // FILTER SWEEPS. In club genres a resonant lowpass opening across a
+  // section does the work that adding instruments does elsewhere - it is
+  // the primary arrangement device, not an effect. Curves are shaped per
+  // section: closed and rising through intros and builds, wide open in
+  // choruses, pulled back for the bridge.
+  const filterAutomation = {};
+  if (FILTER_SWEEP_GENRES.has(style.id)) {
+    const targets = [...(style.melodic.chordInstruments || []), ...(style.melodic.monoInstruments || [])]
+      .filter((i) => i !== "bass");
+    for (const inst of targets) {
+      const pts = [];
+      let last = null;
+      barMetas.forEach((b, i) => {
+        const span = Math.max(b.len - 1, 1);
+        let v;
+        if (b.type === "intro") v = 0.25 + 0.5 * (b.pos / span);
+        else if (b.type === "verse") v = 0.55 + 0.3 * (b.pos / span);
+        else if (b.type === "chorus") v = 1;
+        else if (b.type === "bridge") v = 0.3 + 0.35 * (b.pos / span);
+        else v = 0.75 - 0.5 * (b.pos / span);
+        if (last === null || Math.abs(v - last) > 0.04 || i === barMetas.length - 1) {
+          pts.push({ step: i * STEPS_PER_BAR, value: Math.max(0, Math.min(1, v)) });
+          last = v;
+        }
+      });
+      filterAutomation[inst] = pts;
+    }
+  }
 
   // The same mix hierarchy loop mode uses - one clear featured melodic
   // voice with the rest sitting behind it - applied on top of the
@@ -2459,5 +2571,169 @@ function generateSongVariation(rawStyle) {
       else automation[inst] = [{ step: 0, value: 0.78 }];
     }
   }
-  return { instruments, structure, barRootDegrees, automation };
+  return { instruments, structure, barRootDegrees, automation, filterAutomation };
+}
+
+// ---- Intentionality: compose several candidates, keep the best one ----
+// Generating one random pattern and shipping it means the program never
+// actually *tries* to make a good beat - it just accepts whatever the
+// dice produced. Real producers write several versions of an idea and
+// keep the one that works. This does the same thing: each request
+// composes a handful of complete candidate beats, judges each one
+// against criteria drawn from how music is actually evaluated, and
+// returns the strongest. Everything scored here is a real musical
+// property, not a proxy for novelty.
+
+function isChordTone(relDegree) {
+  const r = ((relDegree % 7) + 7) % 7;
+  return r === 0 || r === 2 || r === 4;
+}
+
+function scoreVariation(style, v) {
+  const inst = v.instruments;
+  const bars = v.structure.length;
+  const mono = style.melodic.monoInstruments || [];
+  const chordal = style.melodic.chordInstruments || [];
+  let score = 0;
+
+  // 1. HARMONIC COHERENCE - the single most important criterion. A note
+  // sounding on a strong beat should belong to the chord underneath it;
+  // dissonance on a weak beat is passing colour, dissonance on a
+  // downbeat is a wrong note. Weighted so on-beat consonance dominates.
+  let strongTotal = 0, strongConsonant = 0, weakTotal = 0, weakConsonant = 0;
+  for (const i of mono) {
+    const arr = inst[i] || [];
+    for (let s2 = 0; s2 < arr.length; s2++) {
+      const n = arr[s2];
+      if (!n) continue;
+      const bar = Math.floor(s2 / STEPS_PER_BAR);
+      const rel = n.degree - (v.barRootDegrees[bar] || 0);
+      const strong = s2 % 4 === 0;
+      if (strong) { strongTotal++; if (isChordTone(rel)) strongConsonant++; }
+      else { weakTotal++; if (isChordTone(rel)) weakConsonant++; }
+    }
+  }
+  if (strongTotal) score += 34 * (strongConsonant / strongTotal);
+  // Weak beats want *some* colour - all-chord-tone melodies are bland,
+  // so the ideal sits near 65% rather than at 100%.
+  if (weakTotal) score += 10 * (1 - Math.abs(weakConsonant / weakTotal - 0.65) / 0.65);
+
+  // 2. BASS ANCHORS THE HARMONY. The bass note under a bar's downbeat
+  // should be that chord's root - that is what makes a progression read
+  // as the progression rather than as vague noise.
+  if (inst.bass) {
+    let downbeats = 0, onRoot = 0;
+    for (let b = 0; b < bars; b++) {
+      const n = inst.bass[b * STEPS_PER_BAR];
+      if (!n) continue;
+      downbeats++;
+      if (((n.degree - (v.barRootDegrees[b] || 0)) % 7 + 7) % 7 === 0) onRoot++;
+    }
+    if (downbeats) score += 14 * (onRoot / downbeats);
+    score += 6 * Math.min(1, downbeats / bars);
+  }
+
+  // 3. REGISTER SEPARATION. Two melodic voices occupying the same octave
+  // fight each other; an arranger spreads them apart.
+  const leads = mono.filter((i) => i !== "bass");
+  if (leads.length > 1) {
+    const means = leads.map((i) => {
+      const ns = (inst[i] || []).filter(Boolean);
+      return ns.length ? ns.reduce((a, n) => a + n.degree, 0) / ns.length : null;
+    }).filter((x) => x !== null);
+    if (means.length > 1) {
+      let minGap = Infinity;
+      for (let a = 0; a < means.length; a++)
+        for (let b = a + 1; b < means.length; b++)
+          minGap = Math.min(minGap, Math.abs(means[a] - means[b]));
+      score += 8 * Math.min(1, minGap / 4);
+    }
+  }
+
+  // 4. THE PARTS SHOULD INTERLOCK, NOT COLLIDE. Melodic voices landing on
+  // the same step constantly is clutter; never overlapping at all is
+  // incoherent. A modest overlap is what real ensemble playing produces.
+  if (leads.length > 1) {
+    const a = inst[leads[0]] || [], b = inst[leads[1]] || [];
+    let both = 0, either = 0;
+    for (let i = 0; i < a.length; i++) {
+      const x = !!a[i], y = !!b[i];
+      if (x || y) either++;
+      if (x && y) both++;
+    }
+    if (either) score += 8 * (1 - Math.abs(both / either - 0.2) / 0.8);
+  }
+
+  // 5. DENSITY SWEET SPOT. Wall-to-wall onsets exhaust the ear; an empty
+  // grid is not a beat. Target a moderate fill with real space in it.
+  let onsets = 0, slots = 0;
+  for (const k of Object.keys(inst)) {
+    for (const x of inst[k]) { slots++; if (x) onsets++; }
+  }
+  if (slots) {
+    const fill = onsets / slots;
+    score += 10 * Math.max(0, 1 - Math.abs(fill - 0.22) / 0.22);
+  }
+
+  // 6. SINGABLE RANGE + 7. CONTOUR. A hook stays inside about an octave
+  // and moves mostly by step, leaping only occasionally.
+  for (const i of leads) {
+    const ns = (inst[i] || []).filter(Boolean).map((n) => n.degree);
+    if (ns.length < 3) continue;
+    const span = Math.max(...ns) - Math.min(...ns);
+    score += 6 * Math.max(0, 1 - Math.abs(span - 7) / 9);
+    let steps = 0, leapsBig = 0;
+    for (let k = 1; k < ns.length; k++) {
+      const d = Math.abs(ns[k] - ns[k - 1]);
+      if (d > 0 && d <= 2) steps++;
+      if (d >= 5) leapsBig++;
+    }
+    score += 6 * (steps / Math.max(1, ns.length - 1));
+    score -= 5 * (leapsBig / Math.max(1, ns.length - 1));
+  }
+
+  // 8. THE HOOK SHOULD RECUR. A figure the ear can recognise on its
+  // return is the difference between a hook and noodling.
+  if (bars >= 3) {
+    for (const i of leads.slice(0, 1)) {
+      const arr = inst[i] || [];
+      let same = 0;
+      for (let k = 0; k < STEPS_PER_BAR; k++) {
+        if (!!arr[STEPS_PER_BAR + k] === !!arr[3 * STEPS_PER_BAR + k]) same++;
+      }
+      score += 6 * (same / STEPS_PER_BAR);
+    }
+  }
+
+  // 9. CHORDS SHOULD ACTUALLY SOUND. A chordal instrument that rolled
+  // its way into near-silence leaves the harmony unstated.
+  for (const i of chordal) {
+    const c = (inst[i] || []).filter(Boolean).length;
+    if (c > 0) score += 2;
+  }
+
+  return score;
+}
+
+// Candidate counts are tuned so selection is meaningful without making
+// "Generate" feel slow - a full beat is only array math, so this stays
+// well inside a single frame.
+function generateVariation(rawStyle, bars) {
+  let best = null, bestScore = -Infinity;
+  for (let i = 0; i < 9; i++) {
+    const cand = generateVariationOnce(rawStyle, bars);
+    const sc = scoreVariation(rawStyle, cand);
+    if (sc > bestScore) { bestScore = sc; best = cand; }
+  }
+  return best;
+}
+
+function generateSongVariation(rawStyle) {
+  let best = null, bestScore = -Infinity;
+  for (let i = 0; i < 5; i++) {
+    const cand = generateSongVariationOnce(rawStyle);
+    const sc = scoreVariation(rawStyle, cand);
+    if (sc > bestScore) { bestScore = sc; best = cand; }
+  }
+  return best;
 }

@@ -245,6 +245,33 @@ A few smaller genre-authenticity refinements from the same pass:
 - **Juno-106 pad** — the Roland Juno-106's signature isn't really its oscillator (a plain analog saw); it's the built-in BBD (bucket-brigade device) chorus circuit almost every classic Juno pad patch was run through, which is what actually gives it that lush, wide, shimmering character. Modeled as the real DSP a chorus circuit uses — a short delay line whose delay time is itself slowly modulated by an LFO, mixed back in with the dry signal — rather than just another detuned oscillator faking "width." New Pad flavor, and Synthwave's new default.
 - **Vocoder** — a real vocoder imposes a filter bank derived from a spoken "modulator" signal onto a synthesized carrier tone; without an actual speech input to analyze, the classic *synthesized* vocoder hit (Herbie Hancock, Zapp, Daft Punk-adjacent) is approximated with a buzzy square-wave carrier — harmonically richer and more mechanical than the vocal instrument's sawtooth — through a coarser bank of more, narrower fixed-frequency bands, and, like Auto Lead, deliberately no vibrato at all. New Vocal flavor.
 
+## Every beat is composed, not just rolled
+
+The most important change in the whole project. Generating one random pattern and shipping it means the program never actually *tries* to make a good beat — it accepts whatever the dice produced. Real producers write several versions of an idea and keep the one that works, so that's what happens now: **each request composes nine complete candidate beats, judges each against real musical criteria, and returns the strongest.**
+
+Nothing scored is a proxy for novelty; every criterion is a property music is actually judged on:
+
+- **Harmonic coherence** (weighted heaviest). A note sounding on a strong beat should belong to the chord underneath it. Dissonance on a weak beat is passing colour; dissonance on a downbeat is a wrong note. Weak beats are scored toward ~65% consonance rather than 100%, because an all-chord-tone melody is bland.
+- **Bass anchoring the harmony** — the bass under a bar's downbeat should be that chord's root. That's what makes a progression read *as* the progression.
+- **Register separation** between melodic voices, so parts don't fight for the same octave.
+- **Interlock, not collision** — voices sharing a step ~20% of the time reads as an ensemble; constant overlap is clutter, zero overlap is incoherent.
+- **Density sweet spot**, **singable range** (~an octave), **contour** (mostly steps, occasional leaps), **hook recurrence** (bar 3 restating bar 1), and **chords actually sounding** rather than rolling their way into silence.
+
+Measured across all 19 genres: **musical quality +22% over accepting a random first attempt**, with melody notes landing on chord tones on strong beats going from **88.7% → 97.6%** and bass downbeats hitting the chord root **86.7% → 97.6%**. Generation-to-generation uniqueness *improved* at the same time (identical drum patterns 1.9% → 0.2%), so beats got more intentional without getting more samey. The whole selection pass costs a few milliseconds — it's array math, not audio.
+
+## Ten techniques taken from how records are actually made
+
+1. **Filter sweeps as arrangement** (house, techno, dubstep, DnB, UK garage, synthwave). In club music a resonant lowpass opening across a section *is* the arrangement — it does the work that adding instruments does elsewhere. Every melodic track now has a filter that automation drives, with per-section curves: closed and rising through intros and builds, wide open in choruses, pulled back for the bridge. Cutoff is mapped exponentially, because a linear sweep sounds like nothing and then lurches.
+2. **Double-tracked, hard-panned rock guitars.** The single biggest missing piece of a real rock sound. Two genuinely *separate* performances — each with its own strum timing and detune — panned hard left and right. Copying one track to both sides does not work; the width comes precisely from the differences between two human takes.
+3. **Gated reverb** on the Synthwave snare — a big bright reverb slammed shut by a noise gate before it can decay. Discovered by accident at Townhouse Studios and instantly became *the* 80s drum sound. The abrupt cut is the point, so the tail is held flat and then killed rather than faded.
+4. **Ghost notes** — quiet snare taps between the backbeats, which real drummers play almost constantly and whose absence is much of why programmed drums sound stiff. Applied only to the genres whose drum language actually uses them (rock, R&B, neo-soul, hip-hop, lo-fi, DnB, garage), never to an 808 pattern.
+5. **Per-instrument timing pockets.** A single global humanize value can only make everything equally sloppy; real ensembles sit in *different* pockets simultaneously. The Dilla/Questlove feel is drums dragging while the bass stays forward — a relationship between parts. Neo-Soul now runs its snare 16ms late and its bass 3ms early.
+6. **The pre-chorus drop-out** — one beat of near-silence right before the chorus, leaving only the riser. The cheapest and most reliable trick in arrangement, and it always works.
+7. **Sub/mid bass separation** for Reese and growl basses. A clean sine sub carries the low end while the mangled layer carries the character, high-passed so the two never share an octave — without the split, the detuning phase-cancels in the sub and the low end goes soft.
+8. **Vocal stacking.** A solo synthesized vowel sounds thin because records almost never use one. A quiet doubled voice — slightly detuned and delayed, the way a second take differs — now sits under every single-voice vocal.
+9. **Tresillo-aware kick mutation** for Reggaeton, Afrobeats, and Amapiano. Those kicks articulate the 3+3+2 cell underlying dembow and most Afro-diasporic dance rhythm; mutating them generically smears the very figure that defines the groove, so mutation is now constrained to positions inside the cell.
+10. **DJ-length intros and outros** for House, Techno, and UK Garage — 8 bars of drums at each end. Club records are built to be mixed, which is why they don't open on the hook.
+
 ## A measured audit, and the ten fixes that came out of it
 
 Rather than guessing at what sounded off, ~6,000 generated beats across all 19 genres were measured against how real records are built. Every number below is before → after.

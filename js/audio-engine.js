@@ -16,7 +16,13 @@ const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash"
 
 // Guitar flavors that strum chords (rhythm guitar) versus play single
 // picked lines (lead guitar) - see playGuitarChord.
-const GUITAR_STRUM_FLAVORS = new Set(["power", "muted", "acoustic", "twelvestring", "funk"]);
+// Chordal (rhythm) guitar tones. These get a real voicing strummed
+// through the performance layer; everything else stays a single line, the
+// way picked highlife parts and jazz solos actually are.
+const GUITAR_STRUM_FLAVORS = new Set([
+  "power", "muted", "acoustic", "twelvestring", "funk",
+  "openchord", "resonator", "baritone",
+]);
 
 // Distorted rock rhythm parts get double-tracked and hard-panned; an
 // acoustic strum or funk comp is normally a single centred performance.
@@ -2554,6 +2560,56 @@ class BeatEngine {
       return;
     }
 
+    if (flavor === "openchord") {
+      // Open-position chords let unfretted strings ring on. Those open
+      // strings are all E, A, D, G, B and E - fixed pitches that do not
+      // move with the chord - so an open-chord part has a drone running
+      // under the harmony, which is exactly why open-position guitar
+      // sounds so much bigger and more resonant than the same chord
+      // played as a barre further up the neck.
+      const body = this.makeAcousticBody(dest);
+      this.addPickNoise(time, vel, body, 1);
+      this.pluckString(time, freq, dur, vel, body, { damp: 0.22, feedback: 0.992, pluckNoise: 0.01, brightness: 1.1, sustain: 1.8 });
+      // A ringing open string underneath, quietly.
+      if (Math.random() < 0.6) {
+        const openHz = [82.41, 110, 146.83, 196][Math.floor(Math.random() * 4)];
+        this.pluckString(time + 0.01, openHz, dur * 1.4, vel * 0.28, body,
+          { damp: 0.2, feedback: 0.994, pluckNoise: 0.004, brightness: 0.9, sustain: 2.2 });
+      }
+      return;
+    }
+
+    if (flavor === "resonator") {
+      // A resonator guitar has no wooden soundboard at all - a spun metal
+      // cone does the radiating. That cone has a strong, narrow resonance
+      // and a metallic ring, which is the whole blues/bluegrass dobro
+      // character, and it is why a resonator cuts through an acoustic
+      // band the way a wooden guitar cannot.
+      const cone = ctx.createBiquadFilter();
+      cone.type = "peaking";
+      cone.frequency.value = 1250;
+      cone.Q.value = 3.2;
+      cone.gain.value = 11;
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 190;    // metal cone: no deep body
+      cone.connect(hp).connect(dest);
+      this.addPickNoise(time, vel, dest, 1.2);
+      this.pluckString(time, freq, dur, vel, cone, { damp: 0.14, feedback: 0.988, pluckNoise: 0.008, brightness: 1.4, sustain: 1.1 });
+      return;
+    }
+
+    if (flavor === "baritone") {
+      // A baritone guitar is tuned a fourth or fifth below standard, with
+      // a longer scale so the strings stay tight rather than floppy. It
+      // occupies the gap between guitar and bass - the surf/Western and
+      // modern cinematic-rock voice.
+      const cab = this.makeGuitarCab(dest, { bright: 0.8, body: 1.5, presence: 2 });
+      this.addPickNoise(time, vel, cab, 1.1);
+      this.pluckString(time, freq / 2, dur, vel, cab, { damp: 0.24, feedback: 0.991, pluckNoise: 0.012, brightness: 0.9, sustain: 1.5 });
+      return;
+    }
+
     if (flavor === "sitar") {
       // Two features make a sitar a sitar, and neither is the scale it's
       // played in:
@@ -4496,6 +4552,97 @@ class BeatEngine {
       return;
     }
 
+    if (flavor === "felt") {
+      // Felt piano: a strip of felt is laid between the hammers and the
+      // strings. It kills the attack transient almost entirely and rolls
+      // the top off hard, leaving mostly body and the mechanical noise of
+      // the action - which is why it sounds intimate and close-miked
+      // rather than like a piano in a room. The defining detail is that
+      // the KEY NOISE becomes proportionally loud, because the note it
+      // sits under is now so quiet.
+      const dur2 = Math.max(dur, 0.8);
+      const muffle = ctx.createBiquadFilter();
+      muffle.type = "lowpass";
+      muffle.frequency.setValueAtTime(1500, time);
+      muffle.frequency.exponentialRampToValueAtTime(600, time + dur2);
+      muffle.connect(dest);
+      for (const [ratio, lvl] of [[1, 1], [2, 0.24], [3, 0.08]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "triangle";
+        osc.frequency.value = freq * ratio;
+        const g = ctx.createGain();
+        // Slow attack: felt absorbs the hammer strike.
+        g.gain.setValueAtTime(0.0001, time);
+        g.gain.linearRampToValueAtTime(vel * 0.5 * lvl, time + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, time + dur2 / (ratio * 0.5 + 0.6));
+        osc.connect(g).connect(muffle);
+        osc.start(time);
+        osc.stop(time + dur2 + 0.15);
+      }
+      // The action: felt-piano recordings are full of it.
+      const key = ctx.createBufferSource();
+      key.buffer = this.makeNoiseBuffer(0.03);
+      const kbp = ctx.createBiquadFilter();
+      kbp.type = "bandpass";
+      kbp.frequency.value = 1100;
+      kbp.Q.value = 0.8;
+      const kg = ctx.createGain();
+      kg.gain.setValueAtTime(vel * 0.16, time);
+      kg.gain.exponentialRampToValueAtTime(0.001, time + 0.03);
+      key.connect(kbp).connect(kg).connect(dest);
+      key.start(time);
+      key.stop(time + 0.04);
+      return;
+    }
+
+    if (flavor === "tack") {
+      // Tack piano: drawing pins pushed into the hammer felts, so metal
+      // hits the string instead of wool. Enormous high-frequency attack,
+      // very little sustain - the saloon/vaudeville sound, and a staple
+      // of lo-fi and library music.
+      const dur2 = Math.min(dur, 0.55);
+      for (const [ratio, lvl] of [[1, 0.7], [2, 0.4], [3, 0.25], [5.1, 0.14]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "triangle";
+        osc.frequency.value = freq * ratio;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(vel * lvl, time);
+        g.gain.exponentialRampToValueAtTime(0.001, time + dur2 / (ratio * 0.4 + 0.7));
+        osc.connect(g).connect(dest);
+        osc.start(time);
+        osc.stop(time + dur2 + 0.1);
+      }
+      const tack = ctx.createBufferSource();
+      tack.buffer = this.makeNoiseBuffer(0.012);
+      const thp = ctx.createBiquadFilter();
+      thp.type = "highpass";
+      thp.frequency.value = 5500;
+      const tg = ctx.createGain();
+      tg.gain.setValueAtTime(vel * 0.6, time);
+      tg.gain.exponentialRampToValueAtTime(0.001, time + 0.012);
+      tack.connect(thp).connect(tg).connect(dest);
+      tack.start(time);
+      tack.stop(time + 0.016);
+      return;
+    }
+
+    if (flavor === "jazzgrand") {
+      // A jazz grand recorded close with the lid up: bright, woody, with
+      // a long clean sustain and a strong second partial. Modelled with a
+      // real string model into a soundboard resonance rather than an
+      // oscillator stack, because what a jazz pianist is listening for is
+      // the string itself.
+      const board = ctx.createBiquadFilter();
+      board.type = "peaking";
+      board.frequency.value = 550;
+      board.Q.value = 0.7;
+      board.gain.value = 5;
+      board.connect(dest);
+      this.pluckString(time, freq, Math.max(dur, 1.1), vel * 0.9, board,
+        { damp: 0.18, feedback: 0.9945, pluckNoise: 0.005, brightness: 1.15, sustain: 2 });
+      return;
+    }
+
     if (flavor === "honkytonk") {
       // A honky-tonk piano is an ordinary upright that has gone badly out
       // of tune - and specifically out of tune WITH ITSELF, because each
@@ -5914,16 +6061,32 @@ class BeatEngine {
         // be checked against the instrument's actual range and against the
         // low interval limit. See fitChordToInstrument in instruments.js.
         const voiced = fitChordToInstrument(val.degrees.map((d) => this.midiForDegree(d, step)), inst);
-        for (const midi of voiced) {
-          const freq = midiToFreq(midi);
-          const vel = this.jitterVel(BASE_VELOCITY[inst] * 0.85 * (1 + (this.metricAccent(step) - 1) * 0.5)) * autoMul;
-          if (inst === "piano") this.playPianoVoice(t, freq, noteDur, vel, flavors.piano);
-          else if (inst === "pad") this.playPadVoice(t, freq, noteDur, vel, flavors.pad);
-          else if (inst === "stab") this.playStabVoice(t, freq, noteDur, vel, flavors.stab);
-          else if (inst === "strings") this.playStringsVoice(t, freq, noteDur, vel, flavors.strings);
-          else if (inst === "horn") this.playHornVoice(t, freq, noteDur, vel, flavors.horn);
-          else if (inst === "organ") this.playOrganVoice(t, freq, noteDur, vel, flavors.organ);
-          else if (inst === "vocal") this.playVocalVoice(t, freq, noteDur, vel, flavors.vocal);
+        const baseVel = this.jitterVel(BASE_VELOCITY[inst] * 0.85 * (1 + (this.metricAccent(step) - 1) * 0.5)) * autoMul;
+        // A chord is not an event, it is a gesture. performChord turns the
+        // pitches into individual notes with their own timing, velocity and
+        // length - see performance.js for why every one of those has to
+        // differ per note.
+        const pedal = PEDAL_MULTIPLIER[inst] || 1;
+        const events = performChord(voiced, {
+          artic: (this.pattern.articulation && this.pattern.articulation[inst]) || "block",
+          step,
+          noteDur,
+          vel: baseVel,
+        });
+        for (const e of events) {
+          const et = t + e.delay;
+          const freq = midiToFreq(e.midi);
+          // The sustain pedal: notes ring past their written length and
+          // blur into the next chord, which is most of what makes a real
+          // piano part sound connected rather than typed in.
+          const ed = Math.max(0.05, e.dur) * pedal;
+          if (inst === "piano") this.playPianoVoice(et, freq, ed, e.vel, flavors.piano);
+          else if (inst === "pad") this.playPadVoice(et, freq, ed, e.vel, flavors.pad);
+          else if (inst === "stab") this.playStabVoice(et, freq, ed, e.vel, flavors.stab);
+          else if (inst === "strings") this.playStringsVoice(et, freq, ed, e.vel, flavors.strings);
+          else if (inst === "horn") this.playHornVoice(et, freq, ed, e.vel, flavors.horn);
+          else if (inst === "organ") this.playOrganVoice(et, freq, ed, e.vel, flavors.organ);
+          else if (inst === "vocal") this.playVocalVoice(et, freq, ed, e.vel, flavors.vocal);
         }
       } else if (val.degree !== undefined) {
         // Any melodic part can now carry a harmony stack (see
@@ -5960,9 +6123,23 @@ class BeatEngine {
           // highlife lines and jazz solos actually are.
           if (GUITAR_STRUM_FLAVORS.has(flavors.guitar)) {
             const shape = val.harmony && val.harmony.length > 1 ? val.harmony : [0, 2, 4];
-            const chordFreqs = shape.map((o) => this.freqForDegree(val.degree + o, step));
-            if (GUITAR_DOUBLE_FLAVORS.has(flavors.guitar)) this.playGuitarDoubled(t, chordFreqs, noteDur, vel, flavors.guitar);
-            else this.playGuitarChord(t, chordFreqs, noteDur, vel, flavors.guitar);
+            const chordMidis = fitChordToInstrument(shape.map((o) => this.midiForDegree(val.degree + o, step)), "guitar");
+            // Real strumming: alternating down/up strokes, upstrokes
+            // lighter and catching only the top strings, the whole thing
+            // spread over the time a pick actually needs to cross six
+            // strings. See performChord.
+            const gEvents = performChord(chordMidis, {
+              artic: (this.pattern.articulation && this.pattern.articulation.guitar) || "strum",
+              step, noteDur, vel,
+            });
+            const gPedal = PEDAL_MULTIPLIER.guitar;
+            for (const e of gEvents) {
+              const et = t + e.delay;
+              const ef = midiToFreq(e.midi);
+              const ed = Math.max(0.05, e.dur) * gPedal;
+              if (GUITAR_DOUBLE_FLAVORS.has(flavors.guitar)) this.playGuitarDoubled(et, [ef], ed, e.vel, flavors.guitar);
+              else this.playGuitarChord(et, [ef], ed, e.vel, flavors.guitar);
+            }
           } else {
             this.playGuitarVoice(t, freq, noteDur, vel, flavors.guitar);
           }

@@ -9,11 +9,11 @@ const FLAVOR_POOLS = {
   perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78", "talkingdrum", "woodblock", "tabla", "cabasa", "guiro", "agogo", "vibraslap", "cajon", "djembe", "timbale", "shekere", "ganza", "caxixi", "udu", "pandeiro", "tamborim", "repinique", "surdo", "bata", "cuica"],
   tom: ["acoustic", "simmons", "roto", "taiko"],
   bass: ["warm", "synth", "808", "true808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog", "303", "slap", "sh101", "fretless", "m1organbass"],
-  piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord", "dx7ep", "clav", "m1piano", "cp70", "honkytonk"],
+  piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord", "dx7ep", "clav", "m1piano", "cp70", "honkytonk", "felt", "tack", "jazzgrand"],
   lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm", "whistle", "theremin", "panflute", "harmonica", "ocarina", "hoover", "ms20", "d50", "prophet", "obxa", "phasedist"],
   pad: ["warm", "ensemble", "airy", "glass", "choir", "dark", "juno", "solina", "cs80", "voxhumana", "jupiter8", "polysix", "ppgwave"],
   stab: ["pluck-chord", "square-chord", "bell-chord", "brass-chord", "organ-chord", "string-chord", "orchhit"],
-  guitar: ["clean", "power", "muted", "nylon", "acoustic", "jazz", "funk", "twelvestring", "sitar", "banjo", "mandolin", "ukulele", "slide"],
+  guitar: ["clean", "power", "muted", "nylon", "acoustic", "jazz", "funk", "twelvestring", "sitar", "banjo", "mandolin", "ukulele", "slide", "openchord", "resonator", "baritone"],
   strings: ["soul", "orchestral", "staccato", "synth", "pizzicato", "tremolo", "mellotron", "solina", "cello", "spiccato", "harp"],
   horn: ["brass", "soft", "muted", "sax", "trumpetstab", "section", "clarinet", "frenchhorn", "oboe", "trombone", "tuba", "flugelhorn", "piccolo"],
   organ: ["drawbar", "gospel", "church", "combo", "farfisa", "accordion", "harmonium", "m1organ"],
@@ -176,6 +176,13 @@ const FLAVOR_GENRES = {
   surdo: ["afrobeats", "reggaeton", "amapiano", "dnb"],
   bata: ["afrobeats", "amapiano", "house"],
   cuica: ["afrobeats", "house", "reggaeton"],
+  // --- piano and guitar voices
+  felt: ["lofi", "neosoul", "rnb", "amapiano", "synthwave"],
+  tack: ["lofi", "hiphop", "phonk", "rap"],
+  jazzgrand: ["neosoul", "rnb", "house", "lofi", "amapiano"],
+  openchord: ["rock", "lofi", "afrobeats", "neosoul"],
+  resonator: ["rock", "lofi", "phonk", "hiphop"],
+  baritone: ["rock", "phonk", "synthwave", "drill"],
 };
 
 // A flavor is available to a genre if it is universal, or if that genre is
@@ -207,11 +214,11 @@ const FLAVOR_TAGS = {
   perc: { shaker: "warm", conga: "warm", cowbell: "bright", clave: "bright", tambourine: "bright", bongo: "warm", triangle: "bright", timpani: "dark", cr78: "warm", talkingdrum: "warm", woodblock: "bright" , tabla: "warm", cabasa: "bright", guiro: "bright", agogo: "bright", vibraslap: "bright", cajon: "warm", djembe: "warm", timbale: "bright", shekere: "warm", ganza: "bright", caxixi: "warm", udu: "dark", pandeiro: "bright", tamborim: "bright", repinique: "bright", surdo: "dark", bata: "warm", cuica: "bright"},
   tom: { acoustic: "warm", simmons: "bright" , roto: "bright", taiko: "dark"},
   bass: { warm: "warm", synth: "bright", "808": "dark", true808: "dark", hard808: "dark", sub: "dark", pluck: "warm", logdrum: "dark", wobble: "dark", drillslide: "dark", distorted: "dark", reese: "dark", growl: "dark", upright: "warm", moog: "warm", "303": "bright", slap: "bright" , sh101: "bright", fretless: "warm", m1organbass: "bright"},
-  piano: { electric: "bright", pluck: "bright", grand: "warm", rhodes: "warm", wurlitzer: "warm", upright: "warm", celesta: "bright", toy: "bright", harpsichord: "bright", dx7ep: "bright", clav: "bright" , m1piano: "bright", cp70: "bright", honkytonk: "warm"},
+  piano: { electric: "bright", pluck: "bright", grand: "warm", rhodes: "warm", wurlitzer: "warm", upright: "warm", celesta: "bright", toy: "bright", harpsichord: "bright", dx7ep: "bright", clav: "bright" , m1piano: "bright", cp70: "bright", honkytonk: "warm", felt: "warm", tack: "bright", jazzgrand: "warm"},
   lead: { square: "bright", saw: "bright", bell: "bright", flute: "warm", supersaw: "bright", pluck: "bright", sine: "warm", chip: "bright", brasslead: "warm", fm: "bright", whistle: "bright" , theremin: "warm", panflute: "warm", harmonica: "bright", ocarina: "warm", hoover: "dark", ms20: "bright", d50: "bright", prophet: "bright", obxa: "warm", phasedist: "bright"},
   pad: { warm: "warm", ensemble: "warm", airy: "bright", glass: "bright", choir: "warm", dark: "dark", juno: "warm" , solina: "warm", cs80: "warm", voxhumana: "warm", jupiter8: "warm", polysix: "warm", ppgwave: "bright"},
   stab: { "pluck-chord": "bright", "square-chord": "bright", "bell-chord": "bright", "brass-chord": "warm", "organ-chord": "warm", "string-chord": "warm", orchhit: "dark" },
-  guitar: { clean: "bright", power: "dark", muted: "dark", nylon: "warm", acoustic: "warm", jazz: "warm", funk: "bright", twelvestring: "bright" , sitar: "bright", banjo: "bright", mandolin: "bright", ukulele: "warm", slide: "warm"},
+  guitar: { clean: "bright", power: "dark", muted: "dark", nylon: "warm", acoustic: "warm", jazz: "warm", funk: "bright", twelvestring: "bright" , sitar: "bright", banjo: "bright", mandolin: "bright", ukulele: "warm", slide: "warm", openchord: "bright", resonator: "bright", baritone: "dark"},
   strings: { soul: "warm", orchestral: "warm", staccato: "bright", synth: "bright", pizzicato: "bright", tremolo: "dark", mellotron: "warm" , solina: "warm", cello: "dark", spiccato: "bright", harp: "warm"},
   horn: { brass: "bright", soft: "warm", muted: "dark", sax: "warm", trumpetstab: "bright", section: "bright", clarinet: "warm", frenchhorn: "warm", oboe: "bright" , trombone: "warm", tuba: "dark", flugelhorn: "warm", piccolo: "bright"},
   organ: { drawbar: "warm", gospel: "dark", church: "dark", combo: "bright" , farfisa: "bright", accordion: "warm", harmonium: "warm", m1organ: "bright"},
@@ -2830,6 +2837,18 @@ function pickChordInstruments(style) {
 // interplay it simply always picked the busiest option, which quietly
 // undid most of the variety this is here to create.
 function planInstrumentation(style) {
+  // How each part is physically played is chosen per generation too - a
+  // strummed guitar and a fingerpicked one are different performances of
+  // the same chords, and that difference is bigger than any kit change.
+  const articulation = {};
+  for (const inst of [...(style.melodic.chordInstruments || []), ...(style.melodic.monoInstruments || [])]) {
+    // Guarded: patterns.js is loaded independently of performance.js, and
+    // a beat with no articulation plan still plays (everything falls back
+    // to "block"), so a missing performance layer must not be fatal.
+    if (typeof INSTRUMENT_ARTICULATIONS !== "undefined" && INSTRUMENT_ARTICULATIONS[inst]) {
+      articulation[inst] = pickArticulation(inst);
+    }
+  }
   const solos = pickSoloInstruments(style);
   const melody = { ...style.melody };
   for (const inst of solos) {
@@ -2840,6 +2859,7 @@ function planInstrumentation(style) {
   const keptMono = (style.melodic.monoInstruments || []).filter((i) => i === "bass" || i === "guitar");
   return {
     melody,
+    articulation,
     melodic: {
       ...style.melodic,
       monoInstruments: [...keptMono, ...solos.filter((i) => !keptMono.includes(i))],
@@ -2853,6 +2873,7 @@ function resolveGenerationStyle(style, plan) {
   return {
     ...style,
     melody: p.melody,
+    articulation: p.articulation,
     melodic: p.melodic,
     drums: { ...style.drums, main: mutateGroove(pickDrumMain(style), TRESILLO_GENRES.has(style.id)) },
     progression: pickProgression(style),
@@ -2936,7 +2957,7 @@ function generateVariationOnce(rawStyle, bars, plan) {
     }
   }
 
-  return { instruments, structure, barRootDegrees, barChordContexts, automation, genStyle: style };
+  return { instruments, structure, barRootDegrees, barChordContexts, automation, articulation: style.articulation, genStyle: style };
 }
 
 // ---- Full-song arrangement ----
@@ -3209,7 +3230,7 @@ function generateSongVariationOnce(rawStyle, plan) {
       else automation[inst] = [{ step: 0, value: 0.78 }];
     }
   }
-  return { instruments, structure, barRootDegrees, automation, filterAutomation, genStyle: style };
+  return { instruments, structure, barRootDegrees, automation, filterAutomation, articulation: style.articulation, genStyle: style };
 }
 
 // ---- Intentionality: compose several candidates, keep the best one ----

@@ -101,6 +101,8 @@ const FLAVOR_LABELS = {
   overdrive: "Overdrive", fuzz: "Fuzz", wah: "Wah", sustain: "Feedback Sustain",
   octave: "Octave Lead", cleantone: "Clean Lead", harmonics: "Pinch Harmonics",
   // More classic synths.
+  felt: "Felt Piano", tack: "Tack Piano", jazzgrand: "Jazz Grand",
+  openchord: "Open Chords", resonator: "Resonator", baritone: "Baritone Guitar",
   drumulator: "Drumulator", drumtraks: "DrumTraks", rx5: "Yamaha RX5", cr8000: "CR-8000",
   kr55: "Korg KR-55", dr110: "Boss DR-110", mpc60: "MPC60",
   shekere: "Shekere", ganza: "Ganzá", caxixi: "Caxixi", udu: "Udu", pandeiro: "Pandeiro",

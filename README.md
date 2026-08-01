@@ -485,6 +485,53 @@ Complexity changes the composition rather than a playback parameter, so it takes
 **282 kits total.** All rendered through an `OfflineAudioContext` — none silent, none clipping. 19 genres generated and played at complexity 1, 5 and 10 with zero console errors, plus song mode and scratch mode.
 
 
+## Why the piano and guitar sounded fake
+
+Reported as the biggest thing separating this from real music. It was not the timbre. It was one line in the scheduler:
+
+```js
+for (const midi of voiced) {
+  const vel = ...;
+  this.playPianoVoice(t, freq, noteDur, vel, flavor);   // every note at the same t
+}
+```
+
+**Every note of every chord started at exactly the same timestamp.** No pianist has ever done that — ten fingers cannot strike within a microsecond of each other — and a guitarist physically *cannot*, because a pick crosses six strings one at a time. Simultaneous, equal-velocity onsets are the single most recognisable "this is not a person" cue in programmed music, and no amount of better synthesis fixes it.
+
+`js/performance.js` turns a chord from an **event** into a **gesture**: each note gets its own time offset, its own velocity and its own length.
+
+**Measured across 19 genres, instrumenting every voice call:**
+
+| | before | after |
+|---|---|---|
+| Chords that were simultaneous *and* equal-velocity | **89%** | **0%** |
+| Median onset spread across a chord | **0 ms** | **24 ms** |
+| Average velocity span within a chord | 0.018 (random jitter only) | **0.20** (musical roles) |
+
+### What the layer models
+
+- **Melody lead.** On a block chord the top voice is struck slightly *ahead* of the rest and played harder. That is how a pianist makes a melody read as a melody rather than as the top of a chord.
+- **Strum direction.** A strumming hand keeps moving in a constant down-up cycle whether or not it hits the strings, so the stroke is not a free choice: downbeats get downstrokes, the "and" gets upstrokes. **An upstroke starts at the thin strings, only catches the top few, and is quieter** — that asymmetry is most of what a strummed part's groove actually *is*.
+- **Real articulations** rather than one gesture for everything: rolled chords, broken chords (bass note on the beat, the rest a moment later — the ballad left hand), arpeggios spread across the note's full length, stride (the left hand literally striding between registers), the funk 16th-note **chuck**, and **Travis picking** (an alternating thumb bass with fingers interlocking between the beats — two independent rhythms from one hand).
+- **The sustain pedal.** Notes ring past their written length and blur into the next chord. Without it every piano part sounds staccato and separated no matter how good the voicing is.
+- **Rootless voicings.** When the bass already states the root, keyboard players drop it rather than doubling it — standard practice from Bill Evans onward and the basis of jazz, R&B and neo-soul comping. Doubling the bass an octave up is exactly what makes programmed keyboard parts sound thick and undefined.
+
+Which articulation each part uses is chosen **per generation**, so a strummed guitar and a fingerpicked one are different performances of the same chords — a bigger difference than any kit change.
+
+*(Two bugs in my own new code, caught by inspecting the generated events rather than by listening: the strum's timing jitter could produce a **negative** delay, which would schedule a note before the beat — Web Audio silently drops anything requested in the past. And Travis picking stepped the treble fingers by a half beat instead of a whole one, so they landed *on* the alternating thumb bass instead of interlocking between it. 63,000 generated events now contain zero negative delays.)*
+
+## Six more piano and guitar voices
+
+- **Felt piano** — a strip of felt between hammers and strings kills the attack and rolls the top off hard. The defining detail is that the **key noise becomes proportionally loud**, because the note under it is now so quiet; that mechanical action sound is why felt piano recordings feel intimate rather than like a piano in a room.
+- **Tack piano** — drawing pins pushed into the hammer felts, so metal hits the string instead of wool. Huge high-frequency attack, almost no sustain.
+- **Jazz grand** — close-miked with the lid up, modelled with a real physical string model into a soundboard resonance rather than an oscillator stack, because the string itself is what a jazz pianist is listening for.
+- **Open chords** — unfretted strings ring on, and those open strings are fixed pitches that *do not move with the chord*, so an open-position part has a drone running under the harmony. That is why it sounds so much bigger than the same chord as a barre further up the neck.
+- **Resonator** — no wooden soundboard at all; a spun metal cone radiates instead, with a strong narrow resonance and a metallic ring. It cuts through an acoustic band in a way a wooden guitar cannot.
+- **Baritone guitar** — tuned a fourth or fifth below standard with a longer scale so the strings stay tight, occupying the gap between guitar and bass.
+
+**288 kits total**, all rendered offline with none silent or clipping; 19 genres played at complexity 1, 5 and 10 with zero console errors.
+
+
 ## The reel is as long as your beat
 
 The reel used to run for a fixed 15, 30, or 60 seconds regardless of what the beat actually was, which is the wrong unit entirely: a 4-bar loop got chopped mid-phrase, and a full song got truncated a third of the way in. **Length is now derived from the pattern**, so a video always contains a whole number of loops and never cuts off in the middle of a bar.

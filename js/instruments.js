@@ -43,12 +43,12 @@ const INSTRUMENT_PROFILE = {
   bass:     { range: [28, 67],  sweet: [28, 55], voices: 2, voicing: "root",    sustain: false, role: "foundation" },
   // Piano: full 88 keys exist, but comping lives between C3 and C6 -
   // below that, close voicings turn to mud (see LOW_INTERVAL_LIMIT).
-  piano:    { range: [21, 108], sweet: [48, 84], voices: 6, voicing: "close",   sustain: false, role: "comp" },
+  piano:    { range: [21, 108], sweet: [48, 84], voices: 6, voicing: "close",   sustain: false, role: "comp", rootless: 0.55 },
   lead:     { range: [55, 96],  sweet: [60, 88], voices: 1, voicing: "mono",    sustain: true,  role: "melody" },
   // Synth pad: no physical limit, so the constraint is purely musical -
   // spread wide, stay out of the bass, and never crowd the vocal range.
   pad:      { range: [36, 96],  sweet: [48, 84], voices: 6, voicing: "spread",  sustain: true,  role: "bed" },
-  stab:     { range: [40, 96],  sweet: [55, 84], voices: 4, voicing: "close",   sustain: false, role: "punctuation" },
+  stab:     { range: [40, 96],  sweet: [55, 84], voices: 4, voicing: "close",   sustain: false, role: "punctuation", rootless: 0.3 },
   // Guitar sounds an octave below written: the open low string is E2, the
   // top of the neck about E6. It cannot play close stacked thirds down
   // low - the shapes do not exist on the fretboard.
@@ -64,7 +64,7 @@ const INSTRUMENT_PROFILE = {
   // Hammond drawbar manual is 61 keys, C2 to C7. Drawbar registration is
   // itself an octave-doubling voicing, so the organ profile adds the
   // octave rather than more thirds.
-  organ:    { range: [36, 96],  sweet: [48, 84], voices: 5, voicing: "drawbar", sustain: true,  role: "comp" },
+  organ:    { range: [36, 96],  sweet: [48, 84], voices: 5, voicing: "drawbar", sustain: true,  role: "comp", rootless: 0.35 },
   // Vocal stacks are SATB-shaped: four parts, close, inside one octave
   // and change, sitting where people actually sing.
   vocal:    { range: [43, 81],  sweet: [50, 76], voices: 4, voicing: "close",   sustain: true,  role: "texture" },
@@ -141,6 +141,17 @@ function shapeVoicing(degrees, inst) {
   if (style === "mono" || style === "root") {
     // Nothing to space - these are single-line instruments.
     return out.slice(0, profile.voices);
+  }
+
+  // ROOTLESS VOICING. When a bass instrument is already stating the root,
+  // keyboard players drop it from their own voicing rather than doubling
+  // it. This is standard practice from Bill Evans onward and it is the
+  // whole basis of jazz, R&B and neo-soul comping: the root is covered,
+  // so the hand spends its notes on the 3rd, 7th and colour tones
+  // instead. Doubling the bass an octave or two up is exactly what makes
+  // programmed keyboard parts sound thick and undefined.
+  if (profile.rootless && out.length >= 4 && Math.random() < profile.rootless) {
+    out = out.slice(1);
   }
 
   if (style === "spread") {

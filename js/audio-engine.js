@@ -83,9 +83,12 @@ class BeatEngine {
     }
   }
 
-  ensureContext() {
+  // An external context can be injected so the same graph can be built
+  // inside an OfflineAudioContext - that is what makes it possible to
+  // MEASURE the program's own output rather than only listen to it.
+  ensureContext(externalCtx) {
     if (!this.ctx) {
-      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+      this.ctx = externalCtx || new (window.AudioContext || window.webkitAudioContext)();
 
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = 0.9;
@@ -185,7 +188,11 @@ class BeatEngine {
         this.reverbSends[t] = send;
       }
     }
-    if (this.ctx.state === "suspended") {
+    // An OfflineAudioContext also reports "suspended" before rendering
+    // starts, but resuming one throws - it has no clock to resume. Only a
+    // live context needs waking from the browser's autoplay suspension.
+    if (this.ctx.state === "suspended" && typeof this.ctx.resume === "function"
+        && typeof this.ctx.startRendering !== "function") {
       this.ctx.resume();
     }
   }
@@ -6416,5 +6423,61 @@ class BeatEngine {
       this.timerId = null;
     }
     this.stopAmbience();
+  }
+
+  // -------------------------------------------------------------------------
+  // Render the current beat offline, faster than real time
+  // -------------------------------------------------------------------------
+  // Playback is driven by a lookahead scheduler on a wall clock, which an
+  // OfflineAudioContext has no use for - there, time is whatever we say it
+  // is. So this bypasses the scheduler entirely and walks every step,
+  // computing each one's absolute time directly, including the same swing
+  // offset the live path applies. The result is a buffer of exactly the
+  // audio the speakers would have produced, available in a fraction of the
+  // beat's own length.
+  //
+  // A separate engine instance is used rather than this one so that
+  // rendering never disturbs playback: the two have completely independent
+  // audio graphs, and only the settings that shape the sound are copied.
+  async renderOffline(opts = {}) {
+    if (!this.pattern || !this.style) return null;
+    if (typeof OfflineAudioContext === "undefined") return null;
+    const sampleRate = opts.sampleRate || 44100;
+    const loops = Math.max(1, opts.loops || 1);
+
+    const stepDur = 60 / this.tempo / 4;
+    // Swing lengthens the off-steps, so the true bar length is not simply
+    // stepCount * stepDuration.
+    let total = 0;
+    for (let i = 0; i < this.stepCount; i++) total += stepDur * (i % 2 === 1 ? 1 + this.swing : 1);
+    // A tail so the last hit's release is captured rather than chopped.
+    const seconds = total * loops + 2.5;
+
+    const offline = new OfflineAudioContext(2, Math.ceil(seconds * sampleRate), sampleRate);
+    const clone = new BeatEngine();
+    clone.ensureContext(offline);
+    clone.pattern = this.pattern;
+    clone.style = this.style;
+    clone.flavors = this.flavors;
+    clone.rootMidi = this.rootMidi;
+    clone.tempo = this.tempo;
+    clone.swing = this.swing;
+    clone.stepCount = this.stepCount;
+    clone.automation = this.automation;
+    clone.sidechainEnabled = this.sidechainEnabled;
+    for (const t of ALL_TRACKS) {
+      if (this.trackState[t]) clone.trackState[t] = Object.assign({}, this.trackState[t]);
+      if (clone.trackGains[t]) clone.trackGains[t].gain.value = this.trackState[t].volume;
+    }
+
+    let t = 0.05;
+    for (let loop = 0; loop < loops; loop++) {
+      for (let step = 0; step < this.stepCount; step++) {
+        clone.scheduleStep(step, t);
+        t += stepDur * (step % 2 === 1 ? 1 + this.swing : 1);
+      }
+    }
+    const buffer = await offline.startRendering();
+    return buffer;
   }
 }

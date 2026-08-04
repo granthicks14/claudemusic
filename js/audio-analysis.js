@@ -35,39 +35,106 @@
 // how much the spectrum RISES frame to frame (spectral flux), because that
 // is what a percussive attack looks like, then find the lag at which that
 // envelope best correlates with itself.
-function detectTempo(channel, sampleRate) {
-  const hop = 512;
-  const win = 1024;
-  const frames = Math.floor((channel.length - win) / hop);
+
+// Second-order Butterworth sections (RBJ cookbook, Q = 1/sqrt(2)). Used in
+// cascaded pairs for 24dB/octave splits - shallow filters leak badly enough
+// to make a band measurement meaningless.
+function biquad(input, c) {
+  const out = new Float64Array(input.length);
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  for (let i = 0; i < input.length; i++) {
+    const x0 = input[i];
+    const y0 = c.b[0] * x0 + c.b[1] * x1 + c.b[2] * x2 - c.a[1] * y1 - c.a[2] * y2;
+    x2 = x1; x1 = x0; y2 = y1; y1 = y0;
+    out[i] = y0;
+  }
+  return out;
+}
+function lpfCoeffs(freq, sampleRate) {
+  const w = (2 * Math.PI * Math.min(freq, sampleRate * 0.49)) / sampleRate;
+  const cw = Math.cos(w), alpha = Math.sin(w) / Math.SQRT2, a0 = 1 + alpha;
+  return { b: [((1 - cw) / 2) / a0, (1 - cw) / a0, ((1 - cw) / 2) / a0],
+           a: [1, (-2 * cw) / a0, (1 - alpha) / a0] };
+}
+function hpfCoeffs(freq, sampleRate) {
+  const w = (2 * Math.PI * Math.min(freq, sampleRate * 0.49)) / sampleRate;
+  const cw = Math.cos(w), alpha = Math.sin(w) / Math.SQRT2, a0 = 1 + alpha;
+  return { b: [((1 + cw) / 2) / a0, (-(1 + cw)) / a0, ((1 + cw) / 2) / a0],
+           a: [1, (-2 * cw) / a0, (1 - alpha) / a0] };
+}
+
+// Onset strength, as real spectral flux.
+//
+// The previous version claimed to split the signal into eight bands but
+// actually bucketed samples by their INDEX modulo eight, which is not a
+// frequency split at all - every bucket saw the same broadband energy, so it
+// was a plain loudness-envelope detector wearing a spectral-flux label. It
+// found tempos well enough (any energy modulation autocorrelates at the
+// beat) but it could not tell a drum hit from a fade: measured on a fixture
+// with no percussion whatsoever, whose only movement was a level change
+// every four seconds, it reported a STRONGER pulse than the same fixture
+// with a real kick on every beat.
+//
+// This is the honest version: split into five bands with proper filters,
+// track each band's energy per frame, and sum the RISES.
+//
+// The rise is taken on a COMPRESSED magnitude, log(1 + C*rms), rather than
+// on a raw log. Compression is what lets a hi-hat register next to a kick
+// without letting a near-silent band dominate: a plain log difference sends
+// a band lifting off the noise floor to a huge value, and measured against
+// eleven synthetic beats of known tempo that cost three wrong readings where
+// the previous detector got one. At C = 1000 the tempo accuracy is back to
+// parity while a real beat still separates from a static wash by 13x in
+// onset strength.
+//
+// The signal is decimated to 12kHz first - onsets are fully described well
+// below that, and it makes the filtering four times cheaper.
+const ONSET_BANDS = [[0, 100], [100, 300], [300, 800], [800, 2000], [2000, 5000]];
+const ONSET_COMPRESSION = 1000;
+
+function onsetEnvelope(channel, sampleRate) {
+  // Normalise level first. log(1 + C*x) is only log-LIKE above its knee;
+  // below it the curve is essentially linear, so a quiet recording has its
+  // onsets compressed differently from a loud one. Measured, a copy of the
+  // same beat at -20dB scored 0.67 where the original scored 0.96 - which
+  // would mean a quiet track has a weaker beat, and it does not. Scaling to
+  // a fixed RMS first puts every input on the same part of the curve.
+  let sq = 0;
+  for (let i = 0; i < channel.length; i++) sq += channel[i] * channel[i];
+  const rms = Math.sqrt(sq / channel.length);
+  const norm = rms > 1e-6 ? 0.1 / rms : 1;
+  const scaled = new Float64Array(channel.length);
+  for (let i = 0; i < channel.length; i++) scaled[i] = channel[i] * norm;
+
+  // Decimate by 4, anti-aliased, so the band filters run on a quarter of
+  // the samples.
+  const pre = biquad(biquad(scaled, lpfCoeffs(5200, sampleRate)), lpfCoeffs(5200, sampleRate));
+  const dsRate = sampleRate / 4;
+  const dsLen = Math.floor(pre.length / 4);
+  const ds = new Float64Array(dsLen);
+  for (let i = 0; i < dsLen; i++) ds[i] = pre[i * 4];
+
+  const hop = 128;                       // 512 samples at the original rate
+  const win = 256;
+  const frames = Math.floor((dsLen - win) / hop);
   if (frames < 40) return null;
 
-  // Coarse band energies per frame - a full FFT is unnecessary here,
-  // because onset detection only needs to know that energy jumped, not
-  // exactly where.
-  const BANDS = 8;
-  const prev = new Float64Array(BANDS);
   const flux = new Float64Array(frames);
-  for (let f = 0; f < frames; f++) {
-    const start = f * hop;
-    const band = new Float64Array(BANDS);
-    // Cheap band split: successive-difference filtering approximates a
-    // rising set of highpass bands well enough for onset strength.
-    let x1 = 0;
-    for (let i = 0; i < win; i++) {
-      const s = channel[start + i];
-      const d = s - x1;
-      x1 = s;
-      band[Math.min(BANDS - 1, Math.floor((i % BANDS)))] += s * s;
-      band[0] += d * d * 0.0001;
+  for (const [lo, hi] of ONSET_BANDS) {
+    let sig = ds;
+    if (lo) sig = biquad(biquad(sig, hpfCoeffs(lo, dsRate)), hpfCoeffs(lo, dsRate));
+    if (hi < dsRate * 0.45) sig = biquad(biquad(sig, lpfCoeffs(hi, dsRate)), lpfCoeffs(hi, dsRate));
+    let prev = 0;
+    for (let f = 0; f < frames; f++) {
+      const start = f * hop;
+      let e = 0;
+      for (let i = 0; i < win; i++) { const v = sig[start + i]; e += v * v; }
+      // Compressed-magnitude rise, half-wave rectified: only increases
+      // are onsets.
+      const cur = Math.log(1 + ONSET_COMPRESSION * Math.sqrt(e / win));
+      if (f > 0 && cur > prev) flux[f] += cur - prev;
+      prev = cur;
     }
-    let sum = 0;
-    for (let b = 0; b < BANDS; b++) {
-      const v = Math.sqrt(band[b]);
-      const rise = v - prev[b];
-      if (rise > 0) sum += rise;
-      prev[b] = v;
-    }
-    flux[f] = sum;
   }
 
   // Normalise and remove the slow-moving average, so loud sections do not
@@ -76,8 +143,63 @@ function detectTempo(channel, sampleRate) {
   for (let i = 0; i < frames; i++) mean += flux[i];
   mean /= frames;
   for (let i = 0; i < frames; i++) flux[i] = Math.max(0, flux[i] - mean);
+  return { flux, frames, framesPerSec: dsRate / hop };
+}
 
-  const framesPerSec = sampleRate / hop;
+// Tempo plus how strongly that tempo actually stands out.
+//
+// detectTempo on its own always returns SOMETHING - it picks the best of 520
+// candidate BPMs, and the best of a set of bad options is still the best.
+// Measured on an ambient wash with no percussion at all it confidently
+// reported 131.5 BPM. So "is there a beat" cannot be answered by "did a
+// number come back"; it needs the strength of the periodicity itself.
+//
+// Salience is two things multiplied: how PERIODIC the onset envelope is at
+// the beat lag, and how much of an onset there is to be periodic about.
+// Either one alone is fooled - see the comments inside.
+function detectPulse(channel, sampleRate) {
+  const env = onsetEnvelope(channel, sampleRate);
+  if (!env) return { bpm: null, salience: 0 };
+  const bpm = tempoFromEnvelope(env);
+  if (!bpm) return { bpm: null, salience: 0 };
+
+  const { flux, frames, framesPerSec } = env;
+  const lag = Math.round((60 / bpm) * framesPerSec);
+  let num = 0, den = 0;
+  for (let i = 0; i + lag < frames; i++) {
+    num += flux[i] * flux[i + lag];
+    den += flux[i] * flux[i];
+  }
+  const periodicity = den > 0 ? Math.max(0, num / den) : 0;
+
+  // Periodicity on its own is not enough, and this is the trap the first
+  // version fell into: a normalised autocorrelation measures the SHAPE of
+  // the envelope and throws away its magnitude, so a static pad wash - whose
+  // envelope is nothing but low-level wobble - scored 1.00, higher than any
+  // real drum pattern. The envelope has to actually contain onsets.
+  //
+  // Strength is the mean of the loudest 5% of frames. The envelope is built
+  // from a level-normalised signal, so this does not simply restate how loud
+  // the track is: turning a track down does not make its beat weaker.
+  // Measured at 5.65 for a beat with a kick on every count and 0.42 for a
+  // wash with no percussion, so the gate sits between them with room either
+  // side.
+  const sorted = Array.from(flux).sort((a, b) => b - a);
+  const top = Math.max(1, Math.floor(sorted.length * 0.05));
+  let strength = 0;
+  for (let i = 0; i < top; i++) strength += sorted[i];
+  strength /= top;
+  const gate = Math.max(0, Math.min(1, (strength - 0.8) / (3.0 - 0.8)));
+
+  return { bpm, salience: periodicity * gate, periodicity, strength };
+}
+
+function detectTempo(channel, sampleRate) {
+  const env = onsetEnvelope(channel, sampleRate);
+  return env ? tempoFromEnvelope(env) : null;
+}
+
+function tempoFromEnvelope({ flux, frames, framesPerSec }) {
   let best = null, bestScore = -Infinity;
   // 60-190 BPM covers everything this program makes.
   for (let bpm = 60; bpm <= 190; bpm += 0.25) {
@@ -241,5 +363,5 @@ function keyToStyleKey(detected, octave = 2) {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = { detectTempo, detectKey, chromaVector, reduceCentre, keyToStyleKey, KS_MAJOR, KS_MINOR };
+  module.exports = { detectTempo, detectPulse, detectKey, chromaVector, reduceCentre, keyToStyleKey, KS_MAJOR, KS_MINOR };
 }

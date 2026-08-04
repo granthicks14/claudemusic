@@ -40,6 +40,24 @@
       </div>
     </section>
 
+    <section class="prompt-box song-box">
+      <label for="song-search">Build a beat around a song</label>
+      <div class="prompt-row">
+        <input type="text" id="song-search" placeholder="Song or artist — e.g. Seven Nation Army, Bad Bunny, Nujabes" autocomplete="off">
+        <button id="song-search-btn" class="transport-btn play">Search</button>
+      </div>
+      <ul id="song-results" class="song-results" hidden></ul>
+      <p id="song-status" class="shuffle-status"></p>
+      <div id="song-panel" class="credit-panel" hidden>
+        <p id="song-result" class="credit-line"></p>
+        <div class="credit-actions">
+          <a id="song-youtube" class="transport-btn" target="_blank" rel="noopener">Open on YouTube ↗</a>
+          <button id="song-build" class="transport-btn play">Build a beat at this tempo</button>
+        </div>
+        <p class="credit-note">The link opens the real recording on YouTube in a new tab. <strong>Nothing is downloaded, streamed or sampled</strong> — the program only takes the tempo, key and genre, and those are facts, not property. What you get is an original beat that sits in the same pocket as a record you like. Tempo and key are reference values and every control stays editable.</p>
+      </div>
+    </section>
+
     <section class="prompt-box remix-box">
       <label for="audio-file">Build a beat around your own track</label>
       <div class="prompt-row">
@@ -123,6 +141,28 @@
             <span id="taste-status" class="taste-status"></span>
           </div>
         </div>
+
+        <div class="control-group">
+          <span class="control-group-label">Score this beat</span>
+          <div class="control-group-row">
+            <button id="score-btn" class="transport-btn play" title="Render this beat offline and measure it the way a mastering engineer would">Rate this beat</button>
+            <span id="score-status" class="taste-status"></span>
+          </div>
+        </div>
+      </div>
+
+      <div id="score-panel" class="score-panel" hidden>
+        <div class="score-head">
+          <div class="score-number"><span id="score-value">–</span><span class="score-of">/100</span></div>
+          <div class="score-head-text">
+            <p id="score-verdict" class="score-verdict"></p>
+            <p id="score-source" class="score-source"></p>
+          </div>
+          <button id="score-close" class="transport-btn" title="Hide the score">Close</button>
+        </div>
+        <p id="score-advice" class="score-advice"></p>
+        <div id="score-terms" class="score-terms"></div>
+        <p class="credit-note">Every term is a measurement, not an opinion, and each one is weighted. The score is the weighted mean of all of them: <code>100 · Σwᵢgᵢ(xᵢ) / Σwᵢ</code>. Terms with a target band use a Gaussian tolerance curve, so being under is penalised the same way as being over.</p>
       </div>
 
       <div class="chords-bar">
@@ -187,6 +227,8 @@
   <script src="js/learning.js"></script>
   <script src="js/policy.js"></script>
   <script src="js/audio-analysis.js"></script>
+  <script src="js/rating.js"></script>
+  <script src="js/songs.js"></script>
   <script src="js/artists.js"></script>
   <script src="js/midi-export.js"></script>
   <script src="js/patterns.js"></script>

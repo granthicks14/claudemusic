@@ -912,3 +912,70 @@ The channel rack got a real visual pass, not just new features:
 ## A note on the vocal instrument
 
 It's genuinely synthesized (formant filtering, not a recording), and it reads as a vowel-like "ooh"/"ahh" chop rather than an actual voice — a real sung or sampled vocal isn't achievable without shipping audio files. If you want something closer to a real vocal texture, the honest next step would be adding a small set of licensed one-shot vocal samples rather than pushing the synthesis further.
+
+## Search a song, get its YouTube link, build a beat in its pocket
+
+Type a song or artist into "Build a beat around a song". You get a ranked list, a link to the real recording on YouTube, and a one-click "Build a beat at this tempo" that sets the tempo, the key (where the record has an unambiguous one) and the genre before generating.
+
+**What crosses over is tempo, key and genre — and nothing else.** No audio is downloaded, streamed, decoded or sampled. The link opens YouTube in a new tab, which is what a link is for. Pulling the audio down would breach YouTube's terms of service and wouldn't grant any right to the recording regardless, so the program doesn't do it and there's no hidden switch that makes it. What you end up with is an original beat that sits in the same pocket as a record you like — tempo and key are facts, not property, and nobody owns 140 BPM in F minor.
+
+**Why the catalogue ships with the program rather than coming from an API.** A static page with no server can only call an API that sends CORS headers. MusicBrainz — the obvious free choice — documents that it does not, so the browser simply cannot read it. Shipping an API key for a commercial catalogue isn't an option either, because a key in a static page is a published key. So `js/songs.js` carries 109 reference tracks spanning all 19 genres, and it's honest about being finite: **a song that isn't listed still gets you a YouTube link**, built from whatever you typed — you just don't get the tempo hint with it.
+
+Tempos are reference values for well-documented recordings. Keys are given only where a record has an unambiguous one and **left out rather than guessed at**, because a wrong key is worse than no key — the program would build the entire beat around it. Everything is a starting point; every control stays editable afterwards.
+
+## Rating a beat: one number, and every term shown
+
+"Rate this beat" renders the current beat **offline** — faster than real time, through the identical audio graph the speakers get — and measures it. Any file you load in the remix box gets rated too. The equation is:
+
+```
+Rating = 100 · Σ wᵢ·gᵢ(xᵢ) / Σ wᵢ
+```
+
+Each `xᵢ` is a measurement, each `wᵢ` a written-down weight, and `gᵢ` maps the measurement into [0,1]. The shape of `gᵢ` is the design decision that matters: almost nothing in production is "more is better" — loudness, dynamic range, brightness and stereo width all have a **band** that sounds right and get worse in *both* directions. So those use a Gaussian tolerance curve `g(x) = exp(−((x−μ)/σ)²)`, which is 1.0 on target and decays smoothly rather than falling off a cliff. Genuinely monotone terms use a saturating ramp. A weighted *mean* rather than a sum means an unmeasurable term (a mono file has no stereo width) is dropped from both halves of the fraction instead of scoring zero and dragging a good mix down.
+
+**18 terms.** Eleven acoustic: integrated loudness (real ITU-R BS.1770 K-weighting with both gates), true peak, crest factor, four spectral bands, stereo correlation, arrangement dynamics, rhythmic clarity and tonal clarity. Seven structural, read straight off the notes: syncopation (Longuet-Higgins & Lee), drum density, downbeat anchoring, arrangement size, harmonic movement, melodic range and space. The two halves are complementary — audio can tell you a mix is balanced but not whether the harmony makes sense, and a pattern can tell you the harmony makes sense but nothing about how it will sound.
+
+`node tools/test-rating.js` verifies the maths before anyone trusts it, `node tools/test-tempo.js` checks the tempo and pulse detection it depends on, `node tools/test-ui.js` drives the whole thing in a real browser, and `node tools/audit-mix.js` points it at the program's own output, genre by genre.
+
+### A regression the tests caught, in the tests' own subject
+
+Rewriting the onset detector (item 2 below) was a genuine improvement — the thing it replaced was not measuring spectral flux at all. It also **broke tempo detection**, from 1 wrong out of 11 known-BPM beats to 3. A plain log-domain difference sends a band lifting off the noise floor to an enormous value, drowning the actual drum hits. Switching to a compressed magnitude, `log(1 + 1000·rms)`, restored accuracy to parity while keeping a 13× separation between a real beat and a static wash.
+
+Then the first salience measure turned out to be fooled by exactly the case it was written for: a normalised autocorrelation measures the *shape* of the onset envelope and discards its magnitude, so a pad wash with no percussion scored **0.997** — higher than any real drum pattern. Salience is now periodicity multiplied by onset strength. And because `log(1+Cx)` is only log-like above its knee, the same beat at −20 dB scored 0.67 against the original's 0.96, so the envelope is now built from a level-normalised signal — a quiet track does not have a weaker beat.
+
+`tools/test-tempo.js` exists so none of that can silently regress again. It also records, rather than hides, a standing limitation: a 150 BPM pattern is read as 75, because the detector locks onto the two-beat snare period — a musically defensible reading of the same signal, and one the previous detector made too.
+
+### Six things the verification caught
+
+Every one of these was found by measuring rather than by reading the code, and each was a case of the code doing something other than what its own comment claimed.
+
+1. **The spectral band splitter was one-pole.** At 6 dB/octave it leaked so badly that a 120 Hz tone put 28% of its energy in the "below 60 Hz" band — so `sub` came out as the weakest term in *every* test case, including the one with the sub oscillator switched off. Replaced with cascaded Butterworth sections at 24 dB/octave: a pure tone now lands 96–99% in the correct band.
+
+2. **The onset detector wasn't measuring spectral flux.** It claimed to split the signal into eight bands but bucketed samples by their *index modulo eight* — every bucket saw the same broadband energy. It found tempos well enough (any energy modulation autocorrelates at the beat) but couldn't tell a drum hit from a fade: on a fixture with no percussion at all, whose only movement was a level change every four seconds, it reported a **stronger** pulse than the same fixture with a real kick on every beat. Rewritten as genuine multi-band log-domain flux.
+
+3. **"Is there a beat" was answered by "did a number come back".** `detectTempo` always returns something — it picks the best of 520 candidate BPMs, and the best of a bad set is still the best. On an ambient wash it confidently reported 131.5 BPM. Added `detectPulse`, which returns the onset envelope's normalised autocorrelation at the beat lag, so the term measures how strongly the pulse actually repeats.
+
+4. **Spectral balance was measured on the left channel alone.** Anything panned counted once instead of twice, so *widening* a mix appeared to change its tonal balance. Moved to the mono sum, where side content cancels exactly — which is also how a mix gets checked in practice.
+
+5. **Melodic range pooled every part together.** A bass at scale degree −8 under a lead at +31 read as a 39-degree "melody", so every properly arranged beat was marked down for the crime of having both a bass and a lead. Individually those lines span 7–15 degrees, which is exactly right. Now measured per part and averaged by note count.
+
+6. **Harmonic movement was calibrated backwards.** A Gaussian centred on 0.65 assumed that changing chord every bar was too much of a good thing — but measured across 95 generations, 92 changed every bar, because a four-chord progression over a four-bar loop is simply what these genres do. It scored that norm at 0.465, making harmony the weakest term in almost every genre for no musical reason.
+
+### Two ways the rating was unfair to the thing it was rating
+
+Pointing the finished rater at the program's own output scored it **36.5/100** on the mix — and that number was wrong, for reasons that were the rater's fault rather than the engine's:
+
+- **It judged a raw bounce against mastered-release loudness.** The genre targets (−8 to −13 LUFS) are what a *finished, mastered* record measures. A DAW bounce sits 4–6 LU quieter with several dB more crest, because the limiting that closes that gap hasn't happened yet. So `rateAudio` now takes a `mastered` flag; anything the user loads is assumed to be a finished record, and the program's own renders declare themselves unmastered.
+- **It marked a loop down for having no sections.** Arrangement dynamics measures whether a track has *sections*, and a four-bar loop doesn't have sections — it has one idea repeated, at deliberately identical level each time round. That made it the single most common "fault" across all 19 genres. The term is now dropped for loops rather than failed.
+
+With both corrected the same output scores **58.3**, and the terms still flagged are real.
+
+### What the rating says about this program's own mix
+
+Structure scores well (mean **88.3**); the mix is the weaker half (mean **58.3**). Run `node tools/audit-mix.js` to reproduce. The consistent findings:
+
+- **The stereo image is nearly mono.** Correlation measures 0.94–1.00 across every genre. That's partly correct by design — kick, bass, snare and lead are centred on purpose, and they carry most of the energy — but real records sit nearer 0.4–0.9. There's an image here, and it's narrow.
+- **Spectral balance swings hard by genre.** Some genres put 60–82% of their energy in the 60–250 Hz band; others put 50–75% in the mids. That spread is much wider than the differences between those genres should justify, and low-mid buildup is the most common single finding.
+- **Pulse salience is low in a few genres** that ought to have an obvious beat — down from six genres to three once the onset detector itself was fixed, which is a good illustration of why the measuring tool has to be verified before its verdict is believed.
+
+These are left as findings rather than silently "fixed": changing the engine's width, loudness or band balance changes how every beat in the program sounds, which is a judgement call for whoever's listening, not something to quietly adjust so a score goes up. The tool's job is to say where the problems are, and it now does.

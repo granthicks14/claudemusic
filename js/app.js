@@ -2646,6 +2646,19 @@ if (analyseBtn) {
       remixResult.textContent = parts.length
         ? `Detected ${parts.join(" · ")} — the beat has been matched to it.${activeStyle ? "" : " Pick a genre to hear it."}`
         : "Could not detect tempo or key from that file.";
+
+      // The file is already decoded, so score it too - this is the acoustic
+      // half of the rating running on real audio rather than on a render.
+      try {
+        const chans = [];
+        for (let c = 0; c < buffer.numberOfChannels; c++) chans.push(buffer.getChannelData(c));
+        const r = rateAudio(chans, buffer.sampleRate, { genre: activeStyle ? (activeStyle.id || activeStyle.genre) : "_default" });
+        renderScore(r, `${r.terms.length} mix measurements from ${f.name} (${buffer.duration.toFixed(0)}s).`);
+      } catch (e) {
+        // A rating failure must not cost the user the tempo and key match,
+        // which is the part they actually asked for.
+        console.warn("Could not rate that file:", e);
+      }
       remixStatus.textContent = "";
     } catch (err) {
       remixStatus.textContent = `Could not read that file: ${String(err.message || err).slice(0, 120)}`;
@@ -2701,4 +2714,225 @@ function encodeWav(samples, sampleRate) {
     v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
   }
   return buf;
+}
+
+// ---------------------------------------------------------------------------
+// Search a song, get its YouTube link, build a beat in its pocket
+// ---------------------------------------------------------------------------
+const songSearchInput = document.getElementById("song-search");
+const songSearchBtn = document.getElementById("song-search-btn");
+const songResults = document.getElementById("song-results");
+const songStatus = document.getElementById("song-status");
+const songPanel = document.getElementById("song-panel");
+const songResult = document.getElementById("song-result");
+const songYoutube = document.getElementById("song-youtube");
+const songBuild = document.getElementById("song-build");
+let chosenSong = null;
+
+function renderSongResults(list, query) {
+  songResults.innerHTML = "";
+  for (const s of list) {
+    const li = document.createElement("li");
+    const b = document.createElement("button");
+    b.type = "button";
+    const title = document.createElement("span");
+    title.className = "song-title";
+    title.textContent = s.t;
+    const artist = document.createElement("span");
+    artist.className = "song-artist";
+    artist.textContent = s.a;
+    const meta = document.createElement("span");
+    meta.className = "song-meta";
+    meta.textContent = `${s.bpm} BPM · ${s.g} · ${s.y}`;
+    b.append(title, artist, meta);
+    b.addEventListener("click", () => chooseSong(s));
+    li.appendChild(b);
+    songResults.appendChild(li);
+  }
+  songResults.hidden = list.length === 0;
+
+  if (!list.length) {
+    // Nothing in the local catalogue matched. That is not a dead end - the
+    // YouTube link is built from whatever was typed, so the user still gets
+    // where they were going. They just do not get a tempo with it.
+    chosenSong = null;
+    songPanel.hidden = false;
+    songResult.textContent = `No tempo reference for “${query}” — but here is the YouTube search for it.`;
+    songYoutube.href = youtubeSearchUrl(query);
+    songBuild.hidden = true;
+    songStatus.textContent = "Not in the built-in catalogue, so no tempo hint. Pick a genre below and set the tempo yourself.";
+  } else {
+    songStatus.textContent = `${list.length} match${list.length === 1 ? "" : "es"} — pick one.`;
+  }
+}
+
+function chooseSong(s) {
+  chosenSong = s;
+  songResults.hidden = true;
+  songStatus.textContent = "";
+  songPanel.hidden = false;
+  songBuild.hidden = false;
+  songResult.textContent = songCreditLine(s);
+  songYoutube.href = youtubeSearchUrl(s);
+}
+
+function runSongSearch() {
+  const q = songSearchInput.value.trim();
+  if (!q) {
+    songResults.hidden = true;
+    songPanel.hidden = true;
+    songStatus.textContent = "";
+    return;
+  }
+  renderSongResults(searchSongs(q, 8), q);
+}
+
+if (songSearchBtn) {
+  songSearchBtn.addEventListener("click", runSongSearch);
+  songSearchInput.addEventListener("input", runSongSearch);
+  songSearchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); runSongSearch(); }
+  });
+}
+
+if (songBuild) {
+  songBuild.addEventListener("click", () => {
+    if (!chosenSong) return;
+    const set = songToStyleSettings(chosenSong, STYLES);
+    if (set.genre) selectStyle(set.genre);
+    if (!activeStyle) {
+      songStatus.textContent = "Pick a genre below first.";
+      return;
+    }
+    // The tempo slider's range is per-genre, so widen it rather than
+    // silently clamping the reference tempo to something else.
+    tempoSlider.min = Math.min(Number(tempoSlider.min), Math.floor(set.bpm) - 2);
+    tempoSlider.max = Math.max(Number(tempoSlider.max), Math.ceil(set.bpm) + 2);
+    tempoSlider.value = Math.round(set.bpm);
+    tempoValue.textContent = Math.round(set.bpm);
+    engine.updateTempo(Math.round(set.bpm));
+    if (set.key) {
+      populateKeySelect(set.key);
+      activeStyle.key = set.key;
+      activeStyle.scale = set.scale || activeStyle.scale;
+      engine.updateKey(activeStyle);
+    }
+    generatePattern();
+    songStatus.textContent = set.key
+      ? `Built at ${Math.round(set.bpm)} BPM in ${set.key.replace(/\d/, "")} ${set.scale}.`
+      : `Built at ${Math.round(set.bpm)} BPM. Key is the program's own choice — that record's key is not in the catalogue.`;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Score this beat
+// ---------------------------------------------------------------------------
+const scoreBtn = document.getElementById("score-btn");
+const scoreStatus = document.getElementById("score-status");
+const scorePanel = document.getElementById("score-panel");
+const scoreValue = document.getElementById("score-value");
+const scoreVerdict = document.getElementById("score-verdict");
+const scoreSource = document.getElementById("score-source");
+const scoreAdvice = document.getElementById("score-advice");
+const scoreTerms = document.getElementById("score-terms");
+const scoreClose = document.getElementById("score-close");
+
+// Green through amber to red, so a glance at the bars says as much as the
+// numbers do.
+function scoreColour(v) {
+  const hue = Math.round(v * 125);          // 0 = red, 125 = green
+  return `hsl(${hue} 70% 52%)`;
+}
+
+function renderScore(result, sourceText) {
+  scorePanel.hidden = false;
+  scoreValue.textContent = result.score.toFixed(1);
+  scoreValue.style.color = scoreColour(result.score / 100);
+  scoreVerdict.textContent = ratingVerdict(result.score);
+  scoreSource.textContent = sourceText;
+
+  const weak = ratingWeaknesses(result, 3);
+  scoreAdvice.textContent = weak.length
+    ? "Weakest links: " + weak.map((t) => `${t.label.toLowerCase()} (${t.detail})`).join("; ") + "."
+    : "Nothing is scoring badly — every measured term is inside its target band.";
+
+  scoreTerms.innerHTML = "";
+  for (const t of result.terms.slice().sort((a, b) => a.score - b.score)) {
+    const row = document.createElement("div");
+    row.className = "score-term";
+    const label = document.createElement("span");
+    label.className = "score-term-label";
+    label.textContent = t.label;
+    const bar = document.createElement("div");
+    bar.className = "score-bar";
+    const fill = document.createElement("span");
+    fill.style.width = `${Math.round(t.score * 100)}%`;
+    fill.style.background = scoreColour(t.score);
+    bar.appendChild(fill);
+    const detail = document.createElement("span");
+    detail.className = "score-term-detail";
+    detail.textContent = t.detail || "";
+    row.append(label, bar, detail);
+    scoreTerms.appendChild(row);
+  }
+}
+
+// Two ratings, combined. The symbolic one knows what the notes are but not
+// how they will sound; the acoustic one hears the render but knows nothing
+// about the harmony. Averaging them by total weight - rather than 50/50 -
+// keeps every individual term's weight meaning the same thing it does on
+// its own.
+function combineRatings(a, b) {
+  const terms = a.terms.concat(b.terms);
+  const wSum = terms.reduce((s, t) => s + t.weight, 0) || 1;
+  const score = (terms.reduce((s, t) => s + t.weight * t.score, 0) / wSum) * 100;
+  return { score: Math.round(score * 10) / 10, terms };
+}
+
+if (scoreBtn) {
+  scoreBtn.addEventListener("click", async () => {
+    if (!currentPattern || !activeStyle) {
+      scoreStatus.textContent = "Generate a beat first.";
+      return;
+    }
+    scoreBtn.disabled = true;
+    scoreStatus.textContent = "Rendering and measuring…";
+    try {
+      const symbolic = ratePattern(activeStyle, currentPattern);
+
+      // Render the beat offline and measure the actual audio. This is the
+      // same signal the speakers get, so the mix terms are measuring the
+      // real thing rather than a guess from the pattern.
+      let combined = symbolic;
+      let source = "Structure only — offline rendering is unavailable in this browser.";
+      engine.ensureContext();
+      engine.updatePattern(currentPattern);
+      const buffer = await engine.renderOffline({ loops: 2 });
+      if (buffer) {
+        const chans = [];
+        for (let c = 0; c < buffer.numberOfChannels; c++) chans.push(buffer.getChannelData(c));
+        // mastered:false - this is a raw bounce, not a release, and the
+        // loudness and crest targets differ accordingly.
+        const acoustic = rateAudio(chans, buffer.sampleRate, {
+          genre: activeStyle.id || activeStyle.genre,
+          mastered: false,
+          // Anything but Full Song mode is a loop, and a loop has no
+          // sections to measure arrangement dynamics across.
+          isLoop: arrangementMode !== "song",
+        });
+        combined = combineRatings(symbolic, acoustic);
+        source = `${symbolic.terms.length} structural terms and ${acoustic.terms.length} mix measurements, `
+               + `from ${buffer.duration.toFixed(1)}s rendered offline.`;
+      }
+      renderScore(combined, source);
+      scoreStatus.textContent = "";
+    } catch (err) {
+      scoreStatus.textContent = `Could not score that: ${String(err.message || err).slice(0, 120)}`;
+    }
+    scoreBtn.disabled = false;
+  });
+}
+
+if (scoreClose) {
+  scoreClose.addEventListener("click", () => { scorePanel.hidden = true; });
 }

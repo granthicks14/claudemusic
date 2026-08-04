@@ -902,3 +902,62 @@ body {
 .credit-note a {
   color: var(--accent-2);
 }
+
+/* --- Song search ---------------------------------------------------------- */
+.song-results {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--line, #2a2f3a);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.22);
+}
+.song-results li { border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+.song-results li:last-child { border-bottom: none; }
+.song-results button {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.song-results button:hover,
+.song-results button:focus-visible { background: rgba(255, 255, 255, 0.08); }
+.song-title { font-weight: 600; }
+.song-artist { opacity: 0.75; }
+.song-meta { margin-left: auto; opacity: 0.6; font-size: 0.85em; white-space: nowrap; }
+a.transport-btn { text-decoration: none; display: inline-flex; align-items: center; }
+
+/* --- Score panel ---------------------------------------------------------- */
+.score-panel {
+  margin: 14px 0 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line, #2a2f3a);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.24);
+}
+.score-head { display: flex; align-items: center; gap: 16px; }
+.score-number { font-size: 2.6rem; font-weight: 700; line-height: 1; white-space: nowrap; }
+.score-of { font-size: 1rem; font-weight: 400; opacity: 0.5; margin-left: 2px; }
+.score-head-text { flex: 1 1 auto; min-width: 0; }
+.score-verdict { margin: 0; font-size: 1.05rem; font-weight: 600; }
+.score-source { margin: 2px 0 0; opacity: 0.65; font-size: 0.88em; }
+.score-advice { margin: 12px 0 0; font-size: 0.94em; }
+.score-terms { margin-top: 12px; display: grid; gap: 7px; }
+.score-term { display: grid; grid-template-columns: 12.5rem 1fr auto; gap: 10px; align-items: center; font-size: 0.88em; }
+.score-term-label { opacity: 0.85; }
+.score-bar { height: 8px; border-radius: 5px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.score-bar span { display: block; height: 100%; border-radius: 5px; }
+.score-term-detail { opacity: 0.6; font-size: 0.92em; white-space: nowrap; }
+@media (max-width: 640px) {
+  .score-term { grid-template-columns: 1fr; gap: 3px; }
+  .score-term-detail { white-space: normal; }
+}

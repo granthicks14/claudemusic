@@ -532,6 +532,79 @@ Which articulation each part uses is chosen **per generation**, so a strummed gu
 **288 kits total**, all rendered offline with none silent or clipping; 19 genres played at complexity 1, 5 and 10 with zero console errors.
 
 
+## The guitars were playing the wrong notes
+
+Reported as a major issue across three rounds of work on timbre. The cause turned out not to be timbre at all.
+
+A `DelayNode` that sits inside a **feedback cycle** is required by the Web Audio spec to impose at least one render quantum of delay — 128 samples, about 2.9ms at 44.1kHz. That delay is *added* to whatever `delayTime` you ask for, so the plucked-string loop period was
+
+```
+1/freq + 128/sampleRate      instead of      1/freq
+```
+
+and every plucked note came out flat. The prediction matched the measurement exactly: asking for E2 (82.41 Hz) produced a harmonic series built on **66.5 Hz**, which is precisely `1/(1/82.41 + 128/44100)`.
+
+Measured across the guitar range, before and after compensating:
+
+| note | requested | tuning error before | after |
+|---|---|---|---|
+| E2 | 82.41 Hz | −372 ¢ | **0 ¢** |
+| A2 | 110 Hz | −480 ¢ | **0 ¢** |
+| D3 | 146.83 Hz | +585 ¢ | **0 ¢** |
+| G3 | 196 Hz | +420 ¢ | **0 ¢** |
+| B3 | 246.94 Hz | +264 ¢ | **−3 ¢** |
+| E4 | 329.63 Hz | −1164 ¢ | **0 ¢** |
+| A4 | 440 Hz | −1425 ¢ | **0 ¢** |
+| E5 | 659.26 Hz | +48 ¢ | **0 ¢** |
+
+**Worst error: 1425 cents → 3 cents.** This bug was in the string model from the day it was written, so every guitar, bass pluck, harp, kora, koto and electric-piano note the program had ever played was at the wrong pitch — often by more than an octave. No amount of cabinet simulation or strumming behaviour was ever going to fix that.
+
+Compensation creates a hard ceiling: once `1/freq` drops below one render quantum the loop cannot be made short enough at all, so **anything above about 344 Hz needs a different model**. Those notes are now synthesised additively, deliberately matching the delay-line model's character rather than being a generic bell — partials stretched by the real stiffness law `f(n) = n·f₀·√(1 + B·n²)`, each one decaying faster than the one below it, and the two vibration planes present as a slight detune.
+
+**Two more things real strings do that the model did not:**
+
+- **Two polarisations.** A plucked string vibrates in two planes at once, and they couple to the bridge differently, so they decay at different rates and are slightly detuned from each other. That is what produces the characteristic two-stage decay — a fast initial fall, then a long quiet tail — and the gentle beating in a held note. One delay line gives a single clean exponential, which the ear reads immediately as electronic. Measured after the change: the first 0.4s falls ~10dB, the next 0.4s only ~3.5dB.
+- **Inharmonicity.** Real strings have bending stiffness, so their partials are stretched sharp. Allpass dispersion was tried in the loop to get this and **measurement killed it**: an allpass has flat magnitude but a frequency-dependent *group delay*, that delay lands inside the feedback path, and it dragged the pitch flat by hundreds of cents. Compensating exactly is impossible from the outside, because varying delay with frequency is the whole point of the filter. Correct pitch is not negotiable, so the loop stays dispersion-free and exactly in tune, and stiffness is modelled in the additive path where every partial's frequency is known exactly.
+
+## Reinforcement learning, for real this time
+
+Last round I said deep RL was not possible here because there was no reward signal at scale. That was right about *user feedback* — a human presses a button a few dozen times — but I missed that `scoreVariation` **is** a programmatic reward function. Fourteen musical criteria, already written. That is a simulator you can sample as often as you like, which is exactly what RL needs.
+
+So there are now two learners, doing different jobs:
+
+**`js/policy.js` — an offline-trained neural policy.**
+
+| | |
+|---|---|
+| Action | 9 continuous offsets to the generation knobs (density, syncopation, extensions, layers, rest, ghost notes, rolls, variation, solo pairing) |
+| Environment | `generateVariation` |
+| Reward | `scoreVariation` |
+| Algorithm | Cross-entropy method — sample a population of policies, keep the top quarter, refit the sampling distribution, repeat |
+| Network | 6 inputs → 8 hidden (tanh) → 9 outputs (tanh, bounded) |
+| Training | 5,200 episodes, `tools/train-policy.js` |
+| **Result** | **baseline 140.11 → 144.14 on held-out episodes (+2.9%)** |
+
+CEM is a standard derivative-free policy-search algorithm, used precisely where the reward is a black box you can only sample. **Honest sizing:** two layers is not "deep", and I am not going to call it that. It is a real neural policy improved by a real RL algorithm against a real reward, and it measurably beats the un-policied generator on held-out problems — which is the part that matters. A larger network would not help; the action space is nine numbers and the reward is smooth in them, so capacity is not the bottleneck.
+
+The action range is **bounded on purpose**. An unbounded policy optimising a hand-written reward would find whatever degenerate corner scores highest — the classic proxy-optimisation failure, a beat that scores well and sounds terrible. The genre and the complexity dial stay in charge; the policy trims.
+
+**`js/learning.js` — your own ratings**, unchanged and still layered on top. The policy is what the program knows about music in general; the taste model is what it knows about you.
+
+## Build a beat around your own track
+
+The version of the instrumental request that actually works, and it does the half worth having.
+
+You supply the audio — your own recording, something you hold rights to, or a Creative Commons track ([ccMixter](http://ccmixter.org/) exists precisely for this: everything is CC-BY and explicitly licensed for remixing, and `stems.ccmixter.org` carries a cappellas). **The file is read in the browser and never uploaded anywhere.**
+
+**Tempo detection** — spectral-flux onset envelope, then autocorrelation summed over the beat lag and its multiples so a bar-length pattern reinforces the beat rather than competing with it, with octave-error correction. **6/6 correct on synthetic tracks with known tempos.**
+
+**Key detection** — Krumhansl-Schmuckler, using Krumhansl and Kessler's published listener-rating profiles, with chroma computed by Goertzel at each semitone (far cheaper than a full FFT when only 12 classes are wanted).
+
+*This needed a real fix.* Relative major and minor contain **exactly the same seven pitch classes**, so a chroma correlation cannot tell C minor from Eb major — it ranks them near-identically and the winner is noise. First measurement: 0/4 correct, and three of the four errors were exactly that substitution. What separates them is which note acts as the tonic, and in practically all popular music **the bass states it** — so a second chroma is taken from the bass register alone and used to break the tie. **6/6 correct after the fix**, and the readout reports the runner-up so you can see how close the call was.
+
+**Centre-channel reduction** — real DSP, not machine learning. A lead vocal is almost always panned dead centre, so it is near-identical in both channels; subtracting one from the other cancels what they share and leaves what is panned, with the centred low end filtered back in so the result is usable. It is the karaoke trick, it is decades old, and it is honest about being partial: anything else centred (usually kick and bass) goes with the vocal, and stereo reverb on the vocal stays behind. **It is not source separation and does not pretend to be.**
+
+
 ## Teaching it your taste
 
 Every "Generate" already composes twelve beats and keeps the best one — but the scorer's opinions were hand-written by me, identical for everyone. Two buttons (**👍 More like this** / **👎 Less like this**) close that loop: the program measures what the liked beats have in common that the disliked ones do not, and that difference steers both the candidate search *and* the generation parameters.

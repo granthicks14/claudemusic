@@ -18,6 +18,13 @@ const creditLineEl = document.getElementById("credit-line");
 const copyUploadBtn = document.getElementById("copy-upload-text");
 const creditCopied = document.getElementById("credit-copied");
 let lastArtist = null;
+const audioFileInput = document.getElementById("audio-file");
+const analyseBtn = document.getElementById("analyse-btn");
+const remixStatus = document.getElementById("remix-status");
+const remixPanel = document.getElementById("remix-panel");
+const remixResult = document.getElementById("remix-result");
+const makeInstrumentalBtn = document.getElementById("make-instrumental");
+let loadedAudio = null;   // { buffer, name }
 const exportMidiBtn = document.getElementById("export-midi-btn");
 const rateUpBtn = document.getElementById("rate-up");
 const rateDownBtn = document.getElementById("rate-down");
@@ -2579,3 +2586,119 @@ if (exportMidiBtn) {
     }
   }
 })();
+
+
+// ---------------------------------------------------------------------------
+// Build a beat around a track the user brings
+// ---------------------------------------------------------------------------
+if (audioFileInput) {
+  audioFileInput.addEventListener("change", () => {
+    loadedAudio = null;
+    remixPanel.hidden = true;
+    const f = audioFileInput.files && audioFileInput.files[0];
+    analyseBtn.disabled = !f;
+    remixStatus.textContent = f ? `${f.name} ready — press Analyse.` : "";
+  });
+}
+
+if (analyseBtn) {
+  analyseBtn.addEventListener("click", async () => {
+    const f = audioFileInput.files && audioFileInput.files[0];
+    if (!f) return;
+    analyseBtn.disabled = true;
+    remixStatus.textContent = "Decoding…";
+    try {
+      engine.ensureContext();
+      const bytes = await f.arrayBuffer();
+      const buffer = await engine.ctx.decodeAudioData(bytes);
+      loadedAudio = { buffer, name: f.name };
+      remixStatus.textContent = "Analysing tempo and key…";
+      // Yield so the status paints before the analysis blocks the thread.
+      await new Promise((r) => setTimeout(r, 20));
+
+      const mono = buffer.getChannelData(0);
+      const bpm = detectTempo(mono, buffer.sampleRate);
+      const key = detectKey(mono, buffer.sampleRate);
+
+      const parts = [];
+      if (bpm) {
+        // Match the beat to the track. The slider has a genre-specific
+        // range, so widen it rather than silently clamping to something
+        // that is not the detected tempo.
+        tempoSlider.min = Math.min(Number(tempoSlider.min), Math.floor(bpm) - 2);
+        tempoSlider.max = Math.max(Number(tempoSlider.max), Math.ceil(bpm) + 2);
+        tempoSlider.value = Math.round(bpm);
+        tempoValue.textContent = Math.round(bpm);
+        engine.updateTempo(Math.round(bpm));
+        parts.push(`${Math.round(bpm)} BPM`);
+      }
+      if (key && activeStyle) {
+        const k = keyToStyleKey(key, keySelect.dataset.octave || "2");
+        populateKeySelect(k.key);
+        activeStyle.key = k.key;
+        activeStyle.scale = k.scale;
+        engine.updateKey(activeStyle);
+        parts.push(`${key.tonic} ${key.mode} (confidence ${key.correlation.toFixed(2)})`);
+      }
+      if (activeStyle) generatePattern();
+
+      remixPanel.hidden = false;
+      remixResult.textContent = parts.length
+        ? `Detected ${parts.join(" · ")} — the beat has been matched to it.${activeStyle ? "" : " Pick a genre to hear it."}`
+        : "Could not detect tempo or key from that file.";
+      remixStatus.textContent = "";
+    } catch (err) {
+      remixStatus.textContent = `Could not read that file: ${String(err.message || err).slice(0, 120)}`;
+    }
+    analyseBtn.disabled = false;
+  });
+}
+
+if (makeInstrumentalBtn) {
+  makeInstrumentalBtn.addEventListener("click", () => {
+    if (!loadedAudio) return;
+    const b = loadedAudio.buffer;
+    if (b.numberOfChannels < 2) {
+      document.getElementById("remix-note2").textContent = "Needs a stereo file — a mono track has no centre to cancel.";
+      return;
+    }
+    const out = reduceCentre(b.getChannelData(0), b.getChannelData(1), b.sampleRate);
+    const wav = encodeWav(out, b.sampleRate);
+    const url = URL.createObjectURL(new Blob([wav], { type: "audio/wav" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = loadedAudio.name.replace(/\.[^.]+$/, "") + "-centre-reduced.wav";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    document.getElementById("remix-note2").textContent = "Downloaded.";
+  });
+}
+
+// Minimal 16-bit PCM WAV writer - the browser can decode almost anything
+// but can only encode what we write ourselves.
+function encodeWav(samples, sampleRate) {
+  const n = samples.length;
+  const buf = new ArrayBuffer(44 + n * 2);
+  const v = new DataView(buf);
+  const str = (off, s) => { for (let i = 0; i < s.length; i++) v.setUint8(off + i, s.charCodeAt(i)); };
+  str(0, "RIFF");
+  v.setUint32(4, 36 + n * 2, true);
+  str(8, "WAVE");
+  str(12, "fmt ");
+  v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true);      // PCM
+  v.setUint16(22, 1, true);      // mono
+  v.setUint32(24, sampleRate, true);
+  v.setUint32(28, sampleRate * 2, true);
+  v.setUint16(32, 2, true);
+  v.setUint16(34, 16, true);
+  str(36, "data");
+  v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return buf;
+}

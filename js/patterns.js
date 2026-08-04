@@ -2311,26 +2311,42 @@ function patternSyncopation(instruments, lanes) {
 // Everything below is derived from it, so the setting moves the whole
 // arrangement coherently instead of just turning up one parameter.
 let BEAT_COMPLEXITY = 5;
+// The policy conditions on context, so the current genre and swing have to
+// be visible to complexityProfile. Set by resolveGenerationStyle.
+let CURRENT_STYLE_ID = null;
+let CURRENT_SWING = 10;
+function setGenerationContext(styleId, swing) {
+  CURRENT_STYLE_ID = styleId || null;
+  if (swing !== undefined && swing !== null) CURRENT_SWING = swing;
+}
 function setBeatComplexity(n) {
   BEAT_COMPLEXITY = Math.max(1, Math.min(10, Math.round(n)));
 }
 
 function complexityProfile(c = BEAT_COMPLEXITY) {
   const t = (c - 1) / 9;   // 0 at simplest, 1 at most complex
-  // Learned taste leans the same knobs the dial moves - see
-  // Taste.generationBias. Zero until the user has rated anything.
+  // Two learned sources lean the same knobs the dial moves, and both are
+  // zero unless something has actually been learned:
+  //   * Taste.generationBias  - what THIS user has rated up
+  //   * policyAction          - the offline-trained RL policy (policy.js)
   let b = null;
   try { b = typeof Taste !== "undefined" ? Taste.generationBias() : null; } catch (_) { b = null; }
   const bias = b || { syncopation: 0, density: 0, extension: 0, layers: 0, melodic: 0 };
+  let pol = null;
+  try {
+    pol = typeof policyAction === "function"
+      ? policyAction(CURRENT_STYLE_ID, c, CURRENT_SWING) : null;
+  } catch (_) { pol = null; }
+  const P = pol || { density: 0, syncopation: 0, extension: 0, layers: 0, rest: 0, ghost: 0, roll: 0, variation: 0, pair: 0 };
   return {
     level: c,
     t,
     // Target LHL syncopation per bar, summed across the drum lanes. At 1
     // the beat should sit almost entirely on the grid; at 10 it should
     // be pushing against it constantly.
-    syncTarget: Math.max(0.5, 1 + t * 16 + bias.syncopation),
+    syncTarget: Math.max(0.5, 1 + t * 16 + bias.syncopation + P.syncopation),
     // Fraction of the grid that carries an onset, across all drums.
-    densityTarget: Math.max(0.06, Math.min(0.55, 0.13 + t * 0.26 + bias.density)),
+    densityTarget: Math.max(0.06, Math.min(0.55, 0.13 + t * 0.26 + bias.density + P.density)),
     // The finest subdivision allowed to carry an onset. Simple beats are
     // simple partly because they do not use 16ths at all. A hard bucket
     // per subdivision made whole pairs of levels identical (1 and 2 were
@@ -2339,23 +2355,23 @@ function complexityProfile(c = BEAT_COMPLEXITY) {
     // which fills in the steps between subdivisions.
     minStep: c <= 2 ? 4 : c <= 4 ? 2 : 1,
     offGridKeep: c === 1 ? 0 : c === 2 ? 0.3 : c === 3 ? 0.12 : c === 4 ? 0.45 : 1,
-    ghostProbability: 0.04 + t * 0.34,
-    rollBoost: (t - 0.4) * 0.5,
+    ghostProbability: Math.max(0, Math.min(0.7, 0.04 + t * 0.34 + P.ghost)),
+    rollBoost: (t - 0.4) * 0.5 + P.roll,
     // Harmony: triads at the bottom, 7ths in the middle, 9ths and 11ths
     // at the top. This is the same axis jazz uses to describe harmonic
     // sophistication, so it belongs on a complexity control.
-    extensionBonus: Math.max(0, Math.round((t < 0.25 ? 0 : t < 0.5 ? 1 : t < 0.75 ? 2 : 3) + bias.extension)),
+    extensionBonus: Math.max(0, Math.round((t < 0.25 ? 0 : t < 0.5 ? 1 : t < 0.75 ? 2 : 3) + bias.extension + P.extension)),
     // Chords per bar. Faster harmonic rhythm is one of the clearest
     // markers of a more worked-out arrangement.
     splitMotionProbability: 0.1 + t * 0.65,
     anticipateProbability: 0.05 + t * 0.45,
     // Melody
-    restBias: 0.22 - t * 0.34 - bias.melodic,        // more complex = fewer rests
-    variationBoost: -0.1 + t * 0.35,
+    restBias: 0.22 - t * 0.34 - bias.melodic + P.rest,        // more complex = fewer rests
+    variationBoost: -0.1 + t * 0.35 + P.variation,
     passingToneBoost: t * 0.22,
     // How many voices are in play at once.
-    soloPairProbability: Math.max(0, Math.min(0.95, 0.12 + t * 0.6 + bias.layers)),
-    chordKeepProbability: Math.max(0.1, Math.min(0.98, 0.3 + t * 0.5 + bias.layers)),
+    soloPairProbability: Math.max(0, Math.min(0.95, 0.12 + t * 0.6 + bias.layers + P.pair)),
+    chordKeepProbability: Math.max(0.1, Math.min(0.98, 0.3 + t * 0.5 + bias.layers + P.layers)),
     percLayerProbability: t * 0.75,
   };
 }
@@ -2895,6 +2911,7 @@ function planInstrumentation(style) {
 }
 
 function resolveGenerationStyle(style, plan) {
+  setGenerationContext(style.id, style.swing !== undefined ? style.swing * 100 : undefined);
   const p = plan || planInstrumentation(style);
   return {
     ...style,

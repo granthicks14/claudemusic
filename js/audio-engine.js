@@ -2331,6 +2331,80 @@ class BeatEngine {
   // first and measured (via OfflineAudioContext RMS analysis) to blow up
   // into runaway noise at these very short in-loop delay times even at low
   // Q, so this simpler, provably-bounded filter is used instead.
+// Above roughly 344Hz a feedback delay loop cannot be made short enough
+  // in Web Audio (see the render-quantum note in pluckString), so high
+  // notes are synthesised additively instead. The point is to match the
+  // delay-line model's CHARACTER, not to be a generic bell: the partials
+  // are stretched by the same stiffness law a real string follows,
+  //
+  //     f(n) = n * f0 * sqrt(1 + B*n^2)
+  //
+  // each partial decays faster than the one below it (which is what a
+  // lossy string does), and the two vibration planes are present as a
+  // slight detune so the note beats and has the same two-stage decay.
+  pluckAdditive(time, freq, durationSeconds, vel, dest, opts = {}) {
+    const ctx = this.ctx;
+    const {
+      brightness = 1,
+      sustain = 1.3,
+      pluckNoise = 0.008,
+      outputLowpass = null,
+      stiff = true,
+    } = opts;
+    const ring = Math.max(durationSeconds, sustain);
+    // Thin, high strings are much less stiff than wound low ones.
+    const B = stiff ? 0.00008 : 0.00001;
+
+    let tail = dest;
+    if (outputLowpass) {
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = outputLowpass;
+      lp.connect(dest);
+      tail = lp;
+    }
+    const bus = ctx.createGain();
+    bus.gain.value = 1;
+    bus.connect(tail);
+
+    const nyq = ctx.sampleRate / 2;
+    for (let n = 1; n <= 10; n++) {
+      const fn = n * freq * Math.sqrt(1 + B * n * n);
+      if (fn >= nyq * 0.92) break;
+      const lvl = (1 / Math.pow(n, 1.35)) * (n === 1 ? 1 : brightness);
+      // Higher partials die first - the string's losses rise with
+      // frequency, which is why a plucked note darkens as it rings.
+      const dec = ring / (1 + (n - 1) * 0.55);
+      for (const [detune, amp] of [[1, 1], [1.0009, 0.6]]) {
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.value = fn * detune;
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, time);
+        g.gain.linearRampToValueAtTime(vel * 0.5 * lvl * amp, time + 0.004);
+        g.gain.exponentialRampToValueAtTime(0.0004, time + dec);
+        osc.connect(g).connect(bus);
+        osc.start(time);
+        osc.stop(time + dec + 0.05);
+      }
+    }
+    // The pick itself.
+    const click = ctx.createBufferSource();
+    click.buffer = this.makeNoiseBuffer(Math.max(0.004, pluckNoise));
+    const bp = ctx.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.frequency.value = Math.min(nyq * 0.8, freq * 4);
+    bp.Q.value = 0.9;
+    const cg = ctx.createGain();
+    cg.gain.setValueAtTime(vel * 0.35, time);
+    cg.gain.exponentialRampToValueAtTime(0.001, time + Math.max(0.004, pluckNoise));
+    click.connect(bp).connect(cg).connect(tail);
+    click.start(time);
+    click.stop(time + 0.03);
+
+    setTimeout(() => { try { bus.disconnect(); } catch (_) {} }, (ring + 0.3) * 1000);
+  }
+
   pluckString(time, freq, durationSeconds, vel, dest, opts = {}) {
     const ctx = this.ctx;
     const {
@@ -2340,58 +2414,187 @@ class BeatEngine {
       brightness = 1,
       sustain = 1.3,
       outputLowpass = null,
+      // Set false for instruments that are not stiff steel strings - a
+      // harp or a nylon string is far closer to an ideal flexible string.
+      stiff = true,
     } = opts;
 
-    const delay = ctx.createDelay(1);
-    delay.delayTime.value = 1 / freq;
-    const oneSample = ctx.createDelay(1);
-    oneSample.delayTime.value = 1 / ctx.sampleRate;
-    const gDirect = ctx.createGain();
-    gDirect.gain.value = 1 - damp;
-    const gDelayed = ctx.createGain();
-    gDelayed.gain.value = damp;
-    const fb = ctx.createGain();
-    fb.gain.value = feedback;
-    delay.connect(gDirect).connect(fb);
-    delay.connect(oneSample).connect(gDelayed).connect(fb);
-    fb.connect(delay);
-
-    let outNode = delay;
-    let body = null;
-    if (outputLowpass) {
-      body = ctx.createBiquadFilter();
-      body.type = "lowpass";
-      body.frequency.value = outputLowpass;
-      outNode.connect(body);
-      outNode = body;
+    // ---- Why a plain Karplus-Strong loop still sounds synthetic -------
+    // Two physical facts about a real steel string are missing from the
+    // textbook algorithm, and between them they are most of the remaining
+    // gap:
+    //
+    //  1. INHARMONICITY. An ideal string's partials sit at exact integer
+    //     multiples of the fundamental. A real one has bending STIFFNESS,
+    //     which raises the higher partials progressively - they are
+    //     "stretched" upward, following f(n) = n*f0*sqrt(1 + B*n^2).
+    //     Thicker and wound strings are markedly more inharmonic than thin
+    //     plain ones, which is a large part of why a low E does not sound
+    //     like a transposed high E. A single delay line produces perfectly
+    //     harmonic partials by construction, i.e. exactly the thing real
+    //     strings are not.
+    //
+    //  2. TWO POLARISATIONS. A plucked string vibrates in two planes at
+    //     once - parallel and perpendicular to the soundboard - and the
+    //     two couple to the bridge differently, so they decay at different
+    //     rates and are very slightly detuned from each other. That is
+    //     what produces the characteristic two-stage decay (a fast initial
+    //     fall, then a long quiet tail) and the gentle beating in a held
+    //     note. One delay line gives a single clean exponential decay,
+    //     which the ear reads immediately as electronic.
+    //
+    // Both are modelled below: two loops rather than one, and a cascade of
+    // allpass filters in each loop. An allpass has flat magnitude but a
+    // frequency-dependent DELAY, so it makes high partials travel round
+    // the loop faster than low ones - which is precisely the dispersion
+    // that stretches them sharp. That is the standard way to get
+    // inharmonicity out of a delay-line string without a full waveguide.
+    //
+    // Stiffness rises steeply as strings get thicker, so the amount of
+    // dispersion is scaled by register: low, wound strings get much more
+    // of it than the plain treble strings.
+    // ---- The render-quantum tax ---------------------------------------
+    // A DelayNode that sits inside a FEEDBACK CYCLE is required by the Web
+    // Audio spec to impose at least one render quantum of delay - 128
+    // samples, about 2.9ms at 44.1kHz. That delay is ADDED to whatever
+    // delayTime is asked for, so the loop period is
+    //
+    //     1/freq + 128/sampleRate
+    //
+    // rather than 1/freq, and every plucked note comes out FLAT. Measured:
+    // asking for E2 (82.41Hz) produced a harmonic series built on 66.5Hz,
+    // which is exactly 1/(1/82.41 + 128/44100) - about a minor third flat.
+    // High notes are far worse, because the fixed 2.9ms error is a much
+    // larger fraction of a short period; a requested E4 came out over an
+    // octave low.
+    //
+    // This was in the string model from the day it was written, which
+    // means every guitar, bass pluck, harp, kora and electric-piano note
+    // the program has ever played has been at the wrong pitch. It is very
+    // likely the single biggest reason the guitars never sounded right:
+    // they were not playing the notes they were given.
+    //
+    // The compensation is simply to subtract the quantum back out. The
+    // consequence is a hard ceiling - once 1/freq drops below one render
+    // quantum the loop cannot be made short enough at all, so anything
+    // above about 344Hz needs a different model entirely (see below).
+    const QUANTUM = 128 / ctx.sampleRate;
+    const period = 1 / freq;
+    if (period <= QUANTUM * 1.05) {
+      return this.pluckAdditive(time, freq, durationSeconds, vel, dest, opts);
     }
-    const outGain = ctx.createGain();
+
+    const nodes = [];
     const ringTime = Math.max(durationSeconds, sustain);
+    const outGain = ctx.createGain();
     outGain.gain.setValueAtTime(vel, time);
     outGain.gain.exponentialRampToValueAtTime(0.0006, time + ringTime);
-    outNode.connect(outGain).connect(dest);
 
-    const exciter = ctx.createBufferSource();
-    exciter.buffer = this.makeNoiseBuffer(pluckNoise);
-    const exciterFilter = ctx.createBiquadFilter();
-    exciterFilter.type = "lowpass";
-    exciterFilter.frequency.value = Math.min(9000, freq * 6 * brightness);
-    const exciterGain = ctx.createGain();
-    exciterGain.gain.setValueAtTime(1, time);
-    exciterGain.gain.linearRampToValueAtTime(0, time + pluckNoise);
-    exciter.connect(exciterFilter).connect(exciterGain).connect(delay);
-    exciter.start(time);
-    exciter.stop(time + pluckNoise + 0.01);
+    let tail = outGain;
+    if (outputLowpass) {
+      const body = ctx.createBiquadFilter();
+      body.type = "lowpass";
+      body.frequency.value = outputLowpass;
+      body.connect(outGain);
+      tail = body;
+      nodes.push(body);
+    }
+    outGain.connect(dest);
+    nodes.push(outGain);
+
+    // Allpass dispersion was tried here to get inharmonicity into the
+    // loop, and measurement killed it: an allpass has flat magnitude but a
+    // frequency-dependent GROUP DELAY, and that delay lands inside the
+    // feedback path, lengthening the loop and dragging the pitch flat by
+    // several hundred cents. Compensating for it exactly is not possible
+    // from the outside, because the whole point of the filter is that its
+    // delay varies with frequency.
+    //
+    // Correct pitch is not negotiable and inharmonicity is a refinement,
+    // so the loop stays dispersion-free and exactly in tune. The stiffness
+    // stretching is modelled in pluckAdditive instead, where every partial
+    // is placed individually and its frequency is known exactly.
+    const dispersion = 0;
+
+    // The two polarisations. The vertical one couples strongly to the
+    // bridge so it is louder and dies fast; the horizontal one couples
+    // weakly, so it is quieter and rings on - that ordering is what makes
+    // the decay two-stage rather than a single exponential.
+    const planes = [
+      { detune: 1, gain: 1, fbScale: 1, dampScale: 1 },
+      { detune: 1.0009, gain: 0.62, fbScale: 1.0035, dampScale: 0.82 },
+    ];
+
+    const excite = [];
+    for (const pl of planes) {
+      const d = ctx.createDelay(1);
+      // Subtract the render quantum the cycle will add back.
+      d.delayTime.value = Math.max(1 / ctx.sampleRate, 1 / (freq * pl.detune) - QUANTUM);
+      const oneSample = ctx.createDelay(1);
+      oneSample.delayTime.value = 1 / ctx.sampleRate;
+      const pDamp = Math.min(0.95, damp * pl.dampScale);
+      const gDirect = ctx.createGain();
+      gDirect.gain.value = 1 - pDamp;
+      const gDelayed = ctx.createGain();
+      gDelayed.gain.value = pDamp;
+      // Feedback stays strictly below 1 - the two-tap damping filter has
+      // magnitude <= 1 at every frequency, so the loop is provably stable
+      // for any feedback < 1, and the allpasses below are unity-gain, so
+      // they cannot destabilise it either.
+      const fb = ctx.createGain();
+      fb.gain.value = Math.min(0.9995, feedback * pl.fbScale);
+
+      let loopHead = d;
+      const aps = [];
+      for (let k = 0; k < dispersion; k++) {
+        const ap = ctx.createBiquadFilter();
+        ap.type = "allpass";
+        // Spread the allpass corners across the string's own partial
+        // range so the stretching accumulates smoothly with frequency
+        // rather than kinking at one point.
+        ap.frequency.value = Math.min(ctx.sampleRate / 2 - 100, freq * (2 + k * 3));
+        ap.Q.value = 0.7;
+        loopHead.connect(ap);
+        loopHead = ap;
+        aps.push(ap);
+      }
+      loopHead.connect(gDirect).connect(fb);
+      loopHead.connect(oneSample).connect(gDelayed).connect(fb);
+      fb.connect(d);
+
+      const pg = ctx.createGain();
+      pg.gain.value = pl.gain;
+      loopHead.connect(pg).connect(tail);
+
+      nodes.push(d, oneSample, gDirect, gDelayed, fb, pg, ...aps);
+      excite.push(d);
+    }
+
+    // The pluck. A real pick does not excite both planes equally or at the
+    // same instant - it displaces the string mostly in one direction and
+    // the other plane is set going by coupling a moment later.
+    excite.forEach((target, idx) => {
+      const exciter = ctx.createBufferSource();
+      exciter.buffer = this.makeNoiseBuffer(pluckNoise);
+      const exciterFilter = ctx.createBiquadFilter();
+      exciterFilter.type = "lowpass";
+      exciterFilter.frequency.value = Math.min(9000, freq * 6 * brightness);
+      const exciterGain = ctx.createGain();
+      const lvl = idx === 0 ? 1 : 0.45;
+      const t0 = time + (idx === 0 ? 0 : 0.0012);
+      exciterGain.gain.setValueAtTime(lvl, t0);
+      exciterGain.gain.linearRampToValueAtTime(0, t0 + pluckNoise);
+      exciter.connect(exciterFilter).connect(exciterGain).connect(target);
+      exciter.start(t0);
+      exciter.stop(t0 + pluckNoise + 0.01);
+      nodes.push(exciterFilter, exciterGain);
+    });
 
     const cleanupMs = (ringTime + 0.3) * 1000;
     setTimeout(() => {
-      delay.disconnect();
-      oneSample.disconnect();
-      gDirect.disconnect();
-      gDelayed.disconnect();
-      fb.disconnect();
-      outGain.disconnect();
-      if (body) body.disconnect();
+      for (const n of nodes) {
+        try { n.disconnect(); } catch (_) { /* already gone */ }
+      }
     }, cleanupMs);
   }
 

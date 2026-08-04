@@ -883,3 +883,22 @@ body {
   line-height: 1.45;
   color: var(--muted);
 }
+
+/* Bring-your-own-track panel. */
+.remix-box {
+  background: linear-gradient(160deg, rgba(255, 159, 67, 0.07), rgba(165, 94, 234, 0.05));
+}
+
+.remix-box input[type="file"] {
+  flex: 1;
+  background: #1d1d2b;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 9px;
+  padding: 0.55rem 0.9rem;
+  font-size: 0.85rem;
+}
+
+.credit-note a {
+  color: var(--accent-2);
+}

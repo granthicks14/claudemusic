@@ -23,7 +23,10 @@ const R = (code) => vm.runInContext(code, ctx);
 
 const OUT = R("POLICY_OUTPUTS");
 const IN = R("POLICY_INPUTS");
-const HIDDEN = 8;
+// Wider than the original 8. The input vector doubled (tempo, half-time and
+// four artist-context features were added), so the hidden layer needs room to
+// mix them; at 8 it was a bottleneck rather than a representation.
+const HIDDEN = 16;
 const nIn = IN.length, nOut = OUT.length;
 const DIM = nIn * HIDDEN + HIDDEN + HIDDEN * nOut + nOut;
 
@@ -40,11 +43,17 @@ function unpack(v) {
   return { w1, b1, w2, b2 };
 }
 
+const ARTISTS = R("Object.keys(ARTIST_PROFILES)");
+
 // One episode: set a policy, generate a beat in a random genre at a random
-// complexity, return its musical score.
-function episode(weights, styleId, complexity) {
+// complexity - sometimes while imitating an artist - and return its musical
+// score. Training WITH artist contexts present is the point: the policy has
+// to learn to complement the artist knobs rather than fight them, and it can
+// only learn that if it sees them.
+function episode(weights, styleId, complexity, artist) {
   R(`setPolicyWeights(${weights ? JSON.stringify(weights) : "null"})`);
   R(`setBeatComplexity(${complexity})`);
+  R(`setArtistKnobs(${artist ? `artistKnobs(ARTIST_PROFILES[${JSON.stringify(artist)}])` : "null"})`);
   const s = JSON.stringify(styleId);
   const pat = R(`generateVariationOnce(STYLES[${s}], 4)`);
   return R(`scoreVariation(${JSON.stringify(pat.genStyle ? { melodic: pat.genStyle.melodic, drums: pat.genStyle.drums, id: pat.genStyle.id } : null)} || STYLES[${s}], ${JSON.stringify({ instruments: pat.instruments, structure: pat.structure, barRootDegrees: pat.barRootDegrees })})`);
@@ -52,7 +61,7 @@ function episode(weights, styleId, complexity) {
 
 function evaluate(weights, episodes, seedList) {
   let total = 0;
-  for (const [g, c] of seedList) total += episode(weights, g, c);
+  for (const [g, c, a] of seedList) total += episode(weights, g, c, a);
   return total / seedList.length;
 }
 
@@ -63,17 +72,27 @@ function randn() {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
-const GENERATIONS = Number(process.argv[2] || 14);
-const POP = Number(process.argv[3] || 26);
+const GENERATIONS = Number(process.argv[2] || 24);
+const POP = Number(process.argv[3] || 40);
 const ELITE = Math.max(3, Math.round(POP * 0.25));
-const EPISODES = 26;
+const EPISODES = 40;
 
 // A fixed evaluation set, so every candidate in a generation is judged on
 // the same problems and the comparison is not just noise.
 function makeSeeds(n) {
   const out = [];
   for (let i = 0; i < n; i++) {
-    out.push([GENRES[Math.floor(Math.random() * GENRES.length)], 1 + Math.floor(Math.random() * 10)]);
+    // Two in five episodes imitate a named artist, so the policy is trained
+    // on both situations it will actually meet rather than only the plain one.
+    const withArtist = Math.random() < 0.4;
+    const artist = withArtist ? ARTISTS[Math.floor(Math.random() * ARTISTS.length)] : null;
+    const genre = artist
+      ? R(`ARTIST_PROFILES[${JSON.stringify(artist)}].genre`)
+      : GENRES[Math.floor(Math.random() * GENRES.length)];
+    const complexity = artist
+      ? R(`ARTIST_PROFILES[${JSON.stringify(artist)}].complexity`)
+      : 1 + Math.floor(Math.random() * 10);
+    out.push([genre, complexity, artist]);
   }
   return out;
 }
@@ -81,7 +100,7 @@ function makeSeeds(n) {
 let mean = new Array(DIM).fill(0);
 let std = new Array(DIM).fill(0.7);
 
-const baselineSeeds = makeSeeds(160);
+const baselineSeeds = makeSeeds(220);
 const baseline = evaluate(null, EPISODES, baselineSeeds);
 console.log(`baseline (no policy), ${baselineSeeds.length} episodes: ${baseline.toFixed(2)}`);
 console.log(`training: ${GENERATIONS} generations x ${POP} population, ${EPISODES} episodes each, elite ${ELITE}`);
@@ -122,6 +141,9 @@ finalW.meta = {
   method: "cross-entropy method",
   generations: GENERATIONS, population: POP, episodesPerEval: EPISODES,
   totalEpisodes: GENERATIONS * POP * EPISODES,
+  hidden: HIDDEN,
+  inputs: IN.length,
+  artistAware: true,
   baseline: +baseline.toFixed(2), trained: +finalScore.toFixed(2),
 };
 fs.writeFileSync(path.join(ROOT, "tools", "policy-weights.json"), JSON.stringify(finalW));

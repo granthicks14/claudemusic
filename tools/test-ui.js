@@ -43,7 +43,27 @@ const path = require("path");
   await page.goto("file://" + path.join(__dirname, "..", "index.html"));
   await page.waitForTimeout(400);
 
-  console.log("\n1. Song search");
+  console.log("\n1. The launcher tabs");
+  // Exactly one panel visible at a time, and the genre grid is the default -
+  // it is the entry point most people want, and it used to be buried under
+  // three walls of text.
+  const visiblePanels = await page.$$eval(".launcher-panel", (ps) =>
+    ps.filter((p) => !p.hidden).map((p) => p.dataset.panel));
+  check("one launcher panel is shown at a time", visiblePanels.length === 1, visiblePanels.join(","));
+  check("genres are the default panel", visiblePanels[0] === "genre", visiblePanels[0]);
+  const styleCards = await page.$$eval("#style-select .style-card, #style-select button", (c) => c.length);
+  check("the genre grid is populated", styleCards >= 19, `${styleCards} cards`);
+
+  for (const t of ["describe", "artist", "song", "track", "genre"]) {
+    await page.click(`.launcher-tab[data-tab="${t}"]`);
+    const shown = await page.$$eval(".launcher-panel", (ps) =>
+      ps.filter((p) => !p.hidden).map((p) => p.dataset.panel));
+    check(`the "${t}" tab shows only its own panel`,
+      shown.length === 1 && shown[0] === t, shown.join(","));
+  }
+
+  console.log("\n2. Song search");
+  await page.click('.launcher-tab[data-tab="song"]');
   await page.fill("#song-search", "seven nation army");
   await page.waitForTimeout(150);
   const results = await page.$$eval("#song-results li", (ls) => ls.map((l) => l.textContent));
@@ -62,7 +82,7 @@ const path = require("path");
   const href2 = await page.getAttribute("#song-youtube", "href");
   check("an unknown song still gets a link", /youtube\.com\/results/.test(href2 || ""), href2);
 
-  console.log("\n2. Building the beat from the song");
+  console.log("\n3. Building the beat from the song");
   await page.fill("#song-search", "seven nation army");
   await page.waitForTimeout(150);
   await page.click("#song-results li:first-child button");
@@ -75,7 +95,8 @@ const path = require("path");
   const workspaceVisible = await page.isVisible("#workspace");
   check("the workspace opened with a beat", workspaceVisible);
 
-  console.log("\n3. Offline render and scoring");
+  console.log("\n4. Offline render and scoring");
+  await page.click('.tools-tab[data-tool="score"]');
   await page.click("#score-btn");
   await page.waitForSelector("#score-panel:not([hidden])", { timeout: 45000 });
   await page.waitForFunction(() => {
@@ -112,7 +133,33 @@ const path = require("path");
   check("mix measurements are reported", detail.some((d) => /LUFS/.test(d)),
     detail.find((d) => /LUFS/.test(d)) || detail.slice(0, 3).join(" | "));
 
-  console.log("\n4. No page errors");
+  console.log("\n5. Tools tabs and the space shortcut");
+  const toolPanels = await page.$$eval("[data-tool-panel]", (ps) =>
+    ps.filter((p) => !p.hidden).map((p) => p.dataset.toolPanel));
+  check("one tools panel at a time", toolPanels.length === 1, toolPanels.join(","));
+  for (const t of ["taste", "chords", "sound", "export"]) {
+    await page.click(`.tools-tab[data-tool="${t}"]`);
+    const shown = await page.$$eval("[data-tool-panel]", (ps) =>
+      ps.filter((p) => !p.hidden).map((p) => p.dataset.toolPanel));
+    check(`the "${t}" tool tab works`, shown.length === 1 && shown[0] === t, shown.join(","));
+  }
+  // Space toggles playback, and must not do so while typing.
+  await page.click("body");
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(250);
+  const playing = await page.evaluate(() => engine.isPlaying);
+  check("space starts playback", playing === true, `isPlaying ${playing}`);
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(250);
+  check("space stops it again", (await page.evaluate(() => engine.isPlaying)) === false);
+  await page.click('.tools-tab[data-tool="chords"]');
+  await page.click("#chord-input");
+  await page.keyboard.press("Space");
+  await page.waitForTimeout(150);
+  check("space does not play while typing in a field",
+    (await page.evaluate(() => engine.isPlaying)) === false);
+
+  console.log("\n6. No page errors");
   check("no uncaught errors", errors.length === 0, errors.slice(0, 3).join(" | "));
 
   await browser.close();

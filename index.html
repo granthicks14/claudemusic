@@ -13,167 +13,216 @@
       <p class="subtitle">Pick a style, build a full arrangement, then produce it your way.</p>
     </header>
 
-    <section class="prompt-box">
-      <label for="prompt-input">Describe the beat you want</label>
-      <div class="prompt-row">
-        <input type="text" id="prompt-input" placeholder="e.g. &quot;dark energetic trap with vocal chops&quot; or &quot;chill lofi piano beat&quot;" maxlength="140">
-        <button id="prompt-generate" class="transport-btn play">Generate</button>
+    <section class="launcher">
+      <div class="launcher-summary" id="launcher-summary" hidden>
+        <span class="summary-icon" id="summary-icon">🎛️</span>
+        <span class="summary-text" id="summary-text"></span>
+        <button id="launcher-expand" class="transport-btn">Change ▾</button>
       </div>
-      <p id="prompt-status" class="shuffle-status"></p>
-    </section>
+      <div class="launcher-tabs" role="tablist" aria-label="How do you want to start?">
+        <button class="launcher-tab selected" role="tab" aria-selected="true" data-tab="genre" id="tab-genre" aria-controls="panel-genre">
+          <span class="tab-icon">🎛️</span><span class="tab-name">Pick a genre</span>
+        </button>
+        <button class="launcher-tab" role="tab" aria-selected="false" data-tab="describe" id="tab-describe" aria-controls="panel-describe">
+          <span class="tab-icon">💬</span><span class="tab-name">Describe it</span>
+        </button>
+        <button class="launcher-tab" role="tab" aria-selected="false" data-tab="artist" id="tab-artist" aria-controls="panel-artist">
+          <span class="tab-icon">🎤</span><span class="tab-name">Type beat</span>
+        </button>
+        <button class="launcher-tab" role="tab" aria-selected="false" data-tab="song" id="tab-song" aria-controls="panel-song">
+          <span class="tab-icon">🔍</span><span class="tab-name">From a song</span>
+        </button>
+        <button class="launcher-tab" role="tab" aria-selected="false" data-tab="track" id="tab-track" aria-controls="panel-track">
+          <span class="tab-icon">📂</span><span class="tab-name">From your track</span>
+        </button>
+      </div>
 
-    <section class="prompt-box artist-box">
-      <label for="artist-input">Make a "type beat"</label>
-      <div class="prompt-row">
-        <input type="text" id="artist-input" placeholder="e.g. &quot;Metro Boomin&quot;, &quot;J Dilla&quot;, &quot;Kaytranada&quot;" maxlength="60" autocomplete="off" list="artist-list">
-        <datalist id="artist-list"></datalist>
-        <button id="artist-generate" class="transport-btn play">Generate Type Beat</button>
-      </div>
-      <p id="artist-status" class="shuffle-status"></p>
-      <div id="credit-panel" class="credit-panel" hidden>
-        <p id="credit-line" class="credit-line"></p>
-        <div class="credit-actions">
-          <button id="copy-upload-text" class="transport-btn">Copy upload title + description</button>
-          <span id="credit-copied" class="credit-copied"></span>
+      <div class="launcher-body">
+        <div class="launcher-panel" role="tabpanel" id="panel-genre" aria-labelledby="tab-genre" data-panel="genre">
+          <p class="panel-lead">Nineteen styles, each with its own grooves, chord vocabulary and instruments. Pick one to start.</p>
+          <section id="style-select" class="style-grid"></section>
         </div>
-        <p class="credit-note">Naming an artist <em>describes the style</em> — it is the standard type-beat convention and does not imply endorsement. It is <strong>not</strong> a licence: credit never grants permission to use anyone's recording. Nothing here needs one, because every beat is composed from scratch by this program and contains no sampled audio.</p>
-      </div>
-    </section>
 
-    <section class="prompt-box song-box">
-      <label for="song-search">Build a beat around a song</label>
-      <div class="prompt-row">
-        <input type="text" id="song-search" placeholder="Song or artist — e.g. Seven Nation Army, Bad Bunny, Nujabes" autocomplete="off">
-        <button id="song-search-btn" class="transport-btn play">Search</button>
-      </div>
-      <ul id="song-results" class="song-results" hidden></ul>
-      <p id="song-status" class="shuffle-status"></p>
-      <div id="song-panel" class="credit-panel" hidden>
-        <p id="song-result" class="credit-line"></p>
-        <div class="credit-actions">
-          <a id="song-youtube" class="transport-btn" target="_blank" rel="noopener">Open on YouTube ↗</a>
-          <button id="song-build" class="transport-btn play">Build a beat at this tempo</button>
+        <div class="launcher-panel" role="tabpanel" id="panel-describe" aria-labelledby="tab-describe" data-panel="describe" hidden>
+          <p class="panel-lead">Say what you want in plain words. Mood, tempo, instruments and genre are all understood.</p>
+          <div class="prompt-row">
+            <input type="text" id="prompt-input" placeholder="dark energetic trap with vocal chops" maxlength="140">
+            <button id="prompt-generate" class="transport-btn play">Generate</button>
+          </div>
+          <div class="chip-row" id="prompt-examples">
+            <span class="chip-row-label">Try:</span>
+            <button class="example-chip" type="button">chill lofi piano beat</button>
+            <button class="example-chip" type="button">dark energetic trap with vocal chops</button>
+            <button class="example-chip" type="button">warm neo-soul with rhodes and live drums</button>
+            <button class="example-chip" type="button">fast aggressive drum and bass</button>
+            <button class="example-chip" type="button">dreamy 80s synthwave</button>
+          </div>
+          <p id="prompt-status" class="shuffle-status"></p>
         </div>
-        <p class="credit-note">The link opens the real recording on YouTube in a new tab. <strong>Nothing is downloaded, streamed or sampled</strong> — the program only takes the tempo, key and genre, and those are facts, not property. What you get is an original beat that sits in the same pocket as a record you like. Tempo and key are reference values and every control stays editable.</p>
-      </div>
-    </section>
 
-    <section class="prompt-box remix-box">
-      <label for="audio-file">Build a beat around your own track</label>
-      <div class="prompt-row">
-        <input type="file" id="audio-file" accept="audio/*">
-        <button id="analyse-btn" class="transport-btn play" disabled>Analyse &amp; Match</button>
-      </div>
-      <p id="remix-status" class="shuffle-status"></p>
-      <div id="remix-panel" class="credit-panel" hidden>
-        <p id="remix-result" class="credit-line"></p>
-        <div class="credit-actions">
-          <button id="make-instrumental" class="transport-btn">Download centre-reduced version</button>
-          <span id="remix-note2" class="credit-copied"></span>
+        <div class="launcher-panel" role="tabpanel" id="panel-artist" aria-labelledby="tab-artist" data-panel="artist" hidden>
+          <p class="panel-lead">Name a producer or artist and get a beat built to their style — tempo range, key preferences, drum kit, swing and arrangement density all come from their profile.</p>
+          <div class="prompt-row">
+            <input type="text" id="artist-input" placeholder="Metro Boomin" maxlength="60" autocomplete="off" list="artist-list">
+            <datalist id="artist-list"></datalist>
+            <button id="artist-generate" class="transport-btn play">Generate Type Beat</button>
+          </div>
+          <div class="chip-row" id="artist-examples">
+            <span class="chip-row-label">Popular:</span>
+          </div>
+          <p id="artist-status" class="shuffle-status"></p>
+          <div id="credit-panel" class="credit-panel" hidden>
+            <p id="credit-line" class="credit-line"></p>
+            <div class="credit-actions">
+              <button id="copy-upload-text" class="transport-btn">Copy upload title + description</button>
+              <span id="credit-copied" class="credit-copied"></span>
+            </div>
+            <p class="credit-note">Naming an artist <em>describes the style</em> — it is the standard type-beat convention and does not imply endorsement. It is <strong>not</strong> a licence: credit never grants permission to use anyone's recording. Nothing here needs one, because every beat is composed from scratch by this program and contains no sampled audio.</p>
+          </div>
         </div>
-        <p class="credit-note">Your file is read in the browser and never uploaded anywhere. Tempo and key are detected and the generated beat is matched to them. <strong>Centre reduction is not source separation</strong> — a centred lead vocal largely cancels, but so does anything else centred (usually kick and bass, which are partly restored), and stereo reverb on the vocal stays. Use it on audio you own or that is licensed for it — <a href="http://ccmixter.org/" target="_blank" rel="noopener">ccMixter</a> exists precisely for this.</p>
+
+        <div class="launcher-panel" role="tabpanel" id="panel-song" aria-labelledby="tab-song" data-panel="song" hidden>
+          <p class="panel-lead">Search a record, get a link to it on YouTube, and build an original beat in the same pocket — its tempo, key and genre.</p>
+          <div class="prompt-row">
+            <input type="text" id="song-search" placeholder="Seven Nation Army" autocomplete="off">
+            <button id="song-search-btn" class="transport-btn play">Search</button>
+          </div>
+          <ul id="song-results" class="song-results" hidden></ul>
+          <p id="song-status" class="shuffle-status"></p>
+          <div id="song-panel" class="credit-panel" hidden>
+            <p id="song-result" class="credit-line"></p>
+            <div class="credit-actions">
+              <a id="song-youtube" class="transport-btn" target="_blank" rel="noopener">Open on YouTube ↗</a>
+              <button id="song-build" class="transport-btn play">Build a beat at this tempo</button>
+            </div>
+            <p class="credit-note">The link opens the real recording on YouTube in a new tab. <strong>Nothing is downloaded, streamed or sampled</strong> — the program only takes the tempo, key and genre, and those are facts, not property. What you get is an original beat that sits in the same pocket as a record you like. Tempo and key are reference values and every control stays editable.</p>
+          </div>
+        </div>
+
+        <div class="launcher-panel" role="tabpanel" id="panel-track" aria-labelledby="tab-track" data-panel="track" hidden>
+          <p class="panel-lead">Load audio you own. It is analysed in your browser — tempo and key detected, the beat matched to them, and the mix scored. The file never leaves your machine.</p>
+          <div class="prompt-row">
+            <input type="file" id="audio-file" accept="audio/*">
+            <button id="analyse-btn" class="transport-btn play" disabled>Analyse &amp; Match</button>
+          </div>
+          <p id="remix-status" class="shuffle-status"></p>
+          <div id="remix-panel" class="credit-panel" hidden>
+            <p id="remix-result" class="credit-line"></p>
+            <div class="credit-actions">
+              <button id="make-instrumental" class="transport-btn">Download centre-reduced version</button>
+              <span id="remix-note2" class="credit-copied"></span>
+            </div>
+            <p class="credit-note">Your file is read in the browser and never uploaded anywhere. Tempo and key are detected and the generated beat is matched to them. <strong>Centre reduction is not source separation</strong> — a centred lead vocal largely cancels, but so does anything else centred (usually kick and bass, which are partly restored), and stereo reverb on the vocal stays. Use it on audio you own or that is licensed for it — <a href="http://ccmixter.org/" target="_blank" rel="noopener">ccMixter</a> exists precisely for this.</p>
+          </div>
+        </div>
       </div>
     </section>
-
-    <section id="style-select" class="style-grid"></section>
 
     <section id="workspace" class="workspace" hidden>
-      <div class="control-deck">
-        <div class="control-group">
-          <span class="control-group-label">Playback</span>
-          <div class="control-group-row">
-            <button id="play-btn" class="transport-btn play">▶ Play</button>
-            <button id="generate-btn" class="transport-btn">Generate Beat</button>
-            <button id="scratch-btn" class="transport-btn" title="Blank pattern on this genre's kit - place every hit and note yourself">Start From Scratch</button>
-            <div id="bars-select" class="segmented">
-              <button data-bars="4" class="selected">4 bars</button>
-              <button data-bars="8">8 bars</button>
-              <button data-bars="song">Full Song</button>
-            </div>
-            <div class="transport-field complexity-field">
-              <label for="complexity-slider">Complexity <span id="complexity-value">5</span><span id="complexity-name"></span></label>
-              <input type="range" id="complexity-slider" min="1" max="10" step="1" value="5" title="How intricate the beat is: syncopation, density, chord extensions and how many parts play">
-            </div>
+      <div class="transport-bar">
+        <div class="transport-main">
+          <button id="play-btn" class="transport-btn play big" title="Space">▶ Play</button>
+          <button id="generate-btn" class="transport-btn big" title="Make a different beat in this style">🎲 Generate</button>
+          <div id="bars-select" class="segmented">
+            <button data-bars="4" class="selected">4 bars</button>
+            <button data-bars="8">8 bars</button>
+            <button data-bars="song">Full Song</button>
           </div>
         </div>
-
-        <div class="control-group">
-          <span class="control-group-label">Sound</span>
-          <div class="control-group-row">
-            <div class="transport-field">
-              <label for="key-select">Key</label>
-              <select id="key-select"></select>
-            </div>
-            <div class="transport-field">
-              <label for="tempo-slider">Tempo <span id="tempo-value"></span></label>
-              <input type="range" id="tempo-slider">
-            </div>
-            <div class="transport-field">
-              <label for="swing-slider">Swing <span id="swing-value"></span>%</label>
-              <input type="range" id="swing-slider" min="0" max="30" value="10">
-            </div>
-            <button id="sidechain-btn" class="transport-btn toggle" title="Duck everything but drums when the kick hits">Sidechain</button>
-            <div class="transport-field">
-              <label for="master-slider">Master</label>
-              <input type="range" id="master-slider" min="0" max="100" value="90">
-            </div>
+        <div class="transport-quick">
+          <div class="transport-field complexity-field">
+            <label for="complexity-slider">Complexity <b id="complexity-value">5</b><span id="complexity-name"></span></label>
+            <input type="range" id="complexity-slider" min="1" max="10" step="1" value="5" title="How intricate the beat is: syncopation, density, chord extensions and how many parts play">
           </div>
-        </div>
-
-        <div class="control-group">
-          <span class="control-group-label">Export</span>
-          <div class="control-group-row">
-            <div class="transport-field">
-              <label for="reel-duration">Reel length</label>
-              <select id="reel-duration"></select>
-            </div>
-            <button id="export-reel-btn" class="transport-btn" title="Render a vertical video of this beat to download for Instagram Reels / TikTok / Shorts">🎥 Export Reel</button>
-            <button id="export-midi-btn" class="transport-btn" title="Download a MIDI file — import it into FL Studio, Ableton, Logic or any DAW">🎹 Export MIDI</button>
+          <div class="transport-field">
+            <label for="tempo-slider">Tempo <b id="tempo-value"></b></label>
+            <input type="range" id="tempo-slider">
           </div>
-        </div>
-
-        <div class="control-group">
-          <span class="control-group-label">Teach it your taste</span>
-          <div class="control-group-row">
-            <button id="rate-up" class="transport-btn rate-btn" title="More beats like this one">👍 More like this</button>
-            <button id="rate-down" class="transport-btn rate-btn" title="Fewer beats like this one">👎 Less like this</button>
-            <button id="rate-reset" class="transport-btn" title="Forget everything the program has learned about your taste">Reset</button>
-            <span id="taste-status" class="taste-status"></span>
+          <div class="transport-field narrow">
+            <label for="key-select">Key</label>
+            <select id="key-select"></select>
           </div>
-        </div>
-
-        <div class="control-group">
-          <span class="control-group-label">Score this beat</span>
-          <div class="control-group-row">
-            <button id="score-btn" class="transport-btn play" title="Render this beat offline and measure it the way a mastering engineer would">Rate this beat</button>
-            <span id="score-status" class="taste-status"></span>
+          <div class="transport-field">
+            <label for="master-slider">Master</label>
+            <input type="range" id="master-slider" min="0" max="100" value="90">
           </div>
         </div>
       </div>
 
-      <div id="score-panel" class="score-panel" hidden>
-        <div class="score-head">
-          <div class="score-number"><span id="score-value">–</span><span class="score-of">/100</span></div>
-          <div class="score-head-text">
-            <p id="score-verdict" class="score-verdict"></p>
-            <p id="score-source" class="score-source"></p>
-          </div>
-          <button id="score-close" class="transport-btn" title="Hide the score">Close</button>
+      <div class="tools">
+        <div class="tools-tabs" role="tablist" aria-label="Tools">
+          <button class="tools-tab selected" role="tab" data-tool="score">Score</button>
+          <button class="tools-tab" role="tab" data-tool="taste">Your taste</button>
+          <button class="tools-tab" role="tab" data-tool="chords">Chords</button>
+          <button class="tools-tab" role="tab" data-tool="sound">Feel &amp; mix</button>
+          <button class="tools-tab" role="tab" data-tool="export">Export</button>
         </div>
-        <p id="score-advice" class="score-advice"></p>
-        <div id="score-terms" class="score-terms"></div>
-        <p class="credit-note">Every term is a measurement, not an opinion, and each one is weighted. The score is the weighted mean of all of them: <code>100 · Σwᵢgᵢ(xᵢ) / Σwᵢ</code>. Terms with a target band use a Gaussian tolerance curve, so being under is penalised the same way as being over.</p>
-      </div>
 
-      <div class="chords-bar">
-        <div class="chords-bar-head">
-          <label for="chord-input">Build around your own chords <span class="chords-bar-hint">optional — leave blank for a genre-appropriate progression</span></label>
+        <div class="tools-body">
+          <div class="tools-panel" role="tabpanel" data-tool-panel="score">
+            <div class="tools-row">
+              <button id="score-btn" class="transport-btn play" title="Render this beat offline and measure it the way a mastering engineer would">Rate this beat</button>
+              <span id="score-status" class="taste-status"></span>
+            </div>
+            <p class="tools-hint">Renders the beat offline — faster than real time, through the same audio graph the speakers get — then measures 18 things a mastering engineer would, and tells you which are weakest.</p>
+            <div id="score-panel" class="score-panel" hidden>
+              <div class="score-head">
+                <div class="score-number"><span id="score-value">–</span><span class="score-of">/100</span></div>
+                <div class="score-head-text">
+                  <p id="score-verdict" class="score-verdict"></p>
+                  <p id="score-source" class="score-source"></p>
+                </div>
+                <button id="score-close" class="transport-btn" title="Hide the score">Close</button>
+              </div>
+              <p id="score-advice" class="score-advice"></p>
+              <div id="score-terms" class="score-terms"></div>
+              <p class="credit-note">Every term is a measurement, not an opinion, and each one is weighted. The score is the weighted mean of all of them: <code>100 · Σwᵢgᵢ(xᵢ) / Σwᵢ</code>. Terms with a target band use a Gaussian tolerance curve, so being under is penalised the same way as being over.</p>
+            </div>
+          </div>
+
+          <div class="tools-panel" role="tabpanel" data-tool-panel="taste" hidden>
+            <div class="tools-row">
+              <button id="rate-up" class="transport-btn rate-btn" title="More beats like this one">👍 More like this</button>
+              <button id="rate-down" class="transport-btn rate-btn" title="Fewer beats like this one">👎 Less like this</button>
+              <button id="rate-reset" class="transport-btn" title="Forget everything the program has learned about your taste">Reset</button>
+              <span id="taste-status" class="taste-status"></span>
+            </div>
+            <p class="tools-hint">Rate a few beats and the generator starts biasing what it makes toward what you keep. It learns twelve measurable features of the beats you like, normalised so a near-constant feature cannot drown out a meaningful one.</p>
+          </div>
+
+          <div class="tools-panel" role="tabpanel" data-tool-panel="chords" hidden>
+            <div class="chords-bar-row">
+              <input type="text" id="chord-input" placeholder="Cm7  Fm7  Ab  Bb7" autocomplete="off" spellcheck="false">
+              <button id="chord-clear-btn" class="transport-btn" title="Go back to this genre's own progressions">Clear</button>
+            </div>
+            <div id="chord-chips" class="chord-chips"></div>
+            <p class="tools-hint">One chord per bar, repeating to fill the arrangement. Leave it blank and the genre picks its own progression by functional harmony.</p>
+          </div>
+
+          <div class="tools-panel" role="tabpanel" data-tool-panel="sound" hidden>
+            <div class="tools-row">
+              <div class="transport-field">
+                <label for="swing-slider">Swing <b id="swing-value"></b>%</label>
+                <input type="range" id="swing-slider" min="0" max="30" value="10">
+              </div>
+              <button id="sidechain-btn" class="transport-btn toggle" title="Duck everything but drums when the kick hits">Sidechain</button>
+            </div>
+            <p class="tools-hint">Swing pushes the off-beats late, the way a human player does. Sidechain ducks everything but the drums each time the kick lands — the pumping that holds dance mixes together.</p>
+          </div>
+
+          <div class="tools-panel" role="tabpanel" data-tool-panel="export" hidden>
+            <div class="tools-row">
+              <div class="transport-field">
+                <label for="reel-duration">Reel length</label>
+                <select id="reel-duration"></select>
+              </div>
+              <button id="export-reel-btn" class="transport-btn" title="Render a vertical video of this beat to download for Instagram Reels / TikTok / Shorts">🎥 Export Reel</button>
+              <button id="export-midi-btn" class="transport-btn" title="Download a MIDI file — import it into FL Studio, Ableton, Logic or any DAW">🎹 Export MIDI</button>
+              <button id="scratch-btn" class="transport-btn" title="Blank pattern on this genre's kit - place every hit and note yourself">Start From Scratch</button>
+            </div>
+            <p class="tools-hint">The reel is a real 1080×1920 video with the actual mixed audio. The MIDI file carries every note and drum hit into FL Studio, Ableton, Logic or anything else.</p>
+          </div>
         </div>
-        <div class="chords-bar-row">
-          <input type="text" id="chord-input" placeholder="e.g. Cm7  Fm7  Ab  Bb7   (one chord per bar, repeats to fill the arrangement)" autocomplete="off" spellcheck="false">
-          <button id="chord-clear-btn" class="transport-btn" title="Go back to this genre's own progressions">Clear</button>
-        </div>
-        <div id="chord-chips" class="chord-chips"></div>
       </div>
 
       <p id="shuffle-status" class="shuffle-status"></p>

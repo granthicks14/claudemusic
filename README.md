@@ -979,3 +979,65 @@ Structure scores well (mean **88.3**); the mix is the weaker half (mean **58.3**
 - **Pulse salience is low in a few genres** that ought to have an obvious beat — down from six genres to three once the onset detector itself was fixed, which is a good illustration of why the measuring tool has to be verified before its verdict is believed.
 
 These are left as findings rather than silently "fixed": changing the engine's width, loudness or band balance changes how every beat in the program sounds, which is a judgement call for whoever's listening, not something to quietly adjust so a score goes up. The tool's job is to say where the problems are, and it now does.
+
+## A new front door: five ways in, one at a time
+
+The five entry points — genre, description, type beat, song search, your own track — used to be five boxes stacked down the page, which meant the genre grid, the thing most people actually want, sat underneath three walls of explanatory text. They are now tabs, on equal footing, showing one at a time:
+
+- **Example chips.** The describe box and the type-beat box each carry a row of one-click examples. The artist chips are built from the real profile list, so they cannot drift out of sync with what exists.
+- **The launcher folds away.** The genre grid is nineteen cards tall; leaving it open above the workspace made every regenerate cost a scroll past something already used. Once a beat exists the whole launcher collapses to one line saying where it came from, with a **Change** button to reopen it.
+- **A sticky transport bar.** Play, Generate, length, complexity, tempo, key and master are always visible and never scroll away. Everything else — Score, Your taste, Chords, Feel & mix, Export — moved into a tab strip, so five stacked control groups became one row plus one click.
+- **Space plays and pauses**, the way it does in every DAW, and is correctly ignored while you are typing in a field.
+
+## Naming an artist now changes the music, not just the drum sounds
+
+**The problem, measured.** `tools/measure-artist-match.js` asks one question: within a genre, are two *different* artists further apart than two runs of the *same* artist? It scored **0.68** — below 1.0, meaning two different producers came out **closer to each other** than two runs of one producer. The profile was setting genre, tempo, key, swing, complexity, drum kits and solo voices, and nothing whatsoever about how the beat was *written*. All the apparent variety was noise.
+
+**The fix.** Every profile already carried a descriptive line — "sparse arrangement, heavy space around the hook", "aggressive, bright hats, fast rolls" — and those were instructions sitting unused. A documented keyword table turns them into real generation knobs (density, syncopation, extension, layers, rest, ghost, roll, variation) applied through the same path as the taste bias and the RL policy, and bounded the same way so the genre stays recognisable.
+
+**How far to push them was measured, not guessed.** Sweeping a gain over the whole table against both separation and beat quality:
+
+| gain | separation | mean score | worst |
+|------|-----------|-----------|-------|
+| 0.0  | 0.680 | 88.8 | 63.6 |
+| 1.0  | 0.747 | 88.5 | 67.0 |
+| 2.0  | 0.892 | 87.8 | 61.6 |
+| **2.5** | **0.929** | **87.5** | **63.4** |
+| 3.0  | 0.978 | 87.5 | 58.5 |
+| 4.0  | 1.118 | 87.1 | 64.3 |
+| 6.0  | — | 85.8 | 58.6 |
+
+2.5 is where separation has risen by a third, the mean has given up 1.3 points, and the worst case has not moved at all. Pushing to 4 would buy separation above 1.0, but it starts eating the worst case — and a type beat that is unmistakably Metro Boomin *and also bad* is not the trade anyone wants. Separation now measures **0.94** against 0.71 with the knobs off.
+
+**Six instruments were also promoted to lead voices.** Piano, organ, strings, horn, vocal and pad could only ever play chords, so a Robert Glasper profile could not name the piano and a Just Blaze profile could not name horns — the two things that most define them. The request was silently dropped and a generic beat came out. Each now has a melodic profile written to how the instrument actually behaves: a piano line runs faster and uses more passing tones than a horn line, because a pianist is not breathing.
+
+## More of everything, and a validator for it
+
+- **161 artist profiles**, up from 112. The additions are weighted hard at what was empty: rap had **one** profile and now has nine; jersey club and phonk had two each and now have six and five. Every genre has at least four.
+- **247 reference songs**, up from 109, every genre with at least ten.
+- **298 kits**, with new arp (trance, acid, harp, bell), tom (808, floor, gated) and auto-tune lead (bright, wide, gritty) voices — all real synthesis, not renamed presets.
+
+`tools/test-content.js` and `tools/test-kits.js` exist because all of this fails *silently* when it is wrong. They caught:
+
+1. **Hyphenated artist names were unfindable.** The search stripped punctuation from the query but not from the keys, so "hit-boy" became "hitboy", matched nothing, and fell through to the genre-keyword fallback. Typing the name exactly did not work. Both sides are now normalised the same way, and a second index drops separators entirely because people type "metroboomin" as one word.
+2. **Three kits were on the wrong track.** `snappy` and `roomy` are kick flavors; profiles naming them as snares had those requests dropped without complaint.
+3. **A Cyrillic "о"** had been pasted into a profile, making that text unsearchable.
+4. **A song listed twice**, which made the search return it twice.
+5. **Two pairs of hi-hats were the same sound with different names** — the RZ-1 and Drumulator presets sat 300 Hz apart, and "analog" and the MPC60 within 100 Hz on every corner. They are not remotely the same machine. Worse, *every* hi-hat preset shared one decay, and decay separates hi-hats to the ear far more than filter corners do. Each now has its own.
+
+### Two ways the validators were wrong before they were right
+
+Both are the same lesson as the rating work: check the measuring tool before believing its verdict.
+
+- **The solo-voice check flagged twenty long-standing profiles as broken.** It tested whether the genre *lists* the instrument, but the real gate in `pickSoloInstruments` is whether the instrument has a *melodic profile* — the entire point of a solo pool being to bring in voices the genre does not carry by default. The check was wrong, not the profiles.
+- **The kit-duplicate check reported 106 identical pairs.** It used a hand-rolled "successive differencing" band split, which is the exact broken pattern already found and fixed in the onset detector — it does not separate frequencies at all. Rebuilt on the real Butterworth filters it dropped to a handful, and then to zero once it compared the mean of two renders instead of one: with a single render the cross-distance carries the full per-hit randomness of two kits, so a *different* pair came out closest on every run. The 21 hi-hats are one recipe with different corners, so some are legitimately close; the test now fails only on genuinely identical output and prints the closest pairs either way.
+
+## The RL policy can now see tempo, and knows when it is imitating someone
+
+Retrained from **5,200 episodes to 38,400**, with a wider network (8 → 16 hidden) and twice the input.
+
+**Tempo was not among the policy's inputs.** A 174 BPM drum and bass beat and a 70 BPM ballad looked identical to it, even though how dense a pattern should be depends enormously on how fast it goes — the same sixteenth-note rate is a gentle shuffle at 70 and a blur at 174. It also could not tell that an artist was being imitated, so it pushed the same offsets whether or not a profile was already pulling the knobs somewhere specific, and the two could quietly fight. The context now carries tempo, a half-time flag (trap says 140 but lands half-time; house says 140 and means it), and the artist's own density, syncopation and layer intent. Two episodes in five are trained while imitating a named artist, so the policy learns to complement those knobs rather than fight them.
+
+Measured improvement over the un-policied generator: **138.23 → 142.84 (+3.3%)**.
+
+**A bug this uncovered, which had nothing to do with the policy.** `style.tempo` is a `{min, max, default}` range object, not a number. Passing it straight through made the tempo input `NaN`, which made every policy output `NaN`, which made every complexity target `NaN` — and the generator carried on regardless, producing beats that scored `NaN`. Nothing threw. The call site now passes the number, and `policyForward` refuses any non-finite input outright: no policy is a defined behaviour, a NaN policy is not. The policy also now rejects a weight file whose input count does not match, so an old 6-input file cannot be read as garbage.

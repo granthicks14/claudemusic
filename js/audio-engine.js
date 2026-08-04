@@ -821,7 +821,7 @@ class BeatEngine {
       dark: { hp: 6000, lp: 11000 },
       vinyl: { hp: 5000, lp: 8500 },
       metallic: { hp: 8500, lp: null, peak: 9000 },
-      analog: { hp: 6500, lp: 13000, peak: 7000 },
+      analog: { hp: 7100, lp: 12000, peak: 7000, decay: 0.85 },
       tape: { hp: 5500, lp: 9500, peak: 6500 },
       sizzle: { hp: 9500, lp: null, peak: 11000 },
       lofi808: { hp: 7000, lp: 10500 },
@@ -835,17 +835,34 @@ class BeatEngine {
       // centre than any analog machine's filtered hiss. RZ-1: 12-bit,
       // band-limited by its own converters - bright but capped. R-8: a
       // clean, full PCM hat with a wide spectrum.
-      lm1: { hp: 6000, lp: 11500, peak: 7500 },
-      rz1: { hp: 7500, lp: 9000 },
-      r8: { hp: 6800, lp: 14000, peak: 8500 },
-      drumulator: { hp: 7200, lp: 9500 },
-      rx5: { hp: 7800, lp: 13500, peak: 9000 },
-      cr8000: { hp: 8600, lp: 12000 },
-      kr55: { hp: 7000, lp: 11000, peak: 8000 },
-      dr110: { hp: 9200, lp: null },
-      mpc60: { hp: 6400, lp: 12500, peak: 7800 },
+      // The LM-1 sampled at 8 bits and 28kHz, so its hat is short, gritty
+      // and band-limited - nothing like the MPC60's 12-bit 40kHz hat, which
+      // is the fullest and longest of the sampled machines here.
+      lm1: { hp: 7400, lp: 10000, peak: 8200, decay: 0.78 },
+      // RZ-1 and Drumulator were 300Hz and 500Hz apart, which is to say they
+      // were the same sound with two names - a rendering comparison put them
+      // closer to each other than either was to a second render of itself.
+      // They are not remotely the same machine: the RZ-1 is a 1986 Casio with
+      // 12-bit samples, thin and short and digital-bright; the Drumulator is
+      // a 1983 E-mu running 8-bit samples at 27kHz, which is dark, gritty and
+      // noticeably longer. DECAY is the thing that separates hi-hats to the
+      // ear more than filter corners do, and every preset here was using the
+      // identical decay.
+      rz1: { hp: 8200, lp: 9500, decay: 0.72 },
+      r8: { hp: 6800, lp: 14000, peak: 8500, decay: 1.0 },
+      drumulator: { hp: 5600, lp: 8200, peak: 6200, decay: 1.45 },
+      rx5: { hp: 7800, lp: 13500, peak: 9000, decay: 0.95 },
+      cr8000: { hp: 8600, lp: 12000, decay: 0.8 },
+      kr55: { hp: 7000, lp: 11000, peak: 8000, decay: 1.1 },
+      dr110: { hp: 9200, lp: null, decay: 0.65 },
+      // Same problem with analog vs MPC60 - 100Hz apart on every corner. The
+      // MPC60 is a 12-bit sampler at 40kHz playing a real recorded hat, so it
+      // has body and length; "analog" is filtered noise from a drum machine
+      // that never sampled anything, which is drier and tighter.
+      mpc60: { hp: 5800, lp: 14500, peak: 7200, decay: 1.5 },
     };
-    const decay = open ? 0.32 + Math.random() * 0.1 : 0.05 + Math.random() * 0.02;
+    const base = open ? 0.32 + Math.random() * 0.1 : 0.05 + Math.random() * 0.02;
+    const decay = base * ((presets[flavor] && presets[flavor].decay) || 1);
 
     if (flavor === "909") {
       // The real TR-909 hat isn't noise at all - it's six square-wave
@@ -948,6 +965,90 @@ class BeatEngine {
 
   playTom(time, vel, flavor) {
     const ctx = this.ctx;
+
+    if (flavor === "808tom") {
+      // The 808's tom is the same circuit as its kick with the decay shortened
+      // and the pitch raised - a pure sine with an exponential pitch drop and
+      // no noise component whatsoever.
+      const o = ctx.createOscillator();
+      o.type = "sine";
+      const base = 120 + Math.random() * 40;
+      o.frequency.setValueAtTime(base * 1.9, time);
+      o.frequency.exponentialRampToValueAtTime(base, time + 0.09);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vel * 0.95, time);
+      g.gain.exponentialRampToValueAtTime(0.001, time + 0.42);
+      o.connect(g).connect(this.dest("tom"));
+      o.start(time);
+      o.stop(time + 0.45);
+      return;
+    }
+
+    if (flavor === "floor") {
+      // A big floor tom: low fundamental, a strong second mode, and a short
+      // burst of stick noise on the head at the very start.
+      const base = 78 + Math.random() * 10;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vel, time);
+      g.gain.exponentialRampToValueAtTime(0.001, time + 0.6);
+      g.connect(this.dest("tom"));
+      for (const [ratio, lvl] of [[1, 1], [1.5, 0.34], [2.1, 0.15]]) {
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.setValueAtTime(base * ratio * 1.25, time);
+        o.frequency.exponentialRampToValueAtTime(base * ratio, time + 0.12);
+        const pg = ctx.createGain();
+        pg.gain.value = lvl;
+        o.connect(pg).connect(g);
+        o.start(time);
+        o.stop(time + 0.65);
+      }
+      const stick = ctx.createBufferSource();
+      stick.buffer = this.makeNoiseBuffer(0.016);
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 1800;
+      const sg = ctx.createGain();
+      sg.gain.setValueAtTime(vel * 0.3, time);
+      sg.gain.exponentialRampToValueAtTime(0.001, time + 0.016);
+      stick.connect(hp).connect(sg).connect(this.dest("tom"));
+      stick.start(time);
+      stick.stop(time + 0.02);
+      return;
+    }
+
+    if (flavor === "gatedtom") {
+      // The 80s sound: a tom into a big reverb with the tail cut off dead by
+      // a gate. What makes it work is the ABRUPTNESS - a long swell of noise
+      // that stops instantly rather than fading.
+      const base = 100 + Math.random() * 30;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vel, time);
+      g.gain.setValueAtTime(vel * 0.85, time + 0.16);
+      g.gain.linearRampToValueAtTime(0.0001, time + 0.19);   // the gate slams
+      g.connect(this.dest("tom"));
+      for (const [ratio, lvl] of [[1, 1], [1.6, 0.3]]) {
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.setValueAtTime(base * ratio * 1.3, time);
+        o.frequency.exponentialRampToValueAtTime(base * ratio, time + 0.1);
+        const pg = ctx.createGain();
+        pg.gain.value = lvl;
+        o.connect(pg).connect(g);
+        o.start(time);
+        o.stop(time + 0.22);
+      }
+      const wash = ctx.createBufferSource();
+      wash.buffer = this.makeNoiseBuffer(0.2);
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass"; bp.frequency.value = 900; bp.Q.value = 0.7;
+      const wg = ctx.createGain();
+      wg.gain.value = vel * 0.42;
+      wash.connect(bp).connect(wg).connect(g);
+      wash.start(time);
+      wash.stop(time + 0.2);
+      return;
+    }
     if (flavor === "taiko") {
       // A large Japanese barrel drum: a very heavy, low, slowly-decaying
       // fundamental with a thick wooden body and almost no attack noise,
@@ -4085,8 +4186,16 @@ class BeatEngine {
     const dest = this.dest("autolead");
     const dur = Math.min(durationSeconds, 0.55);
 
-    const formants = flavor === "moody" ? [420, 1000, 2350] : [650, 1500, 2900];
-    const levels = [1, 0.5, 0.28];
+    // Different vowel shapes. Auto-tuned singing reads as a vowel plus a
+    // pitch, and the vowel is entirely in where the formants sit.
+    const FORMANTS = {
+      moody: [420, 1000, 2350],     // an "oh", dark and closed
+      bright: [720, 1720, 3100],    // an "ah", open and forward
+      wide: [500, 1350, 2700],      // between the two, doubled below
+      gritty: [600, 1450, 2800],    // "ah" with the drive turned up
+    };
+    const formants = FORMANTS[flavor] || FORMANTS.moody;
+    const levels = flavor === "bright" ? [1, 0.62, 0.4] : [1, 0.5, 0.28];
 
     const envelope = ctx.createGain();
     envelope.gain.setValueAtTime(0.0001, time);
@@ -4658,6 +4767,98 @@ class BeatEngine {
     const ctx = this.ctx;
     const dest = this.dest("arp");
     const dur = Math.min(durationSeconds, 0.16);
+
+    if (flavor === "trance") {
+      // The supersaw arp of late-90s trance: several detuned saws, a filter
+      // that opens on every note, and just enough of a release tail that the
+      // notes overlap into a continuous ribbon rather than separate blips.
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.Q.value = 7;
+      filter.frequency.setValueAtTime(900, time);
+      filter.frequency.exponentialRampToValueAtTime(5200, time + 0.02);
+      filter.frequency.exponentialRampToValueAtTime(1100, time + dur * 1.6);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.exponentialRampToValueAtTime(vel * 0.5, time + 0.006);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + dur * 1.8);
+      filter.connect(gain).connect(dest);
+      for (const cents of [-14, -5, 0, 5, 14]) {
+        const o = ctx.createOscillator();
+        o.type = "sawtooth";
+        o.frequency.setValueAtTime(freq * Math.pow(2, cents / 1200), time);
+        o.connect(filter);
+        o.start(time);
+        o.stop(time + dur * 1.9);
+      }
+      return;
+    }
+
+    if (flavor === "acid") {
+      // A 303 played as an arpeggio: one saw through a resonant lowpass with
+      // a fast envelope on the cutoff. The squelch is entirely the filter -
+      // high Q plus a sharp sweep is the whole sound.
+      const o = ctx.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.setValueAtTime(freq, time);
+      const f = ctx.createBiquadFilter();
+      f.type = "lowpass";
+      f.Q.value = 16;
+      f.frequency.setValueAtTime(freq * 9, time);
+      f.frequency.exponentialRampToValueAtTime(Math.max(180, freq * 1.4), time + dur * 1.3);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vel * 0.62, time);
+      g.gain.exponentialRampToValueAtTime(0.001, time + dur * 1.4);
+      o.connect(f).connect(g).connect(dest);
+      o.start(time);
+      o.stop(time + dur * 1.5);
+      return;
+    }
+
+    if (flavor === "harp") {
+      // A plucked-string arp. Inharmonic partials would ruin it - a harp is
+      // one of the most nearly-harmonic instruments there is - so the
+      // partials are exact multiples and the top ones simply die first.
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vel * 0.5, time);
+      g.gain.exponentialRampToValueAtTime(0.001, time + 0.7);
+      g.connect(dest);
+      for (const [mult, lvl, decay] of [[1, 1, 0.7], [2, 0.4, 0.42], [3, 0.18, 0.3], [4, 0.09, 0.22], [5, 0.05, 0.16]]) {
+        if (freq * mult > 12000) continue;
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.setValueAtTime(freq * mult, time);
+        const pg = ctx.createGain();
+        pg.gain.setValueAtTime(lvl, time);
+        pg.gain.exponentialRampToValueAtTime(0.0001, time + decay);
+        o.connect(pg).connect(g);
+        o.start(time);
+        o.stop(time + decay + 0.05);
+      }
+      return;
+    }
+
+    if (flavor === "bellarp") {
+      // A struck-bell arp: two sines a slightly-sharp octave apart, which is
+      // the interval that makes a bell read as a bell rather than a flute.
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vel * 0.42, time);
+      g.gain.exponentialRampToValueAtTime(0.001, time + 0.55);
+      g.connect(dest);
+      for (const [mult, lvl] of [[1, 1], [2.02, 0.5], [3.01, 0.2], [4.2, 0.09]]) {
+        if (freq * mult > 13000) continue;
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.setValueAtTime(freq * mult, time);
+        const pg = ctx.createGain();
+        pg.gain.setValueAtTime(lvl, time);
+        pg.gain.exponentialRampToValueAtTime(0.0001, time + 0.55 / (1 + mult * 0.35));
+        o.connect(pg).connect(g);
+        o.start(time);
+        o.stop(time + 0.6);
+      }
+      return;
+    }
 
     if (flavor === "pulse") {
       // A duller, warmer square-wave arp - classic 8-bit/chiptune-adjacent

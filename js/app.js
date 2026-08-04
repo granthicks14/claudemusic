@@ -261,6 +261,11 @@ function rollTempoKeySwing(baseStyle) {
 
 function selectStyle(id) {
   complexityName.textContent = " — " + COMPLEXITY_NAMES[Number(complexitySlider.value)];
+  // Clear any artist shaping. applyArtistProfile calls selectStyle first and
+  // sets its knobs afterwards, so this only ever clears a STALE artist -
+  // without it, picking a genre after making a type beat would quietly keep
+  // building beats in the previous producer's shape.
+  if (typeof setArtistKnobs === "function") setArtistKnobs(null);
   selectedStyleId = id;
   baseStyle = STYLES[id];
   activeStyle = Object.assign({}, baseStyle, { key: baseStyle.key });
@@ -285,6 +290,12 @@ function selectStyle(id) {
   shuffleStatus.textContent = "";
   refreshReelDurations();
   workspace.hidden = false;
+  // Fold the launcher away now there is something to look at. Entry points
+  // that call selectStyle as a step (type beat, song, prompt) overwrite this
+  // summary with their own straight afterwards.
+  if (typeof collapseLauncher === "function") {
+    collapseLauncher("genre", baseStyle.name, baseStyle.blurb || "");
+  }
   closePianoRoll();
   generatePattern();
 
@@ -2489,10 +2500,17 @@ function applyArtistProfile(name) {
   // Bias the solo voice toward the ones that define this artist's sound.
   if (p.solos && p.solos.length) activeStyle.soloOverride = p.solos.slice();
 
+  // And the knobs that shape how the beat is WRITTEN, not just what it is
+  // played on. Without these, two producers in the same genre came out
+  // structurally indistinguishable - measurably so.
+  if (typeof setArtistKnobs === "function") setArtistKnobs(artistKnobs(p));
+
   generatePattern();
   renderStepGrid();
   lastArtist = found;
   showCredit(found);
+  collapseLauncher("artist", `${titleCaseName(found.key)} type beat`,
+    `${STYLES[p.genre].name} · ${tempo} BPM · ${key} ${p.scale}`);
   artistStatus.textContent = `${titleCaseName(found.key)} type beat — ${STYLES[p.genre].name}, ${tempo} BPM, ${key} ${p.scale}. ${p.notes}`;
 }
 
@@ -2818,6 +2836,8 @@ if (songBuild) {
       engine.updateKey(activeStyle);
     }
     generatePattern();
+    collapseLauncher("song", `In the pocket of “${chosenSong.t}”`,
+      `${chosenSong.a} · ${Math.round(set.bpm)} BPM · original beat, no audio from that record`);
     songStatus.textContent = set.key
       ? `Built at ${Math.round(set.bpm)} BPM in ${set.key.replace(/\d/, "")} ${set.scale}.`
       : `Built at ${Math.round(set.bpm)} BPM. Key is the program's own choice — that record's key is not in the catalogue.`;
@@ -2936,3 +2956,149 @@ if (scoreBtn) {
 if (scoreClose) {
   scoreClose.addEventListener("click", () => { scorePanel.hidden = true; });
 }
+
+// ---------------------------------------------------------------------------
+// The launcher: five ways in, one at a time
+// ---------------------------------------------------------------------------
+// Previously all five entry points were stacked down the page, which meant
+// the genre grid - the one most people actually want - sat underneath three
+// walls of explanatory text. Tabs give them equal billing and show one at a
+// time, and the tab that produced the current beat stays selected so it is
+// obvious where the thing you are listening to came from.
+function setLauncherTab(name) {
+  for (const tab of document.querySelectorAll(".launcher-tab")) {
+    const on = tab.dataset.tab === name;
+    tab.classList.toggle("selected", on);
+    tab.setAttribute("aria-selected", on ? "true" : "false");
+  }
+  for (const panel of document.querySelectorAll(".launcher-panel")) {
+    panel.hidden = panel.dataset.panel !== name;
+  }
+  // Put the cursor where the user is about to type, but not on the genre
+  // grid, where there is nothing to type into.
+  const input = document.querySelector(`.launcher-panel[data-panel="${name}"] input[type="text"]`);
+  if (input) input.focus();
+}
+
+for (const tab of document.querySelectorAll(".launcher-tab")) {
+  tab.addEventListener("click", () => setLauncherTab(tab.dataset.tab));
+}
+
+// Arrow keys move between tabs, which is what a tablist is expected to do.
+const launcherTabs = Array.from(document.querySelectorAll(".launcher-tab"));
+for (const tab of launcherTabs) {
+  tab.addEventListener("keydown", (e) => {
+    const i = launcherTabs.indexOf(tab);
+    let next = null;
+    if (e.key === "ArrowRight") next = launcherTabs[(i + 1) % launcherTabs.length];
+    if (e.key === "ArrowLeft") next = launcherTabs[(i - 1 + launcherTabs.length) % launcherTabs.length];
+    if (!next) return;
+    e.preventDefault();
+    next.focus();
+    setLauncherTab(next.dataset.tab);
+  });
+}
+
+// Tools tabs, same idea for the workspace.
+function setToolsTab(name) {
+  for (const tab of document.querySelectorAll(".tools-tab")) {
+    tab.classList.toggle("selected", tab.dataset.tool === name);
+  }
+  for (const panel of document.querySelectorAll("[data-tool-panel]")) {
+    panel.hidden = panel.dataset.toolPanel !== name;
+  }
+}
+for (const tab of document.querySelectorAll(".tools-tab")) {
+  tab.addEventListener("click", () => setToolsTab(tab.dataset.tool));
+}
+
+// Example chips: one click fills the box and runs it. The fastest way to
+// learn what a text field wants is to see it work.
+for (const chip of document.querySelectorAll("#prompt-examples .example-chip")) {
+  chip.addEventListener("click", () => {
+    promptInput.value = chip.textContent;
+    promptGenerateBtn.click();
+  });
+}
+
+// The artist chips are built from the real profile list rather than
+// hardcoded, so they cannot drift out of sync with what actually exists.
+function buildArtistChips() {
+  const row = document.getElementById("artist-examples");
+  if (!row || typeof artistProfileNames !== "function") return;
+  const featured = ["metro boomin", "j dilla", "kaytranada", "timbaland", "pharrell",
+                    "the alchemist", "madlib", "mike dean", "kenny beats"];
+  const names = artistProfileNames();
+  for (const want of featured) {
+    if (!names.includes(want)) continue;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "example-chip";
+    b.textContent = titleCaseName(want);
+    b.addEventListener("click", () => {
+      artistInput.value = b.textContent;
+      artistGenerateBtn.click();
+    });
+    row.appendChild(b);
+  }
+}
+buildArtistChips();
+
+// Song chips would be redundant - the search box already shows results as
+// you type - so the song panel gets a live search instead, which it has.
+
+// Space plays and pauses, the way it does in every DAW. Ignored while
+// typing, so it still inserts a space in the chord box.
+document.addEventListener("keydown", (e) => {
+  if (e.code !== "Space" || e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = e.target;
+  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT"
+            || t.isContentEditable)) return;
+  if (!activeStyle) return;
+  e.preventDefault();
+  playBtn.click();
+});
+
+// Whichever way the beat was made, select that tab, so the page always
+// shows where what you are hearing came from.
+function markLauncherSource(name) {
+  const tab = document.querySelector(`.launcher-tab[data-tab="${name}"]`);
+  if (tab && !tab.classList.contains("selected")) setLauncherTab(name);
+}
+
+// ---------------------------------------------------------------------------
+// Fold the launcher away once there is a beat to look at
+// ---------------------------------------------------------------------------
+// The genre grid is nineteen cards tall. Leaving it open above the workspace
+// meant every regenerate cost a scroll past something already used. Once a
+// beat exists the launcher becomes one line saying where it came from, with
+// a Change button to open it again.
+const launcherEl = document.querySelector(".launcher");
+const launcherSummary = document.getElementById("launcher-summary");
+const summaryText = document.getElementById("summary-text");
+const summaryIcon = document.getElementById("summary-icon");
+const launcherExpand = document.getElementById("launcher-expand");
+
+const SOURCE_ICON = { genre: "🎛️", describe: "💬", artist: "🎤", song: "🔍", track: "📂" };
+
+function collapseLauncher(source, headline, detail) {
+  if (!launcherEl) return;
+  launcherEl.classList.add("collapsed");
+  launcherSummary.hidden = false;
+  summaryIcon.textContent = SOURCE_ICON[source] || "🎛️";
+  summaryText.innerHTML = "";
+  summaryText.append(document.createTextNode(headline));
+  if (detail) {
+    const s = document.createElement("small");
+    s.textContent = detail;
+    summaryText.appendChild(s);
+  }
+  if (source) markLauncherSource(source);
+}
+
+function expandLauncher() {
+  if (!launcherEl) return;
+  launcherEl.classList.remove("collapsed");
+  launcherSummary.hidden = true;
+}
+if (launcherExpand) launcherExpand.addEventListener("click", expandLauncher);

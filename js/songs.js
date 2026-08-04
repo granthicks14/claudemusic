@@ -189,6 +189,186 @@ const SONG_DB = [
   { t: "Killing in the Name", a: "Rage Against the Machine", y: 1992, g: "rock", bpm: 87 },
   { t: "Song 2", a: "Blur", y: 1997, g: "rock", bpm: 130 },
   { t: "My Hero", a: "Foo Fighters", y: 1997, g: "rock", bpm: 148 },
+
+  // --- Round 12: a second pass, weighted to the thin genres ----------------
+  // Jersey club had three entries, drill and UK garage four. A genre with a
+  // handful of references is a genre where the search mostly misses.
+
+  // --- Hip-hop -------------------------------------------------------------
+  { t: "Shook Ones, Pt. II", a: "Mobb Deep", y: 1995, g: "hiphop", bpm: 91 },
+  { t: "Rosa Parks", a: "OutKast", y: 1998, g: "hiphop", bpm: 96 },
+  { t: "Award Tour", a: "A Tribe Called Quest", y: 1993, g: "hiphop", bpm: 96 },
+  { t: "They Reminisce Over You", a: "Pete Rock & CL Smooth", y: 1992, g: "hiphop", bpm: 92 },
+  { t: "Devil in a New Dress", a: "Kanye West", y: 2010, g: "hiphop", bpm: 92 },
+  { t: "Jesus Walks", a: "Kanye West", y: 2004, g: "hiphop", bpm: 87 },
+  { t: "Sing About Me", a: "Kendrick Lamar", y: 2012, g: "hiphop", bpm: 84 },
+  { t: "Nikes", a: "Frank Ocean", y: 2016, g: "hiphop", bpm: 86 },
+  { t: "Simple Things", a: "Miguel", y: 2015, g: "hiphop", bpm: 94 },
+  { t: "Electric Relaxation", a: "A Tribe Called Quest", y: 1993, g: "hiphop", bpm: 94 },
+
+  // --- Rap -----------------------------------------------------------------
+  { t: "In Da Club", a: "50 Cent", y: 2003, g: "rap", bpm: 90 },
+  { t: "Forgot About Dre", a: "Dr. Dre ft. Eminem", y: 1999, g: "rap", bpm: 134 },
+  { t: "Hard Knock Life", a: "JAY-Z", y: 1998, g: "rap", bpm: 92 },
+  { t: "Big Poppa", a: "The Notorious B.I.G.", y: 1994, g: "rap", bpm: 84 },
+  { t: "Panda", a: "Desiigner", y: 2016, g: "rap", bpm: 152 },
+  { t: "First Person Shooter", a: "Drake ft. J. Cole", y: 2023, g: "rap", bpm: 138 },
+  { t: "Not Like Us", a: "Kendrick Lamar", y: 2024, g: "rap", bpm: 101 },
+  { t: "Family Ties", a: "Baby Keem & Kendrick Lamar", y: 2021, g: "rap", bpm: 148 },
+
+  // --- Trap ----------------------------------------------------------------
+  { t: "Antidote", a: "Travis Scott", y: 2015, g: "trap", bpm: 130 },
+  { t: "Jumpman", a: "Drake & Future", y: 2015, g: "trap", bpm: 143 },
+  { t: "T-Shirt", a: "Migos", y: 2017, g: "trap", bpm: 140 },
+  { t: "Gucci Gang", a: "Lil Pump", y: 2017, g: "trap", bpm: 122 },
+  { t: "Lucid Dreams", a: "Juice WRLD", y: 2018, g: "trap", bpm: 84 },
+  { t: "Money So Big", a: "Yeat", y: 2021, g: "trap", bpm: 140 },
+  { t: "Type Shit", a: "Future & Metro Boomin", y: 2024, g: "trap", bpm: 130 },
+  { t: "Knife Talk", a: "Drake ft. 21 Savage", y: 2021, g: "trap", bpm: 145 },
+
+  // --- Drill ---------------------------------------------------------------
+  { t: "Sticky", a: "Drake", y: 2022, g: "drill", bpm: 142 },
+  { t: "Doja", a: "Central Cee", y: 2022, g: "drill", bpm: 140 },
+  { t: "Obsessed with You", a: "Central Cee", y: 2021, g: "drill", bpm: 143 },
+  { t: "Mmm Mmm", a: "Digga D", y: 2021, g: "drill", bpm: 141 },
+  { t: "For a Fee", a: "Headie One", y: 2020, g: "drill", bpm: 142 },
+  { t: "The Woo", a: "Pop Smoke ft. 50 Cent", y: 2020, g: "drill", bpm: 142 },
+  { t: "Hello", a: "Pop Smoke", y: 2020, g: "drill", bpm: 145 },
+  { t: "Trap Phone", a: "Fivio Foreign", y: 2021, g: "drill", bpm: 140 },
+
+  // --- Phonk ---------------------------------------------------------------
+  { t: "Close Eyes", a: "DVRST", y: 2021, g: "phonk", bpm: 140 },
+  { t: "Shadow", a: "LXNGVX", y: 2022, g: "phonk", bpm: 145 },
+  { t: "Vendetta", a: "KSLV Noh", y: 2022, g: "phonk", bpm: 150 },
+  { t: "Rave", a: "Dxrk", y: 2022, g: "phonk", bpm: 160 },
+  { t: "Tell Me Why", a: "Freddie Dredd", y: 2019, g: "phonk", bpm: 135 },
+  { t: "Sweet Dreams", a: "Kordhell", y: 2022, g: "phonk", bpm: 152 },
+
+  // --- Jersey club ---------------------------------------------------------
+  { t: "Wanna Be", a: "GloRilla & Megan Thee Stallion", y: 2024, g: "jerseyclub", bpm: 140 },
+  { t: "Act Up", a: "Cookiee Kawaii", y: 2019, g: "jerseyclub", bpm: 140 },
+  { t: "Vibe (If I Back It Up)", a: "Cookiee Kawaii", y: 2019, g: "jerseyclub", bpm: 140 },
+  { t: "Pretty Girls Walk", a: "Big Boss Vette", y: 2023, g: "jerseyclub", bpm: 142 },
+  { t: "Left Cheek Right Cheek", a: "DJ Sliink", y: 2015, g: "jerseyclub", bpm: 140 },
+  { t: "Sensational", a: "Bandmanrill", y: 2022, g: "jerseyclub", bpm: 145 },
+  { t: "Heartbroken", a: "Lil Uzi Vert", y: 2023, g: "jerseyclub", bpm: 143 },
+
+  // --- R&B -----------------------------------------------------------------
+  { t: "Pony", a: "Ginuwine", y: 1996, g: "rnb", bpm: 92 },
+  { t: "Are You That Somebody?", a: "Aaliyah", y: 1998, g: "rnb", bpm: 96 },
+  { t: "Crazy in Love", a: "Beyonce", y: 2003, g: "rnb", bpm: 99 },
+  { t: "Kill Bill", a: "SZA", y: 2022, g: "rnb", bpm: 89 },
+  { t: "Good Days", a: "SZA", y: 2020, g: "rnb", bpm: 121 },
+  { t: "Location", a: "Khalid", y: 2016, g: "rnb", bpm: 100 },
+  { t: "Thinkin Bout You", a: "Frank Ocean", y: 2012, g: "rnb", bpm: 132 },
+
+  // --- Neo-soul ------------------------------------------------------------
+  { t: "Bag Lady", a: "Erykah Badu", y: 2000, g: "neosoul", bpm: 88 },
+  { t: "Ex-Factor", a: "Lauryn Hill", y: 1998, g: "neosoul", bpm: 88 },
+  { t: "Doo Wop (That Thing)", a: "Lauryn Hill", y: 1998, g: "neosoul", bpm: 100 },
+  { t: "Devil May Cry", a: "The Weeknd", y: 2013, g: "neosoul", bpm: 78 },
+  { t: "Nothing Even Matters", a: "Lauryn Hill & D'Angelo", y: 1998, g: "neosoul", bpm: 76 },
+  { t: "Come Home", a: "Anderson .Paak", y: 2018, g: "neosoul", bpm: 94 },
+  { t: "Sunday Morning", a: "Erykah Badu", y: 2003, g: "neosoul", bpm: 84 },
+
+  // --- Lo-fi ---------------------------------------------------------------
+  { t: "Kaoru Nagisa", a: "Nujabes", y: 2004, g: "lofi", bpm: 88 },
+  { t: "Time Travel", a: "Nujabes", y: 2003, g: "lofi", bpm: 86 },
+  { t: "Antiquity", a: "Nujabes", y: 2005, g: "lofi", bpm: 90 },
+  { t: "Two Can Win", a: "J Dilla", y: 2006, g: "lofi", bpm: 88 },
+  { t: "Workinonit", a: "J Dilla", y: 2006, g: "lofi", bpm: 96 },
+  { t: "Affection", a: "Jinsang", y: 2016, g: "lofi", bpm: 82 },
+  { t: "Coffee", a: "Idealism", y: 2017, g: "lofi", bpm: 78 },
+
+  // --- House ---------------------------------------------------------------
+  { t: "Deep Inside", a: "Hardrive", y: 1993, g: "house", bpm: 122 },
+  { t: "Can You Feel It", a: "Mr. Fingers", y: 1986, g: "house", bpm: 120 },
+  { t: "Percolator", a: "Cajmere", y: 1992, g: "house", bpm: 124 },
+  { t: "Where Love Lives", a: "Alison Limerick", y: 1990, g: "house", bpm: 122 },
+  { t: "Around the World", a: "Daft Punk", y: 1997, g: "house", bpm: 121 },
+  { t: "Sandstorm", a: "Darude", y: 1999, g: "house", bpm: 136 },
+  { t: "Bad Habit", a: "The Kid LAROI"  , y: 2022, g: "house", bpm: 124 },
+  { t: "Rumble", a: "Skrillex, Fred again.. & Flowdan", y: 2023, g: "house", bpm: 140 },
+
+  // --- Techno --------------------------------------------------------------
+  { t: "Acid Tracks", a: "Phuture", y: 1987, g: "techno", bpm: 122 },
+  { t: "Energy Flash", a: "Joey Beltram", y: 1990, g: "techno", bpm: 128 },
+  { t: "Domina", a: "Charlotte de Witte", y: 2019, g: "techno", bpm: 134 },
+  { t: "Hypnotized", a: "Adam Beyer", y: 2018, g: "techno", bpm: 128 },
+  { t: "Sonic Destroyer", a: "X-101", y: 1991, g: "techno", bpm: 130 },
+  { t: "Knights of the Jaguar", a: "DJ Rolando", y: 1999, g: "techno", bpm: 132 },
+
+  // --- Drum and bass -------------------------------------------------------
+  { t: "Pulp Fiction", a: "Alex Reece", y: 1995, g: "dnb", bpm: 170 },
+  { t: "Terminator", a: "Metalheadz / Goldie", y: 1992, g: "dnb", bpm: 165 },
+  { t: "Valley of the Shadows", a: "Origin Unknown", y: 1993, g: "dnb", bpm: 170 },
+  { t: "Warm Up", a: "Netsky", y: 2010, g: "dnb", bpm: 174 },
+  { t: "Turn Back Time", a: "Sub Focus", y: 2009, g: "dnb", bpm: 174 },
+  { t: "Tarantula", a: "Pendulum", y: 2005, g: "dnb", bpm: 174 },
+  { t: "Heartbeat Loud", a: "Chase & Status", y: 2019, g: "dnb", bpm: 174 },
+
+  // --- Dubstep -------------------------------------------------------------
+  { t: "Bass Cannon", a: "Flux Pavilion", y: 2011, g: "dubstep", bpm: 140 },
+  { t: "I Can't Stop", a: "Flux Pavilion", y: 2010, g: "dubstep", bpm: 140 },
+  { t: "Cracks (Flux Pavilion Remix)", a: "Freestylers", y: 2010, g: "dubstep", bpm: 140 },
+  { t: "Archangel", a: "Burial", y: 2007, g: "dubstep", bpm: 138 },
+  { t: "Night", a: "Benga & Coki", y: 2007, g: "dubstep", bpm: 140 },
+  { t: "Where's My Money", a: "Skrillex / TC", y: 2011, g: "dubstep", bpm: 140 },
+
+  // --- UK garage -----------------------------------------------------------
+  { t: "Sweet Like Chocolate", a: "Shanks & Bigfoot", y: 1999, g: "ukgarage", bpm: 133 },
+  { t: "Movin' Too Fast", a: "Artful Dodger & Romina Johnson", y: 2000, g: "ukgarage", bpm: 134 },
+  { t: "Body Groove", a: "Architechs", y: 2000, g: "ukgarage", bpm: 132 },
+  { t: "Battle", a: "Wookie", y: 2000, g: "ukgarage", bpm: 134 },
+  { t: "Baby Cakes", a: "3 of a Kind", y: 2004, g: "ukgarage", bpm: 136 },
+  { t: "Latch", a: "Disclosure ft. Sam Smith", y: 2012, g: "ukgarage", bpm: 122 },
+  { t: "White Noise", a: "Disclosure ft. AlunaGeorge", y: 2013, g: "ukgarage", bpm: 122 },
+
+  // --- Reggaeton -----------------------------------------------------------
+  { t: "Safaera", a: "Bad Bunny", y: 2020, g: "reggaeton", bpm: 94 },
+  { t: "Yo Perreo Sola", a: "Bad Bunny", y: 2020, g: "reggaeton", bpm: 90 },
+  { t: "Hey Mor", a: "Ozuna & Feid", y: 2022, g: "reggaeton", bpm: 92 },
+  { t: "Pepas", a: "Farruko", y: 2021, g: "reggaeton", bpm: 130 },
+  { t: "Mia", a: "Bad Bunny ft. Drake", y: 2018, g: "reggaeton", bpm: 97 },
+  { t: "Provenza", a: "Karol G", y: 2022, g: "reggaeton", bpm: 111 },
+  { t: "La Modelo", a: "Ozuna & Cardi B", y: 2017, g: "reggaeton", bpm: 96 },
+
+  // --- Afrobeats -----------------------------------------------------------
+  { t: "Soco", a: "Wizkid", y: 2018, g: "afrobeats", bpm: 105 },
+  { t: "Come Closer", a: "Wizkid ft. Drake", y: 2017, g: "afrobeats", bpm: 104 },
+  { t: "Peru", a: "Fireboy DML", y: 2021, g: "afrobeats", bpm: 106 },
+  { t: "Unavailable", a: "Davido ft. Musa Keys", y: 2023, g: "afrobeats", bpm: 108 },
+  { t: "Rush", a: "Ayra Starr", y: 2022, g: "afrobeats", bpm: 106 },
+  { t: "Kilometre", a: "Burna Boy", y: 2021, g: "afrobeats", bpm: 104 },
+  { t: "Water", a: "Tyla", y: 2023, g: "afrobeats", bpm: 116 },
+
+  // --- Amapiano ------------------------------------------------------------
+  { t: "Woza", a: "Mr JazziQ & Lady Du", y: 2021, g: "amapiano", bpm: 112 },
+  { t: "Umlando", a: "9umba, Toss & Mdoovar", y: 2022, g: "amapiano", bpm: 112 },
+  { t: "Mnike", a: "Tyler ICU & Tumelo.za", y: 2023, g: "amapiano", bpm: 113 },
+  { t: "Asibe Happy", a: "Kabza De Small & Ami Faku", y: 2022, g: "amapiano", bpm: 112 },
+  { t: "Bopha", a: "Zakes Bantwini & Nomcebo", y: 2022, g: "amapiano", bpm: 112 },
+  { t: "Iplan", a: "TitoM & Yuppe", y: 2023, g: "amapiano", bpm: 113 },
+
+  // --- Synthwave -----------------------------------------------------------
+  { t: "Miami Disco", a: "Kavinsky", y: 2010, g: "synthwave", bpm: 118 },
+  { t: "Blade Runner", a: "Vangelis", y: 1982, g: "synthwave", bpm: 100 },
+  { t: "Le Redoutable", a: "Carpenter Brut", y: 2015, g: "synthwave", bpm: 128 },
+  { t: "Deadcruiser", a: "Perturbator", y: 2014, g: "synthwave", bpm: 130 },
+  { t: "Tech Noir", a: "Gunship", y: 2015, g: "synthwave", bpm: 112 },
+  { t: "Los Angeles", a: "The Midnight", y: 2018, g: "synthwave", bpm: 108 },
+  { t: "Brain", a: "Com Truise", y: 2011, g: "synthwave", bpm: 100 },
+
+  // --- Rock ----------------------------------------------------------------
+  { t: "Enter Sandman", a: "Metallica", y: 1991, g: "rock", bpm: 123 },
+  { t: "Sweet Child O' Mine", a: "Guns N' Roses", y: 1987, g: "rock", bpm: 125 },
+  { t: "Basket Case", a: "Green Day", y: 1994, g: "rock", bpm: 170 },
+  { t: "In Bloom", a: "Nirvana", y: 1991, g: "rock", bpm: 78 },
+  { t: "The Pretender", a: "Foo Fighters", y: 2007, g: "rock", bpm: 172 },
+  { t: "Do I Wanna Know?", a: "Arctic Monkeys", y: 2013, g: "rock", bpm: 85 },
+  { t: "R U Mine?", a: "Arctic Monkeys", y: 2012, g: "rock", bpm: 100 },
+  { t: "Paranoid", a: "Black Sabbath", y: 1970, g: "rock", bpm: 164 },
+  { t: "Are You Gonna Be My Girl", a: "Jet", y: 2003, g: "rock", bpm: 106 },
 ];
 
 // ---------------------------------------------------------------------------

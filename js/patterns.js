@@ -7,7 +7,7 @@ const FLAVOR_POOLS = {
   snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn", "707", "dmx", "sp1200", "rimclick", "gatedverb", "lm1", "rz1", "hr16", "r8", "drumulator", "drumtraks", "rx5", "cr8000", "kr55", "dr110", "mpc60"],
   hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909", "707", "606", "ride", "lm1", "rz1", "r8", "drumulator", "rx5", "cr8000", "kr55", "dr110", "mpc60"],
   perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78", "talkingdrum", "woodblock", "tabla", "cabasa", "guiro", "agogo", "vibraslap", "cajon", "djembe", "timbale", "shekere", "ganza", "caxixi", "udu", "pandeiro", "tamborim", "repinique", "surdo", "bata", "cuica"],
-  tom: ["acoustic", "simmons", "roto", "taiko"],
+  tom: ["acoustic", "simmons", "roto", "taiko", "808tom", "floor", "gatedtom"],
   bass: ["warm", "synth", "808", "true808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog", "303", "slap", "sh101", "fretless", "m1organbass"],
   piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord", "dx7ep", "clav", "m1piano", "cp70", "honkytonk", "felt", "tack", "jazzgrand"],
   lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm", "whistle", "theremin", "panflute", "harmonica", "ocarina", "hoover", "ms20", "d50", "prophet", "obxa", "phasedist"],
@@ -20,13 +20,13 @@ const FLAVOR_POOLS = {
   vocal: ["ooh", "ahh", "ay", "oh", "choir", "vocoder"],
   kalimba: ["kalimba", "musicbox", "steeldrum", "glock", "hangdrum", "balafon", "kora"],
   marimba: ["marimba", "vibraphone", "xylophone", "tubularbell"],
-  arp: ["arp", "pulse"],
+  arp: ["arp", "pulse", "trance", "acid", "harp", "bellarp"],
   // A real mono hook instrument for the "Auto-Tune hook" modern rap/trap
   // production leans on - distinct from the existing "vocal" chordal
   // vowel-chop instrument (see playAutoLeadVoice for why: no vibrato at
   // all, which is what actually reads as hard-pitch-corrected rather than
   // sung).
-  autolead: ["hard", "moody"],
+  autolead: ["hard", "moody", "bright", "wide", "gritty"],
   // A real mono solo-line instrument - saxophone melodies are played one
   // note at a time, a different musical role from Horn's chord stabs.
   sax: ["smooth", "breathy", "alto", "bari"],
@@ -62,6 +62,17 @@ const FLAVOR_POOLS = {
 // Any flavor NOT listed here is treated as universal - that covers every
 // generic flavor the program already had ("warm", "bright", "grand"...).
 const FLAVOR_GENRES = {
+  // --- round 12 additions, each placed where the sound actually comes from
+  "arp:trance": ["synthwave", "techno", "house", "dnb", "dubstep", "ukgarage"],
+  "arp:acid": ["techno", "house", "dnb", "synthwave"],
+  "arp:harp": ["lofi", "neosoul", "rnb", "amapiano", "afrobeats", "hiphop"],
+  "arp:bellarp": ["synthwave", "lofi", "house", "ukgarage", "rnb", "amapiano"],
+  "tom:808tom": ["trap", "drill", "phonk", "rap", "hiphop", "jerseyclub"],
+  "tom:floor": ["rock", "neosoul", "rnb", "dnb", "afrobeats"],
+  "tom:gatedtom": ["synthwave", "rock", "phonk", "dubstep"],
+  "autolead:bright": ["rap", "trap", "jerseyclub", "reggaeton", "afrobeats"],
+  "autolead:wide": ["rnb", "trap", "drill", "synthwave"],
+  "autolead:gritty": ["drill", "phonk", "rap", "dubstep"],
   // --- drum machines, placed by the era and scene that actually used them
   lm1: ["synthwave", "rnb", "rock", "lofi", "hiphop", "rap"],
   rz1: ["lofi", "hiphop", "house", "phonk", "jerseyclub"],
@@ -2314,10 +2325,18 @@ let BEAT_COMPLEXITY = 5;
 // The policy conditions on context, so the current genre and swing have to
 // be visible to complexityProfile. Set by resolveGenerationStyle.
 let CURRENT_STYLE_ID = null;
+// The knobs of the artist being imitated, if any. A third source leaning the
+// same controls the complexity dial moves, alongside the user's taste bias
+// and the RL policy. Null whenever no artist is named, in which case
+// everything behaves exactly as it did before.
+let CURRENT_ARTIST_KNOBS = null;
+function setArtistKnobs(k) { CURRENT_ARTIST_KNOBS = k || null; }
 let CURRENT_SWING = 10;
-function setGenerationContext(styleId, swing) {
+let CURRENT_TEMPO = 110;
+function setGenerationContext(styleId, swing, tempo) {
   CURRENT_STYLE_ID = styleId || null;
   if (swing !== undefined && swing !== null) CURRENT_SWING = swing;
+  if (tempo !== undefined && tempo !== null) CURRENT_TEMPO = tempo;
 }
 function setBeatComplexity(n) {
   BEAT_COMPLEXITY = Math.max(1, Math.min(10, Math.round(n)));
@@ -2335,18 +2354,24 @@ function complexityProfile(c = BEAT_COMPLEXITY) {
   let pol = null;
   try {
     pol = typeof policyAction === "function"
-      ? policyAction(CURRENT_STYLE_ID, c, CURRENT_SWING) : null;
+      ? policyAction(CURRENT_STYLE_ID, c, CURRENT_SWING, CURRENT_TEMPO, CURRENT_ARTIST_KNOBS) : null;
   } catch (_) { pol = null; }
   const P = pol || { density: 0, syncopation: 0, extension: 0, layers: 0, rest: 0, ghost: 0, roll: 0, variation: 0, pair: 0 };
+  // The named artist's own knobs, derived from their profile. Measured
+  // before this existed, two different producers in a genre came out CLOSER
+  // to each other than two runs of one producer - the profile was setting
+  // sounds but not writing.
+  const A = CURRENT_ARTIST_KNOBS
+    || { density: 0, sync: 0, extension: 0, layers: 0, rest: 0, ghost: 0, roll: 0, variation: 0 };
   return {
     level: c,
     t,
     // Target LHL syncopation per bar, summed across the drum lanes. At 1
     // the beat should sit almost entirely on the grid; at 10 it should
     // be pushing against it constantly.
-    syncTarget: Math.max(0.5, 1 + t * 16 + bias.syncopation + P.syncopation),
+    syncTarget: Math.max(0.5, 1 + t * 16 + bias.syncopation + P.syncopation + A.sync),
     // Fraction of the grid that carries an onset, across all drums.
-    densityTarget: Math.max(0.06, Math.min(0.55, 0.13 + t * 0.26 + bias.density + P.density)),
+    densityTarget: Math.max(0.06, Math.min(0.55, 0.13 + t * 0.26 + bias.density + P.density + A.density)),
     // The finest subdivision allowed to carry an onset. Simple beats are
     // simple partly because they do not use 16ths at all. A hard bucket
     // per subdivision made whole pairs of levels identical (1 and 2 were
@@ -2355,23 +2380,23 @@ function complexityProfile(c = BEAT_COMPLEXITY) {
     // which fills in the steps between subdivisions.
     minStep: c <= 2 ? 4 : c <= 4 ? 2 : 1,
     offGridKeep: c === 1 ? 0 : c === 2 ? 0.3 : c === 3 ? 0.12 : c === 4 ? 0.45 : 1,
-    ghostProbability: Math.max(0, Math.min(0.7, 0.04 + t * 0.34 + P.ghost)),
-    rollBoost: (t - 0.4) * 0.5 + P.roll,
+    ghostProbability: Math.max(0, Math.min(0.7, 0.04 + t * 0.34 + P.ghost + A.ghost)),
+    rollBoost: (t - 0.4) * 0.5 + P.roll + A.roll,
     // Harmony: triads at the bottom, 7ths in the middle, 9ths and 11ths
     // at the top. This is the same axis jazz uses to describe harmonic
     // sophistication, so it belongs on a complexity control.
-    extensionBonus: Math.max(0, Math.round((t < 0.25 ? 0 : t < 0.5 ? 1 : t < 0.75 ? 2 : 3) + bias.extension + P.extension)),
+    extensionBonus: Math.max(0, Math.round((t < 0.25 ? 0 : t < 0.5 ? 1 : t < 0.75 ? 2 : 3) + bias.extension + P.extension + A.extension)),
     // Chords per bar. Faster harmonic rhythm is one of the clearest
     // markers of a more worked-out arrangement.
     splitMotionProbability: 0.1 + t * 0.65,
     anticipateProbability: 0.05 + t * 0.45,
     // Melody
-    restBias: 0.22 - t * 0.34 - bias.melodic + P.rest,        // more complex = fewer rests
-    variationBoost: -0.1 + t * 0.35 + P.variation,
+    restBias: 0.22 - t * 0.34 - bias.melodic + P.rest + A.rest,        // more complex = fewer rests
+    variationBoost: -0.1 + t * 0.35 + P.variation + A.variation,
     passingToneBoost: t * 0.22,
     // How many voices are in play at once.
-    soloPairProbability: Math.max(0, Math.min(0.95, 0.12 + t * 0.6 + bias.layers + P.pair)),
-    chordKeepProbability: Math.max(0.1, Math.min(0.98, 0.3 + t * 0.5 + bias.layers + P.layers)),
+    soloPairProbability: Math.max(0, Math.min(0.95, 0.12 + t * 0.6 + bias.layers + P.pair + A.layers)),
+    chordKeepProbability: Math.max(0.1, Math.min(0.98, 0.3 + t * 0.5 + bias.layers + P.layers + A.layers)),
     percLayerProbability: t * 0.75,
   };
 }
@@ -2821,6 +2846,30 @@ const DEFAULT_MELODY = {
   // sung phrase rather than for an instrumental solo.
   talkbox:   { motifBars: 2, noteLengths: [[3,3],[4,3],[6,2],[2,1]], restProbability: 0.52, chordToneProbability: 0.88, chordTonePool: [[0,4],[2,2],[4,2]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.28 },
   guitar:    { motifBars: 2, noteLengths: [[2,3],[4,3],[3,1]], restProbability: 0.45, chordToneProbability: 0.75, chordTonePool: [[0,3],[2,2],[4,2]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.35 },
+
+  // Four instruments that were only ever allowed to play chords, even
+  // though on real records they routinely carry the top line. Without these
+  // a Robert Glasper profile could not name the piano and a Just Blaze
+  // profile could not name horns - the two things that most define them -
+  // and the request was silently dropped, leaving a generic beat.
+  //
+  // A piano solo runs faster and uses more passing tones than a horn line,
+  // because a pianist is not breathing; a horn or string line is long,
+  // rest-separated and mostly chord tones for the same reason in reverse.
+  piano:     { motifBars: 2, noteLengths: [[1,2],[2,4],[3,2],[4,2]], restProbability: 0.34, chordToneProbability: 0.68, chordTonePool: [[0,3],[2,2],[4,2],[7,2],[9,1]], passingTonePool: [[1,2],[3,2],[-1,2],[5,1],[6,1]], variationProbability: 0.45 },
+  organ:     { motifBars: 2, noteLengths: [[2,3],[3,2],[4,3],[6,1]], restProbability: 0.38, chordToneProbability: 0.72, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,2],[3,1],[-1,2],[6,1]], variationProbability: 0.4 },
+  strings:   { motifBars: 4, noteLengths: [[6,3],[8,3],[12,2],[4,1]], restProbability: 0.48, chordToneProbability: 0.8, chordTonePool: [[0,3],[2,2],[4,2],[7,2]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.28, harmony: { shape: "third", probability: 0.5, minLen: 4 } },
+  horn:      { motifBars: 2, noteLengths: [[3,3],[4,3],[6,2],[2,1]], restProbability: 0.52, chordToneProbability: 0.82, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.32, harmony: { shape: "third", probability: 0.45, minLen: 3 } },
+
+  // On a Kanye or Kaytranada record - and on essentially every jersey club
+  // record - the chopped vocal IS the top line, not a background texture.
+  // A vocal chop is the most repetitive hook there is: short notes, almost
+  // entirely chord tones, and it repeats nearly unchanged, because the
+  // whole effect depends on recognising it instantly.
+  vocal:     { motifBars: 2, noteLengths: [[1,3],[2,4],[3,1]], restProbability: 0.46, chordToneProbability: 0.92, chordTonePool: [[0,4],[2,2],[4,2],[7,1]], passingTonePool: [[1,1]], variationProbability: 0.18 },
+  // A pad carrying the melody is the opposite extreme: a handful of very
+  // long notes. This is what a Goldie or a Tainy record puts on top.
+  pad:       { motifBars: 4, noteLengths: [[8,3],[12,3],[16,2]], restProbability: 0.5, chordToneProbability: 0.88, chordTonePool: [[0,3],[2,2],[4,2],[7,2]], passingTonePool: [[1,1],[3,1]], variationProbability: 0.22 },
 };
 
 // Draw this generation's solo voices. One most of the time, two often
@@ -2911,7 +2960,14 @@ function planInstrumentation(style) {
 }
 
 function resolveGenerationStyle(style, plan) {
-  setGenerationContext(style.id, style.swing !== undefined ? style.swing * 100 : undefined);
+  // style.tempo is a {min,max,default} range object, not a number. Passing
+  // the object straight through made the policy's tempo input NaN, which
+  // turned every policy output into NaN, which turned every complexity
+  // target into NaN - and the generator carried on regardless, producing
+  // beats that scored NaN. Nothing threw.
+  const tempoNum = typeof style.tempo === "number" ? style.tempo
+    : (style.tempo && (style.tempo.current || style.tempo.default)) || undefined;
+  setGenerationContext(style.id, style.swing !== undefined ? style.swing * 100 : undefined, tempoNum);
   const p = plan || planInstrumentation(style);
   return {
     ...style,

@@ -553,9 +553,32 @@ Every "Generate" already composes twelve beats and keeps the best one — but th
 
 ## Type beats
 
-Type in an artist and the program configures a session the way a producer would before writing anything: genre, tempo range, key preference, scale, swing, complexity, kit choices and which solo voices belong. **22 profiles**, each with a one-line note on what actually characterises the sound. An unrecognised name falls back to the genre-keyword parser, so "some random drill guy" still produces a drill beat.
+Type in an artist and the program configures a session the way a producer would before writing anything: genre, tempo range, key preference, scale, swing, complexity, kit choices and which solo voices belong. **112 profiles** across all 19 genres, each with a one-line note on what actually characterises the sound. An unrecognised name falls back to the genre-keyword parser, so "some random drill guy" still produces a drill beat.
 
-This reproduces a *production approach* — facts about a genre and an era — not anyone's work. No audio, melody or chord sequence is stored or referenced; the beat is still composed from scratch by the same engine.
+| genre | profiles | | genre | profiles |
+|---|---|---|---|---|
+| trap | 20 | | rock | 7 |
+| hiphop | 10 | | lofi | 6 |
+| synthwave | 8 | | drill | 6 |
+| neosoul | 8 | | afrobeats | 6 |
+| house | 7 | | rnb | 5 |
+| ukgarage | 5 | | techno | 5 |
+| dnb | 4 | | reggaeton | 4 |
+| dubstep | 3 | | amapiano | 3 |
+| phonk | 2 | | jerseyclub | 2 |
+| rap | 1 | | | |
+
+Every profile is validated at build time: the genre must exist, every kit it names must be in that track's pool *and* allowed in that genre, every solo instrument must be real, and the tempo range must be sane. That check caught eleven broken profiles on the first run — kits referenced on the wrong track (`ms20` is a lead flavor, not a bass one; `606` is a hi-hat, not a snare) and five cases where the kit genuinely belonged but the genre map was too narrow (liquid D&B does use string machines and piano house piano; darksynth is built on hoovers).
+
+### Credit, and what it actually does
+
+There is a credit panel under the type-beat box, and it exists because two things get conflated constantly.
+
+**What naming an artist does:** using a name to *describe a style* is ordinary descriptive use, and it is the established convention of the entire type-beat scene — the format was created by producers on YouTube and BeatStars because it is how buyers search, and it describes the style of the beat rather than implying endorsement or affiliation. The panel states that explicitly, and there is a one-click **"Copy upload title + description"** that writes the standard type-beat upload text with the influence credited and the composition's originality stated plainly.
+
+**What it does not do:** credit is not a licence. Naming a rights holder does not grant permission to reproduce their recording — attribution and permission are separate things, and they always have been. So crediting an artist could not make it lawful to take their song's audio, strip the vocal and republish it.
+
+That distinction is why this program is on solid ground: everything it outputs is composed from scratch by its own engine, so there is nothing of anyone else's in it to need a licence for. The credit text exists because being clear about influence is good practice and because the naming convention wants the artist in the title — not as a shield.
 
 ## MIDI export
 

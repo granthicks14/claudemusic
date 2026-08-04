@@ -13,6 +13,11 @@ const artistInput = document.getElementById("artist-input");
 const artistGenerateBtn = document.getElementById("artist-generate");
 const artistStatus = document.getElementById("artist-status");
 const artistList = document.getElementById("artist-list");
+const creditPanel = document.getElementById("credit-panel");
+const creditLineEl = document.getElementById("credit-line");
+const copyUploadBtn = document.getElementById("copy-upload-text");
+const creditCopied = document.getElementById("credit-copied");
+let lastArtist = null;
 const exportMidiBtn = document.getElementById("export-midi-btn");
 const rateUpBtn = document.getElementById("rate-up");
 const rateDownBtn = document.getElementById("rate-down");
@@ -2479,7 +2484,41 @@ function applyArtistProfile(name) {
 
   generatePattern();
   renderStepGrid();
+  lastArtist = found;
+  showCredit(found);
   artistStatus.textContent = `${titleCaseName(found.key)} type beat — ${STYLES[p.genre].name}, ${tempo} BPM, ${key} ${p.scale}. ${p.notes}`;
+}
+
+// Show who the beat was modelled on, and make the standard upload text
+// one click away - the type-beat naming convention puts the artist in the
+// title, so the program may as well write it correctly.
+function showCredit(found) {
+  if (!creditPanel) return;
+  creditPanel.hidden = false;
+  creditLineEl.textContent = creditLine(found.key, found.profile);
+  if (creditCopied) creditCopied.textContent = "";
+}
+
+if (copyUploadBtn) {
+  copyUploadBtn.addEventListener("click", async () => {
+    if (!lastArtist) return;
+    const t = uploadText(lastArtist.key, lastArtist.profile, {
+      bpm: Math.round(Number(tempoSlider.value)),
+      key: keySelect.value + " " + (activeStyle.scale || ""),
+      beatName: activeStyle.name,
+    });
+    const text = `${t.title}\n\n${t.description}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      creditCopied.textContent = "Copied.";
+    } catch (_) {
+      // Clipboard can be blocked (file://, permissions); fall back to a
+      // selectable prompt rather than silently doing nothing.
+      window.prompt("Copy this:", text);
+      creditCopied.textContent = "";
+    }
+    setTimeout(() => { if (creditCopied) creditCopied.textContent = ""; }, 2500);
+  });
 }
 
 function titleCaseName(k) {

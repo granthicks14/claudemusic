@@ -82,11 +82,11 @@ const FLAVOR_GENRES = {
   sh101: ["house", "techno", "ukgarage", "synthwave", "dnb", "jerseyclub"],
   fretless: ["neosoul", "rnb", "lofi"],
   m1organbass: ["house", "ukgarage", "amapiano", "techno", "jerseyclub"],
-  m1piano: ["house", "ukgarage", "amapiano", "jerseyclub"],
+  m1piano: ["house", "ukgarage", "amapiano", "jerseyclub", "dnb"],
   m1organ: ["house", "ukgarage", "amapiano", "techno", "jerseyclub"],
   cp70: ["synthwave", "rnb", "neosoul", "rock"],
   honkytonk: ["lofi", "hiphop"],
-  solina: ["synthwave", "lofi", "neosoul", "rnb", "house"],
+  solina: ["synthwave", "lofi", "neosoul", "rnb", "house", "dnb", "ukgarage"],
   cs80: ["synthwave", "dubstep", "techno", "dnb"],
   voxhumana: ["synthwave", "lofi", "house"],
   farfisa: ["rock", "lofi", "house"],
@@ -124,7 +124,7 @@ const FLAVOR_GENRES = {
   tubularbell: ["drill", "trap", "phonk", "dubstep", "rap"],
 
   // --- synths, placed by the scene that actually made them famous
-  hoover: ["dnb", "dubstep", "techno", "jerseyclub", "phonk"],
+  hoover: ["dnb", "dubstep", "techno", "jerseyclub", "phonk", "synthwave"],
   ms20: ["techno", "dnb", "dubstep", "phonk", "drill"],
   d50: ["synthwave", "house", "rnb", "ukgarage", "amapiano"],
   prophet: ["synthwave", "house", "rock", "techno"],
@@ -132,7 +132,7 @@ const FLAVOR_GENRES = {
   phasedist: ["synthwave", "techno", "ukgarage", "dnb"],
   jupiter8: ["synthwave", "house", "techno", "lofi", "rnb"],
   polysix: ["synthwave", "lofi", "house", "neosoul"],
-  ppgwave: ["synthwave", "techno", "dnb", "dubstep"],
+  ppgwave: ["synthwave", "techno", "dnb", "dubstep", "rock"],
   // --- woodwinds. Amapiano in particular is built on live sax and flute
   // over the log drum, and dark flute lines are a UK drill signature.
   // The concert flute on the woodwind track, NOT the lead synth's

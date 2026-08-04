@@ -9,6 +9,15 @@ const tempoValue = document.getElementById("tempo-value");
 const masterSlider = document.getElementById("master-slider");
 const swingSlider = document.getElementById("swing-slider");
 const complexitySlider = document.getElementById("complexity-slider");
+const artistInput = document.getElementById("artist-input");
+const artistGenerateBtn = document.getElementById("artist-generate");
+const artistStatus = document.getElementById("artist-status");
+const artistList = document.getElementById("artist-list");
+const exportMidiBtn = document.getElementById("export-midi-btn");
+const rateUpBtn = document.getElementById("rate-up");
+const rateDownBtn = document.getElementById("rate-down");
+const rateResetBtn = document.getElementById("rate-reset");
+const tasteStatus = document.getElementById("taste-status");
 const complexityValue = document.getElementById("complexity-value");
 const complexityName = document.getElementById("complexity-name");
 const swingValue = document.getElementById("swing-value");
@@ -433,8 +442,8 @@ function trackHeaderHTML(track) {
   // the shuffle draws from) and everything else. Both stay selectable -
   // deliberately putting a sitar on a techno track is a creative choice,
   // and only the *automatic* shuffle should be stopped from doing it.
-  const fits = pool ? pool.filter((f) => flavorFitsGenre(f, selectedStyleId)) : [];
-  const rest = pool ? pool.filter((f) => !flavorFitsGenre(f, selectedStyleId)) : [];
+  const fits = pool ? pool.filter((f) => flavorFitsGenre(track, f, selectedStyleId)) : [];
+  const rest = pool ? pool.filter((f) => !flavorFitsGenre(track, f, selectedStyleId)) : [];
   const opts = (list) => list
     .map((f) => `<option value="${f}" ${currentFlavors[track] === f ? "selected" : ""}>${flavorLabel(f)}</option>`)
     .join("");
@@ -2381,3 +2390,153 @@ promptInput.addEventListener("keydown", (e) => {
 });
 
 renderStyleCards();
+
+
+// ---------------------------------------------------------------------------
+// Teach it your taste
+// ---------------------------------------------------------------------------
+function refreshTasteStatus() {
+  if (!tasteStatus) return;
+  try {
+    tasteStatus.textContent = Taste.describeTaste().text;
+  } catch (_) {
+    tasteStatus.textContent = "";
+  }
+}
+
+function rateCurrentBeat(liked, btn) {
+  if (!currentPattern || !activeStyle) return;
+  // Rate the beat that was actually produced, using the instrumentation it
+  // was generated with rather than the genre's nominal line-up.
+  const style = currentPattern.genStyle || activeStyle;
+  Taste.rate(style, currentPattern, liked);
+  refreshTasteStatus();
+  btn.classList.add("flash");
+  setTimeout(() => btn.classList.remove("flash"), 350);
+}
+
+if (rateUpBtn) rateUpBtn.addEventListener("click", () => rateCurrentBeat(true, rateUpBtn));
+if (rateDownBtn) rateDownBtn.addEventListener("click", () => rateCurrentBeat(false, rateDownBtn));
+if (rateResetBtn) {
+  rateResetBtn.addEventListener("click", () => {
+    Taste.reset();
+    refreshTasteStatus();
+    shuffleStatus.textContent = "Forgot everything learned about your taste.";
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Type beats
+// ---------------------------------------------------------------------------
+function applyArtistProfile(name) {
+  const found = findArtistProfile(name);
+  if (!found) {
+    // Unknown name: fall back to the same genre keyword parser the
+    // describe-a-beat box uses, so a half-remembered name still lands
+    // somewhere sensible.
+    const genre = artistFallbackGenre(name, GENRE_KEYWORDS);
+    if (genre && STYLES[genre]) {
+      selectStyle(genre);
+      generatePattern();
+      artistStatus.textContent = `No profile for "${name}" — matched the genre keyword instead, so this is a ${STYLES[genre].name} beat.`;
+      return;
+    }
+    artistStatus.textContent = `No profile for "${name}". Known artists: ${artistProfileNames().slice(0, 6).map(titleCaseName).join(", ")}…`;
+    return;
+  }
+
+  const p = found.profile;
+  if (!STYLES[p.genre]) return;
+  selectStyle(p.genre);
+
+  // Tempo, key and swing come from the profile rather than the genre roll.
+  const tempo = Math.round(p.tempo[0] + Math.random() * (p.tempo[1] - p.tempo[0]));
+  tempoSlider.min = Math.min(Number(tempoSlider.min), p.tempo[0]);
+  tempoSlider.max = Math.max(Number(tempoSlider.max), p.tempo[1]);
+  tempoSlider.value = tempo;
+  tempoValue.textContent = tempo;
+  engine.updateTempo(tempo);
+
+  const key = p.keys[Math.floor(Math.random() * p.keys.length)];
+  populateKeySelect(key + (keySelect.dataset.octave || "2"));
+  activeStyle.key = key + (keySelect.dataset.octave || "2");
+  if (p.scale) activeStyle.scale = p.scale;
+  engine.updateKey(activeStyle);
+
+  swingSlider.value = p.swing;
+  swingValue.textContent = p.swing;
+  engine.setSwing(p.swing / 100);
+
+  complexitySlider.value = String(p.complexity);
+  complexitySlider.dispatchEvent(new Event("input"));
+
+  // The profile's kits, but only ones this genre's tracks actually have.
+  for (const [inst, flavor] of Object.entries(p.kits || {})) {
+    if (FLAVOR_POOLS[inst] && FLAVOR_POOLS[inst].includes(flavor)) currentFlavors[inst] = flavor;
+  }
+  // Bias the solo voice toward the ones that define this artist's sound.
+  if (p.solos && p.solos.length) activeStyle.soloOverride = p.solos.slice();
+
+  generatePattern();
+  renderStepGrid();
+  artistStatus.textContent = `${titleCaseName(found.key)} type beat — ${STYLES[p.genre].name}, ${tempo} BPM, ${key} ${p.scale}. ${p.notes}`;
+}
+
+function titleCaseName(k) {
+  return k.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+if (artistGenerateBtn) {
+  artistGenerateBtn.addEventListener("click", () => applyArtistProfile(artistInput.value));
+  artistInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") applyArtistProfile(artistInput.value);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// MIDI export
+// ---------------------------------------------------------------------------
+if (exportMidiBtn) {
+  exportMidiBtn.addEventListener("click", () => {
+    if (!currentPattern || !activeStyle) return;
+    const bytes = patternToMidi(
+      currentPattern,
+      {
+        tempo: Number(tempoSlider.value),
+        stepsPerBar: STEPS_PER_BAR,
+        name: `Beat Studio - ${activeStyle.name}`,
+      },
+      // The scale and any custom chords live in the app, so resolving a
+      // degree to a real MIDI note is passed in rather than duplicated.
+      (deg, step) => {
+        const ctx = contextForStep(step);
+        return scaleDegreeToMidi(ctx.rootMidi, ctx.scale, deg);
+      },
+    );
+    const blob = new Blob([bytes], { type: "audio/midi" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `beatstudio-${selectedStyleId}.mid`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    shuffleStatus.textContent = "MIDI exported — import it into FL Studio with File ▸ Import ▸ MIDI file.";
+  });
+}
+
+// Populate the artist autocomplete and load any saved taste on startup.
+(function initExtras() {
+  try {
+    Taste.load();
+    refreshTasteStatus();
+  } catch (_) { /* no storage available */ }
+  if (artistList) {
+    for (const name of artistProfileNames()) {
+      const o = document.createElement("option");
+      o.value = titleCaseName(name);
+      artistList.appendChild(o);
+    }
+  }
+})();

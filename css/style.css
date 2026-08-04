@@ -833,3 +833,20 @@ body {
   color: var(--accent-2);
   font-weight: 600;
 }
+
+/* Type-beat box sits alongside the describe-a-beat box. */
+.artist-box {
+  background: linear-gradient(160deg, rgba(0, 210, 211, 0.08), rgba(165, 94, 234, 0.05));
+}
+
+.rate-btn.flash {
+  background: linear-gradient(90deg, var(--accent-2), #00b894);
+  border-color: transparent;
+}
+
+.taste-status {
+  font-size: 0.75rem;
+  color: var(--accent-2);
+  max-width: 380px;
+  line-height: 1.3;
+}

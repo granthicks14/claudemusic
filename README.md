@@ -532,6 +532,44 @@ Which articulation each part uses is chosen **per generation**, so a strummed gu
 **288 kits total**, all rendered offline with none silent or clipping; 19 genres played at complexity 1, 5 and 10 with zero console errors.
 
 
+## Teaching it your taste
+
+Every "Generate" already composes twelve beats and keeps the best one — but the scorer's opinions were hand-written by me, identical for everyone. Two buttons (**👍 More like this** / **👎 Less like this**) close that loop: the program measures what the liked beats have in common that the disliked ones do not, and that difference steers both the candidate search *and* the generation parameters.
+
+**What this is, precisely:** online preference learning with a linear model over twelve hand-designed features (syncopation, drum density, chord size, layers, register spread, brightness…), weights being the standardised difference between the liked and disliked groups, with confidence that ramps as ratings accumulate. It persists to `localStorage` and can be reset.
+
+**What it is not: deep reinforcement learning.** A deep RL agent needs either a simulator with a programmatic reward or a large offline dataset of rated examples, and neither exists here — the only reward signal is a human pressing a button, which arrives a few dozen times, not a few million. A network trained on thirty examples would do nothing but memorise them. A linear model over meaningful features is the honest choice at this data volume: it learns from the very first rating, it cannot overfit into nonsense, and it can explain itself — the panel literally tells you *"you seem to prefer busier drums, more syncopated"*, which a neural net would not let it do.
+
+**Verified with a simulated listener.** A synthetic user who consistently prefers syncopated, dense, rich-chord beats rated 60 beats, split at the median so the preference actually discriminated:
+
+| | result |
+|---|---|
+| Top learned weights | **drumDensity 0.69, syncopation 0.60** — two of the three planted preferences, far ahead of everything else |
+| Generated syncopation | 0.476 → **0.534** |
+| Generated drum density | 0.604 → **0.664** |
+| Preferred-feature average | 0.618 → **0.659 (+6.6%)** |
+
+*(Two fixes were needed to get there, both found by measuring rather than assuming. The first model used raw mean differences, so a feature that barely varies across beats — harmonic rhythm — still contributed its noise to the weight vector and outranked real preferences; dividing by each feature's standard deviation turns the weight into "how many standard deviations apart are the two groups", which identified the right features immediately. The second: selection alone did nothing, because the search can only pick from the twelve candidates it was handed — if none of them lean the right way, re-weighting the scorer changes nothing. Taste now also nudges the same generation knobs the complexity dial uses.)*
+
+## Type beats
+
+Type in an artist and the program configures a session the way a producer would before writing anything: genre, tempo range, key preference, scale, swing, complexity, kit choices and which solo voices belong. **22 profiles**, each with a one-line note on what actually characterises the sound. An unrecognised name falls back to the genre-keyword parser, so "some random drill guy" still produces a drill beat.
+
+This reproduces a *production approach* — facts about a genre and an era — not anyone's work. No audio, melody or chord sequence is stored or referenced; the beat is still composed from scratch by the same engine.
+
+## MIDI export
+
+The request was for FL Studio's own `.flp` format. That is proprietary and undocumented — there is no published specification, and a guessed `.flp` would at best fail to open. **MIDI is what the industry actually uses to move musical ideas between programs, and FL Studio imports it natively** (File ▸ Import ▸ MIDI file), so that is what this exports — which also works in Ableton, Logic, Reaper and everything else.
+
+Format 1 SMF: a tempo track plus one track per instrument, drums on channel 10 with General MIDI note numbers, melodic parts with a GM program approximating each instrument. Validated by parsing the output back with an independent parser: **exact byte consumption, every note properly closed, no structural problems.**
+
+## A real bug this round surfaced
+
+Flavor names are namespaced per track — the hi-hat's `bright` and the talkbox's `bright` are unrelated sounds that merely share a word. But `FLAVOR_GENRES` was keyed by the bare name, so a restriction written for one instrument silently applied to every other instrument with the same flavor name.
+
+The talkbox's `bright` vowel path is house/R&B-only. That quietly made **the plain bright hi-hat — one of the most common hat sounds there is — unavailable in fifteen of nineteen genres**, and did the same to the lead synth's `flute` preset. Keys may now be written `track:flavor`, and an instrument-specific entry wins over the bare name. Found by validating that every artist profile's kit reference actually resolves.
+
+
 ## The reel is as long as your beat
 
 The reel used to run for a fixed 15, 30, or 60 seconds regardless of what the beat actually was, which is the wrong unit entirely: a 4-bar loop got chopped mid-phrase, and a full song got truncated a third of the way in. **Length is now derived from the pattern**, so a video always contains a whole number of loops and never cuts off in the middle of a bar.

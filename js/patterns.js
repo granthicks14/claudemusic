@@ -135,7 +135,9 @@ const FLAVOR_GENRES = {
   ppgwave: ["synthwave", "techno", "dnb", "dubstep"],
   // --- woodwinds. Amapiano in particular is built on live sax and flute
   // over the log drum, and dark flute lines are a UK drill signature.
-  flute: ["trap", "drill", "rap", "lofi", "afrobeats", "amapiano", "rnb", "neosoul", "hiphop"],
+  // The concert flute on the woodwind track, NOT the lead synth's
+  // flute-ish preset, which has always been available everywhere.
+  "woodwind:flute": ["trap", "drill", "rap", "lofi", "afrobeats", "amapiano", "rnb", "neosoul", "hiphop"],
   altoflute: ["lofi", "neosoul", "rnb", "amapiano"],
   bassclarinet: ["drill", "neosoul", "lofi", "dnb"],
   englishhorn: ["neosoul", "lofi", "rnb"],
@@ -156,7 +158,8 @@ const FLAVOR_GENRES = {
   roger: ["rnb", "neosoul", "hiphop", "house", "rap"],
   gfunk: ["hiphop", "rnb", "phonk", "rap"],
   robot: ["house", "techno", "rnb", "jerseyclub"],
-  bright: ["house", "rnb", "neosoul", "ukgarage"],
+  // The talkbox vowel path, NOT the plain bright hi-hat.
+  "talkbox:bright": ["house", "rnb", "neosoul", "ukgarage"],
   // --- more documented drum machines
   drumulator: ["hiphop", "lofi", "rap", "phonk", "house"],
   drumtraks: ["synthwave", "rnb", "rock", "hiphop"],
@@ -187,14 +190,26 @@ const FLAVOR_GENRES = {
 
 // A flavor is available to a genre if it is universal, or if that genre is
 // in its list.
-function flavorFitsGenre(flavor, styleId) {
-  const allowed = FLAVOR_GENRES[flavor];
+//
+// Flavor names are namespaced PER TRACK in FLAVOR_POOLS - the hi-hat's
+// "bright" and the talkbox's "bright" are unrelated sounds that merely
+// share a word. This map was keyed by the bare name, so a restriction
+// written for one instrument silently applied to every other instrument
+// with the same flavor name: the talkbox's "bright" vowel path is
+// house/R&B-only, which quietly made the plain bright hi-hat - one of the
+// most common hat sounds there is - unavailable in fifteen of nineteen
+// genres. Keys may now be written "track:flavor" to disambiguate, and an
+// instrument-specific entry always wins over the bare name.
+function flavorFitsGenre(inst, flavor, styleId) {
+  // Called as (flavor, styleId) in older code paths; detect and shift.
+  if (arguments.length === 2) { styleId = flavor; flavor = inst; inst = null; }
+  const allowed = (inst && FLAVOR_GENRES[inst + ":" + flavor]) || FLAVOR_GENRES[flavor];
   return !allowed || allowed.includes(styleId);
 }
 
 function poolForGenre(inst, styleId) {
   const pool = FLAVOR_POOLS[inst] || [];
-  const fitted = pool.filter((f) => flavorFitsGenre(f, styleId));
+  const fitted = pool.filter((f) => flavorFitsGenre(inst, f, styleId));
   // Never hand back an empty pool - if a genre somehow excludes
   // everything, fall back to the full list rather than break the shuffle.
   return fitted.length ? fitted : pool;
@@ -2302,15 +2317,20 @@ function setBeatComplexity(n) {
 
 function complexityProfile(c = BEAT_COMPLEXITY) {
   const t = (c - 1) / 9;   // 0 at simplest, 1 at most complex
+  // Learned taste leans the same knobs the dial moves - see
+  // Taste.generationBias. Zero until the user has rated anything.
+  let b = null;
+  try { b = typeof Taste !== "undefined" ? Taste.generationBias() : null; } catch (_) { b = null; }
+  const bias = b || { syncopation: 0, density: 0, extension: 0, layers: 0, melodic: 0 };
   return {
     level: c,
     t,
     // Target LHL syncopation per bar, summed across the drum lanes. At 1
     // the beat should sit almost entirely on the grid; at 10 it should
     // be pushing against it constantly.
-    syncTarget: 1 + t * 16,
+    syncTarget: Math.max(0.5, 1 + t * 16 + bias.syncopation),
     // Fraction of the grid that carries an onset, across all drums.
-    densityTarget: 0.13 + t * 0.26,
+    densityTarget: Math.max(0.06, Math.min(0.55, 0.13 + t * 0.26 + bias.density)),
     // The finest subdivision allowed to carry an onset. Simple beats are
     // simple partly because they do not use 16ths at all. A hard bucket
     // per subdivision made whole pairs of levels identical (1 and 2 were
@@ -2324,18 +2344,18 @@ function complexityProfile(c = BEAT_COMPLEXITY) {
     // Harmony: triads at the bottom, 7ths in the middle, 9ths and 11ths
     // at the top. This is the same axis jazz uses to describe harmonic
     // sophistication, so it belongs on a complexity control.
-    extensionBonus: t < 0.25 ? 0 : t < 0.5 ? 1 : t < 0.75 ? 2 : 3,
+    extensionBonus: Math.max(0, Math.round((t < 0.25 ? 0 : t < 0.5 ? 1 : t < 0.75 ? 2 : 3) + bias.extension)),
     // Chords per bar. Faster harmonic rhythm is one of the clearest
     // markers of a more worked-out arrangement.
     splitMotionProbability: 0.1 + t * 0.65,
     anticipateProbability: 0.05 + t * 0.45,
     // Melody
-    restBias: 0.22 - t * 0.34,        // more complex = fewer rests
+    restBias: 0.22 - t * 0.34 - bias.melodic,        // more complex = fewer rests
     variationBoost: -0.1 + t * 0.35,
     passingToneBoost: t * 0.22,
     // How many voices are in play at once.
-    soloPairProbability: 0.12 + t * 0.6,
-    chordKeepProbability: 0.3 + t * 0.5,
+    soloPairProbability: Math.max(0, Math.min(0.95, 0.12 + t * 0.6 + bias.layers)),
+    chordKeepProbability: Math.max(0.1, Math.min(0.98, 0.3 + t * 0.5 + bias.layers)),
     percLayerProbability: t * 0.75,
   };
 }
@@ -2791,7 +2811,13 @@ const DEFAULT_MELODY = {
 // enough that beats have a call-and-response pair - but never so many
 // that the top of the mix turns into a crowd.
 function pickSoloInstruments(style) {
-  const pool = (SOLO_POOLS[style.id] || []).filter(([inst]) => {
+  // A type-beat profile can name the solo voices that define an artist's
+  // sound; when it does, they replace the genre's own pool rather than
+  // merely being added to it.
+  const source = (style.soloOverride && style.soloOverride.length)
+    ? style.soloOverride.map((i) => [i, 1])
+    : (SOLO_POOLS[style.id] || []);
+  const pool = source.filter(([inst]) => {
     // A genre can only field an instrument it has a melodic profile for,
     // either its own or the shared default.
     return (style.melody && style.melody[inst]) || DEFAULT_MELODY[inst];
@@ -3491,6 +3517,16 @@ function refineVariation(style, v, barRootDegrees, totalSteps, passes = 2) {
   return v;
 }
 
+// learning.js is loaded separately, so a missing taste model must never
+// break generation - it just means nothing has been learned yet.
+function learnedBonus(style, v) {
+  try {
+    return typeof Taste !== "undefined" ? Taste.bonus(style, v) : 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
 // Candidate counts are tuned so selection is meaningful without making
 // "Generate" feel slow - a full beat is only array math, so this stays
 // well inside a single frame.
@@ -3503,7 +3539,10 @@ function generateVariation(rawStyle, bars) {
     // scored and refined against the instruments it actually used - not
     // against the genre's nominal list, which may name parts this
     // candidate does not have.
-    const sc = scoreVariation(cand.genStyle || rawStyle, cand);
+    // The musical score, plus whatever the user's own ratings have taught
+    // the program to prefer. With no ratings the learned term is exactly
+    // zero, so behaviour is identical to before any feedback exists.
+    const sc = scoreVariation(cand.genStyle || rawStyle, cand) + learnedBonus(cand.genStyle || rawStyle, cand);
     if (sc > bestScore) { bestScore = sc; best = cand; }
   }
   return refineVariation(best.genStyle || rawStyle, best, best.barRootDegrees, bars * STEPS_PER_BAR, 2);
@@ -3514,7 +3553,7 @@ function generateSongVariation(rawStyle) {
   let best = null, bestScore = -Infinity;
   for (let i = 0; i < 6; i++) {
     const cand = generateSongVariationOnce(rawStyle, plan);
-    const sc = scoreVariation(cand.genStyle || rawStyle, cand);
+    const sc = scoreVariation(cand.genStyle || rawStyle, cand) + learnedBonus(cand.genStyle || rawStyle, cand);
     if (sc > bestScore) { bestScore = sc; best = cand; }
   }
   return refineVariation(best.genStyle || rawStyle, best, best.barRootDegrees, best.structure.length * STEPS_PER_BAR, 1);

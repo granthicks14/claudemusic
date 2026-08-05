@@ -7797,13 +7797,22 @@ class BeatEngine {
   }
 
   midiForDegree(deg, step) {
+    // Key modulation, applied here because this is the single funnel every
+    // pitched note in the program passes through - melodies, chords, bass and
+    // stabs all resolve their degree to a MIDI note in this one method. Adding
+    // it anywhere else would modulate some parts and not others, which is not
+    // a key change, it is a wrong note in every bar of it.
+    const lift = (this.pattern.barKeyOffset && this.pattern.barKeyOffset.length)
+      ? (this.pattern.barKeyOffset[
+          Math.floor(step / STEPS_PER_BAR) % this.pattern.barKeyOffset.length] || 0)
+      : 0;
     const contexts = this.pattern.barChordContexts;
     if (contexts && contexts.length) {
       const barIdx = Math.floor(step / STEPS_PER_BAR) % contexts.length;
       const ctx = contexts[barIdx];
-      return scaleDegreeToMidi(ctx.rootMidi, ctx.scale, deg);
+      return scaleDegreeToMidi(ctx.rootMidi + lift, ctx.scale, deg);
     }
-    return scaleDegreeToMidi(this.rootMidi, this.style.scale, deg);
+    return scaleDegreeToMidi(this.rootMidi + lift, this.style.scale, deg);
   }
 
   scheduleStep(step, time) {

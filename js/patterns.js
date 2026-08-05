@@ -3537,6 +3537,75 @@ const MODE_DARKNESS = {
   phrygian: 0.9, phrygiandominant: 1.0,
 };
 
+// How long a chord is held, in bars.
+//
+// Every genre changed chord on every single bar - the progression was simply
+// indexed by bar number - and measured across the corpus the root changed on
+// 97% of bar boundaries. That is not a progression, it is a cycle, and it is
+// one of the clearest tells that a beat was generated rather than written.
+//
+// Harmonic rhythm is genre-defining in its own right. Trap and drill hold a
+// chord for two bars and often vamp on one shape for four; neo-soul and
+// boom-bap move every bar because the chords ARE the interest; techno can sit
+// on a single chord for a whole section. Weighted per genre and drawn per
+// generation, so the same genre gets both its common shape and its occasional
+// one.
+const HARMONIC_RHYTHM = {
+  trap:      [[2, 5], [1, 3], [4, 2]],
+  drill:     [[2, 5], [1, 3], [4, 1]],
+  rap:       [[2, 4], [1, 4], [4, 1]],
+  phonk:     [[2, 4], [4, 3], [1, 2]],
+  jerseyclub:[[2, 4], [1, 3]],
+  dubstep:   [[2, 3], [4, 4], [1, 1]],
+  techno:    [[4, 4], [2, 3], [1, 1]],
+  dnb:       [[2, 4], [1, 3]],
+  synthwave: [[2, 4], [1, 3]],
+  house:     [[2, 4], [1, 3]],
+  ukgarage:  [[2, 4], [1, 3]],
+  amapiano:  [[2, 4], [1, 3]],
+  afrobeats: [[2, 4], [1, 3]],
+  reggaeton: [[2, 4], [1, 3]],
+  // The genres where the harmony is the point move faster.
+  neosoul:   [[1, 5], [2, 2]],
+  rnb:       [[1, 4], [2, 3]],
+  hiphop:    [[1, 4], [2, 3]],
+  lofi:      [[1, 4], [2, 3]],
+  rock:      [[1, 4], [2, 3]],
+};
+// The final-chorus lift.
+//
+// A key change is the oldest trick in popular songwriting for making the last
+// chorus feel bigger than the ones before it without adding a single
+// instrument: everything simply moves up, and the ear reads the whole
+// arrangement as having gained energy. Up a semitone is the classic pop
+// version; a whole tone is the more emphatic one.
+//
+// Only in full-song mode, and only on the final chorus, because that is the
+// one place it is a device rather than a mistake. Modulating a four-bar loop
+// would just mean the loop does not loop.
+//
+// Returned as a per-bar semitone offset so it can be applied at the single
+// point every pitched note resolves through, rather than by rewriting the
+// notes - which would have to rewrite the bass, the chords and the melody
+// consistently and would go wrong the first time one of them was missed.
+function planKeyLift(barMetas) {
+  const offsets = barMetas.map(() => 0);
+  // Two songs in five get one. Always doing it makes it a formula.
+  if (Math.random() > 0.4) return offsets;
+  const lift = pickWeighted([[1, 3], [2, 2]]);
+  let lifted = 0;
+  for (let i = 0; i < barMetas.length; i++) {
+    const label = String(barMetas[i].label || "").toLowerCase();
+    if (/final chorus/.test(label) || /outro/.test(label)) { offsets[i] = lift; lifted++; }
+  }
+  return lifted ? offsets : barMetas.map(() => 0);
+}
+
+function pickHarmonicRhythm(style) {
+  const pool = HARMONIC_RHYTHM[style.id];
+  return pool ? pickWeighted(pool) : 1;
+}
+
 function pickMode(style) {
   const pool = GENRE_MODES[style.id];
   if (!pool) return style.scale;
@@ -3610,7 +3679,9 @@ function generateVariationOnce(rawStyle, bars, plan) {
     barRootDegrees = structure.map(() => 0);
     barChordContexts = buildBarContextsFromChords(customChords, structure.length);
   } else {
-    barRootDegrees = structure.map((_, i) => style.progression[i % style.progression.length]);
+    const hold = pickHarmonicRhythm(style);
+    barRootDegrees = structure.map((_, i) =>
+      style.progression[Math.floor(i / hold) % style.progression.length]);
   }
 
   const drumBars = structure.map((variant) => buildDrumBar(style, variant));
@@ -3797,12 +3868,16 @@ function generateSongVariationOnce(rawStyle, plan) {
   const bars = barMetas.length;
   const totalSteps = bars * STEPS_PER_BAR;
   const customChords = rawStyle.customChords;
+  let barKeyOffset = null;
   let barRootDegrees, barChordContexts;
   if (customChords && customChords.length) {
     barRootDegrees = barMetas.map(() => 0);
     barChordContexts = buildBarContextsFromChords(customChords, bars);
   } else {
-    barRootDegrees = barMetas.map((_, i) => style.progression[i % style.progression.length]);
+    const songHold = pickHarmonicRhythm(style);
+    barRootDegrees = barMetas.map((_, i) =>
+      style.progression[Math.floor(i / songHold) % style.progression.length]);
+    barKeyOffset = planKeyLift(barMetas);
   }
   const priorityList = priorityInstrumentList(style);
   const totalInstruments = priorityList.length;
@@ -3932,7 +4007,7 @@ function generateSongVariationOnce(rawStyle, plan) {
       else automation[inst] = [{ step: 0, value: 0.78 }];
     }
   }
-  return { instruments, structure, barRootDegrees, automation, filterAutomation, articulation: style.articulation, genStyle: style };
+  return { instruments, structure, barRootDegrees, barKeyOffset, automation, filterAutomation, articulation: style.articulation, genStyle: style };
 }
 
 // ---- Intentionality: compose several candidates, keep the best one ----

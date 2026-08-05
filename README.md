@@ -1396,3 +1396,35 @@ Thresholds are relative to the register table now rather than to numbers that us
 ### Still open
 
 Stem export, undo/version history, and the twelve missing genres (rage, pluggnb, pop, metal, jazz, EDM, country, orchestral, cinematic, funk, soul, ambient). The genres are the largest single piece: the suite requires every genre to carry at least eight reference songs and four artist profiles, and those invariants are worth keeping.
+
+## Auditing the theory engine instead of grepping for it
+
+The previous pass checked whether the program *had* each thing the brief asked for and moved on. That is not good enough in this codebase: it has now produced six separate cases where a feature existed, ran, and did nothing or the opposite of its name — a saxophone kit that was a bell, a distortion that was a sine, a velocity check that read a field which does not exist, an 808 an octave above where an 808 lives.
+
+`tools/audit-theory.js` measures **twenty claims against generated output**, never against the source. Across 95 beats and 19 genres:
+
+| | measured |
+|---|---|
+| voice leading | lowest voice moves **2.4 semitones** between chords |
+| tonic anchoring | **96%** of progressions start or end on i |
+| extended harmony | **89%** of neo-soul/R&B/house chords have 4+ notes |
+| motif restatement | **80%** of bar pairs share a rhythmic shape |
+| phrase arc | **93%** of phrases peak away from their ends |
+| scale membership | 3,683 notes, **0** outside the mode |
+| downbeat | **100%** of beats put a kick on 1 |
+| bass/kick lock | **68%** of bass notes land on or beside a kick |
+| song sections | intro/verse/chorus/bridge/outro in **4 of 4** genres, chorus denser than verse in all 4 |
+
+### The one thing it caught
+
+Inside a check that passed, a number that should not have: **the chord root changed on 97% of bar boundaries.** Every genre was indexing its progression by bar number, so a chord was never held. That is a cycle rather than a progression, and it is one of the clearest tells that a beat was generated rather than written.
+
+Harmonic rhythm is genre-defining in its own right — trap and drill hold a chord for two bars and often vamp on one shape for four, neo-soul and boom-bap move every bar because the chords *are* the interest, techno can sit on one chord for a whole section. `HARMONIC_RHYTHM` gives each genre a weighted hold length drawn per generation. **97% → 53%.**
+
+### Key modulation
+
+Genuinely absent, and named in the brief. The final-chorus lift is the oldest device in popular songwriting for making the last chorus feel bigger without adding a single instrument — everything moves up and the ear reads the whole arrangement as having gained energy.
+
+Applied in `midiForDegree`, because that is the single funnel every pitched note in the program passes through. Anywhere else would modulate some parts and not others, which is not a key change — it is a wrong note in every bar of it. Returned as a per-bar semitone offset rather than by rewriting notes, which would have to rewrite bass, chords and melody consistently and would go wrong the first time one was missed.
+
+Full-song mode only, on the final chorus and outro only, in about two songs in five — a device, not a formula. Measured: **0 bars lifted anywhere else.**

@@ -3997,3 +3997,183 @@ generatePattern = function () {
 for (const t of document.querySelectorAll('.tools-tab[data-tool="plan"]')) {
   t.addEventListener("click", renderProductionPlan);
 }
+
+// ===========================================================================
+// Top 10 — the best beats this program can find
+// ===========================================================================
+// The Score tab answers "how good is the beat in front of me". This answers
+// the more useful question: "out of a run of them, which were the good ones,
+// and can I have that one back."
+//
+// Every entry keeps everything needed to reconstitute the beat that scored -
+// the pattern, the kits, the key, the tempo, the mode the generator drew.
+// A leaderboard you cannot load from is a list of numbers about music you can
+// no longer hear, which is worse than useless.
+
+const top10Panel = document.getElementById("top10-panel");
+const top10Run = document.getElementById("top10-run");
+const top10Count = document.getElementById("top10-count");
+const top10Scope = document.getElementById("top10-scope");
+const top10Status = document.getElementById("top10-status");
+
+let top10Entries = [];
+let top10Loaded = -1;
+let top10Busy = false;
+
+function renderTop10() {
+  if (!top10Panel) return;
+  if (!top10Entries.length) {
+    top10Panel.innerHTML = '<p class="plan-why">No run yet. “Find my best beats” generates a batch, ' +
+      'scores every one of them offline, and ranks the ten best.</p>';
+    return;
+  }
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const top = top10Entries[0].score || 1;
+  top10Panel.innerHTML = top10Entries.map((e, i) => `
+    <button class="top10-row${i === top10Loaded ? " loaded" : ""}" data-idx="${i}">
+      <span class="top10-rank">${i + 1}</span>
+      <span class="top10-score" style="color:${scoreColour(e.score)}">${e.score.toFixed(1)}</span>
+      <span class="top10-meta">
+        <b>${esc(e.genreName)} · ${esc(e.key)} ${esc(e.scale)} · ${e.tempo} BPM</b>
+        <small>${esc(e.parts)}</small>
+        <span class="top10-bar"><i style="width:${Math.max(4, (e.score / top) * 100)}%"></i></span>
+      </span>
+      <span class="top10-load">${i === top10Loaded ? "loaded" : "load ↩"}</span>
+    </button>`).join("");
+  for (const row of top10Panel.querySelectorAll(".top10-row")) {
+    row.addEventListener("click", () => loadTop10Entry(Number(row.dataset.idx)));
+  }
+}
+
+// Put a scored beat back exactly as it was.
+//
+// The order matters and is the same trap the "Your style" panel hit: selectStyle
+// resets kits, key, tempo and any shaping, so everything specific has to be
+// applied after it rather than before.
+function loadTop10Entry(idx) {
+  const e = top10Entries[idx];
+  if (!e) return;
+  selectStyle(e.styleId);
+  activeStyle = e.style;
+  currentPattern = e.pattern;
+  currentFlavors = { ...e.flavors };
+  arrangementMode = e.arrangementMode;
+  selectedBars = e.bars;
+
+  tempoSlider.value = e.tempo;
+  tempoValue.textContent = e.tempo;
+  engine.updateTempo(e.tempo);
+  populateKeySelect(e.keyFull);
+  engine.updateKey(activeStyle);
+  swingSlider.value = e.swing;
+  swingValue.textContent = e.swing;
+  engine.setSwing(e.swing / 100);
+
+  renderSectionRow();
+  renderStepGrid();
+  pushAutomationToEngine();
+  engine.updatePattern(currentPattern);
+  refreshReelDurations();
+  if (typeof renderProductionPlan === "function") renderProductionPlan();
+
+  top10Loaded = idx;
+  renderTop10();
+  collapseLauncher("genre", `#${idx + 1} · ${e.genreName}`, `scored ${e.score.toFixed(1)} / 100`);
+  top10Status.textContent = `Loaded #${idx + 1} — ${e.score.toFixed(1)}/100. Hit play.`;
+}
+
+async function runTop10() {
+  if (top10Busy) return;
+  top10Busy = true;
+  top10Run.disabled = true;
+  const n = Number(top10Count.value);
+  const genres = top10Scope.value === "all"
+    ? Object.keys(STYLES)
+    : [selectedStyleId || "trap"];
+  const scored = [];
+  let skipped = 0;
+  const started = Date.now();
+  try {
+    for (let i = 0; i < n; i++) {
+      const g = genres[i % genres.length];
+      top10Status.textContent = `Scoring ${i + 1} of ${n}…`;
+      // Yield to the browser so the status text actually paints and the tab
+      // does not lock up for the length of the run.
+      await new Promise((r) => setTimeout(r, 0));
+      selectStyle(g);
+
+      const symbolic = ratePattern(activeStyle, currentPattern);
+      engine.ensureContext();
+      engine.updatePattern(currentPattern);
+      // One beat that will not render must not take the run down with it.
+      //
+      // Each render builds an OfflineAudioContext, and a browser will only
+      // hand out so many before it starts refusing or stalling - so a long
+      // session that has already scored and re-scored can reach the point
+      // where a render never resolves. Left unguarded that is not a slow run,
+      // it is a hang with a spinner: the loop simply waits forever on a
+      // promise that has no reason to settle.
+      let buffer = null;
+      try {
+        buffer = await Promise.race([
+          engine.renderOffline({ loops: 2 }),
+          new Promise((r) => setTimeout(() => r(null), 15000)),
+        ]);
+      } catch (_) { buffer = null; }
+      if (!buffer) { skipped++; continue; }
+      const chans = [];
+      for (let c = 0; c < buffer.numberOfChannels; c++) chans.push(buffer.getChannelData(c));
+      const acoustic = rateAudio(chans, buffer.sampleRate, {
+        genre: activeStyle.id || activeStyle.genre,
+        mastered: false,
+        isLoop: arrangementMode !== "song",
+      });
+      const combined = combineRatings(symbolic, acoustic);
+
+      const gs = currentPattern.genStyle || activeStyle;
+      const played = Object.keys(currentPattern.instruments).filter((k) =>
+        Array.isArray(currentPattern.instruments[k]) && currentPattern.instruments[k].some(Boolean));
+      scored.push({
+        score: combined.score,
+        styleId: g,
+        genreName: STYLES[g].name,
+        key: keySelect.value,
+        keyFull: keySelect.value + (keySelect.dataset.octave || "2"),
+        scale: gs.scale || activeStyle.scale,
+        tempo: Number(tempoSlider.value),
+        swing: Number(swingSlider.value),
+        bars: selectedBars,
+        arrangementMode,
+        parts: played.filter((p) => !["kick", "snare", "hihat", "openhat", "crash", "perc", "tom", "fx"]
+          .includes(p)).map((p) => TRACK_LABELS[p] || p).join(", "),
+        // Deep-copied on purpose. These are the live objects the generator and
+        // the app keep mutating, so storing them by reference would leave the
+        // whole leaderboard pointing at whatever the last beat happened to be.
+        pattern: JSON.parse(JSON.stringify(currentPattern)),
+        style: JSON.parse(JSON.stringify(activeStyle)),
+        flavors: { ...currentFlavors },
+      });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    top10Entries = scored.slice(0, 10);
+    top10Loaded = -1;
+    renderTop10();
+    const best = top10Entries[0];
+    const mean = scored.reduce((a, b) => a + b.score, 0) / (scored.length || 1);
+    top10Status.textContent = scored.length
+      ? `${scored.length} beats in ${((Date.now() - started) / 1000).toFixed(0)}s — ` +
+        `best ${best.score.toFixed(1)}, average ${mean.toFixed(1)}. Click a row to load it.` +
+        (skipped ? ` (${skipped} could not be rendered and were skipped.)` : "")
+      : "Nothing could be rendered — try reloading the page.";
+  } catch (err) {
+    top10Status.textContent = `Run failed: ${String(err.message || err).slice(0, 120)}`;
+  }
+  top10Run.disabled = false;
+  top10Busy = false;
+}
+
+if (top10Run) {
+  top10Run.addEventListener("click", runTop10);
+  renderTop10();
+}

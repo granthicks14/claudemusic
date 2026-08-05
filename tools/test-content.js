@@ -332,6 +332,62 @@ if (thinSongs.length) {
     }
   }
 
+  // Melodies have to move like melodies.
+  //
+  // Measured, note-to-note motion was 30% steps against 30% thirds. Sung
+  // melody runs the other way round - roughly 50-65% steps against 20%
+  // thirds - and the cause was structural: a chord-tone note drew from
+  // [0,2,4,7], root/third/fifth/octave, which contains no step at all, so the
+  // closest thing to stepwise motion available was a third and every line
+  // outlined its chord instead of singing over it.
+  //
+  // Guarded as a distribution rather than a rule per note, because the fault
+  // was never any single note - each one was individually legal.
+  console.log("\n  Melodic movement");
+  {
+    const SKIP = new Set(["kick", "snare", "hihat", "openhat", "crash", "perc", "tom",
+                          "fx", "bass", "pad", "stab", "strings", "horn", "organ",
+                          "vocal", "piano", "guitar"]);
+    const c = { rep: 0, step: 0, third: 0, mid: 0, leap: 0, n: 0 };
+    for (const g of Object.keys(STYLES)) {
+      for (let k = 0; k < 4; k++) {
+        setBeatComplexity(5);
+        const v = generateVariation(STYLES[g], 4);
+        for (const [inst, arr] of Object.entries(v.instruments)) {
+          if (SKIP.has(inst) || !Array.isArray(arr)) continue;
+          let prev = null;
+          for (const x of arr) {
+            if (!x || x.degree === undefined) continue;
+            if (prev !== null) {
+              const d = Math.abs(x.degree - prev);
+              c.n++;
+              if (d === 0) c.rep++;
+              else if (d === 1) c.step++;
+              else if (d === 2) c.third++;
+              else if (d <= 4) c.mid++;
+              else c.leap++;
+            }
+            prev = x.degree;
+          }
+        }
+      }
+    }
+    const pct = (x) => (c.n ? x / c.n : 0);
+    const bad = [];
+    if (pct(c.step) < 0.35) bad.push(`only ${Math.round(pct(c.step) * 100)}% stepwise, wanted 35%+`);
+    if (pct(c.third) > 0.28) bad.push(`${Math.round(pct(c.third) * 100)}% thirds, wanted under 28%`);
+    if (pct(c.leap) > 0.12) bad.push(`${Math.round(pct(c.leap) * 100)}% leaps of a 6th+, wanted under 12%`);
+    if (pct(c.rep) > 0.30) bad.push(`${Math.round(pct(c.rep) * 100)}% repeated notes, wanted under 30%`);
+    if (bad.length) {
+      console.log(`  FAIL  melodies do not move like melodies: ${bad.join("; ")}`);
+      failures++;
+    } else {
+      console.log(`  PASS  melodic motion is ${Math.round(pct(c.step) * 100)}% steps, ` +
+                  `${Math.round(pct(c.third) * 100)}% thirds, ${Math.round(pct(c.leap) * 100)}% wide leaps, ` +
+                  `${Math.round(pct(c.rep) * 100)}% repeats`);
+    }
+  }
+
   console.log("  PASS  every genre has at least 8 reference songs");
 }
 

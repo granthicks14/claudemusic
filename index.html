@@ -232,6 +232,7 @@
         <div class="tools-tabs" role="tablist" aria-label="Tools">
           <button class="tools-tab selected" role="tab" data-tool="score">Score</button>
           <button class="tools-tab" role="tab" data-tool="plan">Production plan</button>
+          <button class="tools-tab" role="tab" data-tool="top10">Top 10</button>
           <button class="tools-tab" role="tab" data-tool="taste">Your taste</button>
           <button class="tools-tab" role="tab" data-tool="chords">Chords</button>
           <button class="tools-tab" role="tab" data-tool="sound">Feel &amp; mix</button>
@@ -240,6 +241,28 @@
         </div>
 
         <div class="tools-body">
+          <div class="tools-panel" role="tabpanel" data-tool-panel="top10" hidden>
+            <div class="tools-row">
+              <button id="top10-run" class="transport-btn play">Find my best beats</button>
+              <label class="transport-field">Beats to try
+                <select id="top10-count">
+                  <option value="20">20</option>
+                  <option value="40" selected>40</option>
+                  <option value="80">80</option>
+                </select>
+              </label>
+              <label class="transport-field">From
+                <select id="top10-scope">
+                  <option value="current">this genre</option>
+                  <option value="all">every genre</option>
+                </select>
+              </label>
+              <span id="top10-status" class="taste-status"></span>
+            </div>
+            <p class="tools-hint">Generates a run of beats, renders every one of them offline, scores it with the same equation the Score tab uses, and keeps the ten best. Click any row to load that exact beat back — the pattern, the kits, the key and the tempo it scored with.</p>
+            <div id="top10-panel" class="top10-panel"></div>
+          </div>
+
           <div class="tools-panel" role="tabpanel" data-tool-panel="plan" hidden>
             <p class="tools-hint">What this beat is, and why every part of it is what it is. Read off the arrangement that was actually generated — the chord numerals are the roots the generator used, the instrument list is what is really playing, and the checks are the ones a candidate had to pass before it was allowed to become this beat.</p>
             <div id="plan-panel" class="plan-panel"></div>

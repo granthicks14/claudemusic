@@ -338,7 +338,66 @@ const path = require("path");
     label.hat === "Bright" && label.talkbox === "Bright Talkbox" && label.clarinet === "Clarinet",
     `hi-hat "${label.hat}", talkbox "${label.talkbox}", clarinet "${label.clarinet}"`);
 
-  console.log("\n9. No page errors");
+  console.log("\n9. Top 10");
+  // On its own page. The run builds an OfflineAudioContext per beat, and by
+  // this point the shared page has already built a good many for the score
+  // panel and the sample editor - enough that a render can stop resolving.
+  // That is a real limit worth knowing about, and runTop10 now skips a beat
+  // whose render does not come back rather than hanging on it, but a feature
+  // test should exercise the feature rather than the browser's ceiling.
+  const page2 = await browser.newPage();
+  page2.on("pageerror", (e) => errors.push(String(e)));
+  page2.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
+  await page2.goto("file://" + path.join(__dirname, "..", "index.html"));
+  await page2.waitForTimeout(400);
+  await page2.evaluate(() => selectStyle("trap"));
+  await page2.waitForTimeout(400);
+  // A leaderboard you cannot load from is a list of numbers about music you
+  // can no longer hear, so the test checks the loading as well as the ranking.
+  await page2.click('.tools-tab[data-tool="top10"]');
+  await page2.selectOption("#top10-count", "20");
+  await page2.selectOption("#top10-scope", "all");
+  await page2.click("#top10-run");
+  // waitForFunction takes (fn, arg, options) - passing the options object as
+  // the second argument makes it the ARGUMENT, and the default 30s timeout
+  // applies instead, which is shorter than the run.
+  await page2.waitForFunction(
+    () => document.querySelectorAll(".top10-row").length > 0
+       || /failed|Nothing/.test(document.getElementById("top10-status").textContent),
+    null, { timeout: 240000 });
+  const board = await page2.evaluate(() => ({
+    rows: document.querySelectorAll(".top10-row").length,
+    scores: top10Entries.map((e) => e.score),
+    status: document.getElementById("top10-status").textContent,
+  }));
+  check("a leaderboard came back", board.rows >= 5 && board.rows <= 10, `${board.rows} rows`);
+  check("it is sorted best-first",
+    JSON.stringify(board.scores) === JSON.stringify([...board.scores].sort((a, b) => b - a)),
+    board.scores.map((s) => s.toFixed(1)).join(" > "));
+  check("every entry scored in range",
+    board.scores.every((s) => s > 0 && s <= 100), board.scores.length + " entries");
+
+  // Clicking a row must give back the beat that scored, not a fresh one.
+  await page2.click(".top10-row");
+  await page2.waitForTimeout(700);
+  const restored = await page2.evaluate(() => {
+    const e = top10Entries[0];
+    return {
+      exact: e.styleId === selectedStyleId
+          && e.tempo === Number(tempoSlider.value)
+          && e.key === keySelect.value,
+      tracks: Object.keys(currentPattern.instruments).filter((k) =>
+        Array.isArray(currentPattern.instruments[k])
+        && currentPattern.instruments[k].some(Boolean)).length,
+      status: document.getElementById("top10-status").textContent,
+    };
+  });
+  check("clicking a row restores that exact beat", restored.exact && restored.tracks > 3,
+    restored.status);
+
+  await page2.close();
+
+  console.log("\n10. No page errors");
   check("no uncaught errors", errors.length === 0, errors.slice(0, 3).join(" | "));
 
   await browser.close();

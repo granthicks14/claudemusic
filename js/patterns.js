@@ -470,8 +470,15 @@ function pickNextDegree(prevOffset, lastLeapDirection, candidates, arcTarget, re
     // note-to-note motion in corpus studies); coefficients tuned so
     // random tie-breaking can still let a leap win a meaningful share of
     // the time instead of steps mechanically sweeping every choice.
-    let score = -dist * 0.55;
-    if (dist === 0) score -= 0.4; // some motion is more interesting than none
+    // Proximity, and it has to actually bite. At -0.55 per degree a third
+    // costs 1.1 while the randomiser below spans 1.6, so the tie-breaker was
+    // outvoting the principle it was meant to only break ties in.
+    let score = -dist * 0.95;
+    // Some motion is more interesting than none. Raised from 0.4 once
+    // neighbour tones existed: with a step finally available at every
+    // choice, a repeat that merely ties with it should lose, or the melody
+    // trades arpeggios for a drone and neither is a tune.
+    if (dist === 0) score -= 0.95;
     // Repeated notes are a legitimate hook device (a trap 808 line
     // hammering its root is authentic), but past a few repeats a line
     // reads as a drone rather than a phrase - so the penalty *scales*
@@ -486,7 +493,7 @@ function pickNextDegree(prevOffset, lastLeapDirection, candidates, arcTarget, re
     }
     score -= Math.abs(c - arcTarget) * 0.18; // gentle pull toward the phrase's overall arc
     score += (weight || 1) * 0.25; // still honors each genre's authored chord-tone preferences
-    score += Math.random() * 1.6; // keeps it from being fully deterministic
+    score += Math.random() * 1.05; // keeps it from being fully deterministic
     if (score > bestScore) {
       bestScore = score;
       best = c;
@@ -546,6 +553,37 @@ function generateMotif(lengthSteps, params, feel = "authored") {
       const rawPool = (useChordTone ? params.chordTonePool : params.passingTonePool) || [];
       const candidates = rawPool.map(([value, weight]) => ({ value, weight }));
       if (!candidates.some((c) => c.value === 0)) candidates.push({ value: 0, weight: 0.5 });
+
+      // Neighbour tones - the reason melodies here arpeggiated instead of
+      // singing.
+      //
+      // Measured across all 19 genres, note-to-note motion was 30% steps and
+      // 30% thirds. Sung melody runs the other way round: roughly 50-65%
+      // steps against 20% thirds. The cause is structural rather than a
+      // weighting problem. A chord-tone note - and 78-90% of notes are chord
+      // tones - draws from [0, 2, 4, 7]: root, third, fifth, octave. There is
+      // no step anywhere in that set, so the nearest thing to stepwise motion
+      // available is a third, and a line built from it outlines the chord
+      // rather than writing a tune over it.
+      //
+      // What real writing does is put chord tones on the strong beats and
+      // CONNECT them with the scale steps in between - passing tones and
+      // neighbour tones, the first thing any counterpoint text teaches. So
+      // the degree either side of the previous note is always on the table.
+      // It is always in the scale, because these are scale degrees, and it
+      // costs nothing when a leap is the better idea: these are candidates,
+      // not instructions.
+      //
+      // Weighted below the authored pool on strong beats, where the chord
+      // tone should still usually win, and above it on weak beats, which is
+      // exactly where a passing tone belongs.
+      const neighbourWeight = isStrongBeat ? 1.1 : 2.4;
+      for (const step of [-1, 1]) {
+        const v = prevOffset + step;
+        if (!candidates.some((c) => c.value === v)) {
+          candidates.push({ value: v, weight: neighbourWeight });
+        }
+      }
 
       const arcTarget = Math.sin((pos / lengthSteps) * Math.PI) * 3;
       const next = pickNextDegree(prevOffset, lastLeapDirection, candidates, arcTarget, repeatStreak);

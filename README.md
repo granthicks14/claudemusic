@@ -1319,3 +1319,36 @@ The pentatonic nudge is applied *before* the range fold rather than after, becau
 BPM ranges were checked against the stated per-genre targets and all sit inside them (trap 132–150 within 130–170, hip hop 82–96 within 80–105, drill 138–145 within 135–150, R&B 68–88 within 65–110). The 808 already follows chord roots 76–82% of the time with the fifth as its deliberate secondary. Trap already excludes marimbas, ukuleles and acoustic guitars, enforced by the genre gate.
 
 **Pop is genuinely missing** and is the one named genre the program does not have. Adding it is not a one-line change — the test suite requires every genre to carry at least eight reference songs and four artist profiles, and those invariants exist for good reasons — so it is called out here rather than half-added.
+
+## Melodies arpeggiated their chords instead of singing over them
+
+The brief asked for melodic movement to be studied and for every note to have a reason. Measured, note-to-note motion across all 19 genres was **30% steps against 30% thirds**. Sung melody runs the other way round: roughly 50–65% steps against 20% thirds. A line built mostly from thirds outlines the chord rather than writing a tune over it, and that is a large part of what "sounds like random notes" actually describes.
+
+**The cause was structural, not a weighting problem.** A chord-tone note — and 78–90% of notes are chord tones — drew its candidates from `[0, 2, 4, 7]`: root, third, fifth, octave. **There is no step anywhere in that set.** The closest thing to stepwise motion available was a third, so the melody had no choice but to arpeggiate.
+
+What real writing does is put chord tones on the strong beats and *connect them with the scale steps in between* — passing and neighbour tones, the first thing any counterpoint text teaches. The degree either side of the previous note is now always a candidate: weighted below the authored pool on strong beats where a chord tone should still usually win, and above it on weak beats, which is exactly where a passing tone belongs.
+
+Two supporting fixes fell out of it. Proximity was scored at −0.55 per degree while the randomiser spanned 1.6, so **the tie-breaker was outvoting the principle it was only meant to break ties in**. And once a step was finally available at every choice, the repeat penalty had to rise too, or the melody just traded arpeggios for a drone.
+
+| | before | after | sung melody |
+|---|---|---|---|
+| steps | 30% | **45%** | 50–65% |
+| thirds | 30% | **17%** | ~20% |
+| leaps of a 6th+ | 7% | **8%** | <10% |
+| repeats | 20% | **19%** | ~20% |
+
+Guarded as a distribution rather than a rule per note, because the fault was never any single note — each one was individually legal.
+
+## Top 10
+
+The Score tab answers "how good is the beat in front of me". This answers the more useful question: **out of a run of them, which were the good ones, and can I have that one back.**
+
+It generates a batch (20/40/80, from the current genre or across all nineteen), renders every one offline, scores it with the same combined equation the Score tab uses, and ranks the ten best. Each row shows the score, genre, key and mode, tempo and the parts that played — and clicking it reconstitutes that exact beat: the pattern, the kits, the key, the tempo, the mode the generator drew.
+
+Everything is deep-copied into the entry. These are the live objects the generator and the app keep mutating, so storing them by reference would leave the whole leaderboard pointing at whatever the last beat happened to be. A leaderboard you cannot load from is a list of numbers about music you can no longer hear.
+
+### A real limit it exposed
+
+Each render builds an `OfflineAudioContext`, and a browser only hands out so many before it starts refusing or stalling. In a session that had already scored and re-scored, a render would simply never resolve — and unguarded that is not a slow run, it is **a hang with a spinner**, because the loop waits forever on a promise with no reason to settle. Renders are now raced against a timeout and a beat that will not come back is skipped and reported, rather than taking the run down with it.
+
+Caught because the test suite runs its sections on one shared page, and the Top 10 section timed out there while passing in 13 seconds on its own.

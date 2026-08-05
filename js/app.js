@@ -3102,3 +3102,254 @@ function expandLauncher() {
   launcherSummary.hidden = true;
 }
 if (launcherExpand) launcherExpand.addEventListener("click", expandLauncher);
+
+// ---------------------------------------------------------------------------
+// The sample bank
+// ---------------------------------------------------------------------------
+// Load audio, slice it, and make it available as a kit on any track. A sample
+// is offered through the same flavor mechanism as every synthesized kit, so
+// nothing else in the program needs to know it exists.
+const sampleFilesInput = document.getElementById("sample-files");
+const sampleListEl = document.getElementById("sample-list");
+const sampleStatus = document.getElementById("sample-status");
+const sampleClearBtn = document.getElementById("sample-clear");
+
+const SAMPLE_ASSIGNABLE = ["kick", "snare", "hihat", "openhat", "tom", "perc",
+  "bass", "piano", "lead", "pad", "stab", "vocal", "kalimba", "marimba", "arp"];
+
+// Draw the waveform so a slice count means something visually rather than
+// being a number the user has to trust.
+function drawSampleWave(canvas, item) {
+  const ctx2d = canvas.getContext("2d");
+  const w = canvas.width, h = canvas.height;
+  ctx2d.clearRect(0, 0, w, h);
+  const d = item.buffer.getChannelData(0);
+  const step = Math.max(1, Math.floor(d.length / w));
+  ctx2d.fillStyle = "rgba(255,255,255,0.45)";
+  for (let x = 0; x < w; x++) {
+    let peak = 0;
+    for (let i = x * step; i < (x + 1) * step && i < d.length; i++) {
+      const v = Math.abs(d[i]);
+      if (v > peak) peak = v;
+    }
+    const bar = Math.max(1, peak * h);
+    ctx2d.fillRect(x, (h - bar) / 2, 1, bar);
+  }
+  if (item.mode === "sliced" && item.slices.length > 1) {
+    ctx2d.fillStyle = "rgba(110,231,255,0.9)";
+    for (const s of item.slices) {
+      const x = Math.floor((s.start / item.duration) * w);
+      ctx2d.fillRect(x, 0, 1, h);
+    }
+  }
+}
+
+function renderSampleList() {
+  if (!sampleListEl) return;
+  sampleListEl.innerHTML = "";
+  const items = SampleBank.list();
+  if (!items.length) {
+    sampleStatus.textContent = "";
+    return;
+  }
+  for (const item of items) {
+    const li = document.createElement("li");
+    li.className = "sample-item";
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 160; canvas.height = 34;
+    li.appendChild(canvas);
+
+    const name = document.createElement("span");
+    name.className = "sample-name";
+    name.textContent = item.name;
+    li.appendChild(name);
+
+    const meta = document.createElement("span");
+    meta.className = "sample-meta";
+    const setMeta = () => {
+      meta.textContent = `${item.duration.toFixed(2)}s`
+        + (item.mode === "sliced" ? ` · ${item.slices.length} slices` : ` · ${item.mode}`);
+    };
+    setMeta();
+    li.appendChild(meta);
+
+    const mode = document.createElement("select");
+    for (const m of ["oneshot", "sliced", "pitched"]) {
+      const o = document.createElement("option");
+      o.value = m; o.textContent = m;
+      if (item.mode === m) o.selected = true;
+      mode.appendChild(o);
+    }
+    mode.addEventListener("change", () => {
+      item.mode = mode.value;
+      // Slices are only computed when they are wanted - transient detection
+      // over a long file is not free.
+      if (item.mode === "sliced" && item.slices.length < 2) {
+        item.slices = sliceOnTransients(item.buffer);
+      }
+      setMeta();
+      drawSampleWave(canvas, item);
+    });
+    li.appendChild(mode);
+
+    const assign = document.createElement("select");
+    assign.className = "sample-assign";
+    const none = document.createElement("option");
+    none.value = ""; none.textContent = "not assigned";
+    assign.appendChild(none);
+    for (const t of SAMPLE_ASSIGNABLE) {
+      const o = document.createElement("option");
+      o.value = t; o.textContent = t;
+      if (currentFlavors[t] === item.flavor) o.selected = true;
+      assign.appendChild(o);
+    }
+    assign.addEventListener("change", () => {
+      // Clear this sample off any track it was previously on, so moving it
+      // does not leave it playing in two places.
+      for (const t of SAMPLE_ASSIGNABLE) {
+        if (currentFlavors[t] === item.flavor) {
+          currentFlavors[t] = (baseStyle && baseStyle.defaultFlavors && baseStyle.defaultFlavors[t]) || undefined;
+        }
+      }
+      if (assign.value) currentFlavors[assign.value] = item.flavor;
+      renderStepGrid();
+      sampleStatus.textContent = assign.value
+        ? `"${item.name}" now plays on ${assign.value}.`
+        : `"${item.name}" unassigned.`;
+    });
+    li.appendChild(assign);
+
+    const audition = document.createElement("button");
+    audition.className = "transport-btn";
+    audition.textContent = "▶";
+    audition.title = "Hear it";
+    audition.addEventListener("click", () => {
+      engine.ensureContext();
+      engine.playSampleFlavor("perc", item.flavor, engine.ctx.currentTime + 0.02, 0.9, 440, 1.5, 0);
+    });
+    li.appendChild(audition);
+
+    const del = document.createElement("button");
+    del.className = "transport-btn";
+    del.textContent = "✕";
+    del.title = "Remove";
+    del.addEventListener("click", () => {
+      for (const t of SAMPLE_ASSIGNABLE) {
+        if (currentFlavors[t] === item.flavor) {
+          currentFlavors[t] = (baseStyle && baseStyle.defaultFlavors && baseStyle.defaultFlavors[t]) || undefined;
+        }
+      }
+      SampleBank.remove(item.id);
+      renderSampleList();
+      renderStepGrid();
+    });
+    li.appendChild(del);
+
+    sampleListEl.appendChild(li);
+    drawSampleWave(canvas, item);
+  }
+}
+
+if (sampleFilesInput) {
+  sampleFilesInput.addEventListener("change", async () => {
+    const files = Array.from(sampleFilesInput.files || []);
+    if (!files.length) return;
+    engine.ensureContext();
+    let loaded = 0;
+    for (const f of files) {
+      sampleStatus.textContent = `Decoding ${f.name}…`;
+      try {
+        const bytes = await f.arrayBuffer();
+        const buffer = await engine.ctx.decodeAudioData(bytes);
+        // Level-match on load, so a quiet recording and a loud one sit
+        // together without hand-adjusting every track gain.
+        normaliseBuffer(buffer);
+        const slices = buffer.duration >= 1.2 ? sliceOnTransients(buffer) : [{ start: 0, end: buffer.duration }];
+        SampleBank.add(f.name, buffer, { slices, mode: guessMode(buffer, slices.length) });
+        loaded++;
+      } catch (err) {
+        sampleStatus.textContent = `Could not decode ${f.name}: ${String(err.message || err).slice(0, 80)}`;
+      }
+    }
+    renderSampleList();
+    if (loaded) {
+      sampleStatus.textContent = `${loaded} sample${loaded === 1 ? "" : "s"} loaded — pick a track to put one on.`;
+    }
+    sampleFilesInput.value = "";
+  });
+}
+
+if (sampleClearBtn) {
+  sampleClearBtn.addEventListener("click", () => {
+    for (const item of SampleBank.list()) {
+      for (const t of SAMPLE_ASSIGNABLE) {
+        if (currentFlavors[t] === item.flavor) {
+          currentFlavors[t] = (baseStyle && baseStyle.defaultFlavors && baseStyle.defaultFlavors[t]) || undefined;
+        }
+      }
+    }
+    SampleBank.clear();
+    renderSampleList();
+    renderStepGrid();
+    sampleStatus.textContent = "All samples removed.";
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The measured-best kit combination
+// ---------------------------------------------------------------------------
+// tools/research-kits.js renders thousands of random kit combinations and
+// scores each with the rating engine. This loads the winner for the current
+// genre. It is a starting point known not to be muddy - not a claim about
+// beauty, which is not something the rating equation measures.
+const bestKitsBtn = document.getElementById("best-kits-btn");
+const bestKitsStatus = document.getElementById("best-kits-status");
+
+// The presets live in a JSON file the research tool writes, fetched rather
+// than inlined so re-running the research does not mean editing source.
+// Over file:// a fetch of a local JSON is blocked by CORS in some browsers,
+// so a failure here is not an error worth shouting about - the button simply
+// reports that the data is not loaded.
+let kitPresetsReady = null;
+async function ensureKitPresets() {
+  if (kitPresetsReady !== null) return kitPresetsReady;
+  try {
+    const res = await fetch("tools/kit-presets.json");
+    if (!res.ok) throw new Error(String(res.status));
+    kitPresetsReady = loadKitPresets(await res.json()) > 0;
+  } catch (e) {
+    kitPresetsReady = false;
+  }
+  return kitPresetsReady;
+}
+
+if (bestKitsBtn) {
+  bestKitsBtn.addEventListener("click", async () => {
+    if (!activeStyle) return;
+    bestKitsStatus.textContent = "";
+    const ok = await ensureKitPresets();
+    if (!ok) {
+      bestKitsStatus.textContent =
+        "Kit research data is not loaded — run `node tools/research-kits.js`, or serve the page over http rather than file://.";
+      return;
+    }
+    const kits = bestKitsFor(selectedStyleId);
+    if (!kits) {
+      bestKitsStatus.textContent = `No measured combination for ${selectedStyleId} yet.`;
+      return;
+    }
+    let applied = 0;
+    for (const [track, flavor] of Object.entries(kits)) {
+      if (FLAVOR_POOLS[track] && FLAVOR_POOLS[track].includes(flavor)) {
+        currentFlavors[track] = flavor;
+        applied++;
+      }
+    }
+    generatePattern();
+    renderStepGrid();
+    const meta = KIT_PRESET_META;
+    bestKitsStatus.textContent = `${applied} kits loaded — scored ${KIT_PRESETS[selectedStyleId].score}`
+      + (meta.samplesPerGenre ? ` out of ${meta.samplesPerGenre} combinations tried.` : ".");
+  });
+}

@@ -1,0 +1,279 @@
+{
+ "generatedAt": "2026-08-05",
+ "samplesPerGenre": 14,
+ "presets": {
+  "hiphop": {
+   "score": 70.51,
+   "kits": {
+    "kick": "707",
+    "snare": "deepsnare",
+    "hihat": "lofi808",
+    "perc": "timpani",
+    "bass": "distorted",
+    "piano": "clav",
+    "lead": "fm",
+    "strings": "synth",
+    "stab": "supersaw-chord",
+    "organ": "flute8",
+    "horn": "lowbrass"
+   }
+  },
+  "trap": {
+   "score": 66,
+   "kits": {
+    "kick": "boombap",
+    "snare": "ghost",
+    "hihat": "606",
+    "bass": "hard808",
+    "lead": "chip",
+    "stab": "fm-chord",
+    "vocal": "ooh",
+    "fx": "riser",
+    "woodwind": "clarinet"
+   }
+  },
+  "house": {
+   "score": 78.26,
+   "kits": {
+    "kick": "acoustic",
+    "snare": "brush",
+    "hihat": "r8",
+    "perc": "cuica",
+    "bass": "sh101",
+    "piano": "dx7ep",
+    "pad": "choir",
+    "lead": "prophet",
+    "stab": "organ-chord",
+    "vocal": "ohh",
+    "fx": "impact"
+   }
+  },
+  "rock": {
+   "score": 78.14,
+   "kits": {
+    "kick": "distorted",
+    "snare": "housesnare",
+    "hihat": "dirty",
+    "bass": "upright",
+    "guitar": "mandolin",
+    "perc": "cowbell",
+    "tom": "floor",
+    "leadguitar": "sustain"
+   }
+  },
+  "reggaeton": {
+   "score": 75.15,
+   "kits": {
+    "kick": "dmx",
+    "snare": "roomsnare",
+    "hihat": "606",
+    "perc": "cr78",
+    "bass": "slap",
+    "lead": "saw",
+    "horn": "frenchhorn",
+    "stab": "saw-chord",
+    "vocal": "mmm",
+    "tom": "acoustic"
+   }
+  },
+  "lofi": {
+   "score": 70.44,
+   "kits": {
+    "kick": "606",
+    "snare": "brush",
+    "hihat": "brushhat",
+    "perc": "bongo",
+    "bass": "reese",
+    "piano": "harpsichord",
+    "pad": "juno",
+    "lead": "supersaw",
+    "strings": "cinematic",
+    "stab": "brass-chord",
+    "marimba": "xylophone",
+    "horn": "flugelhorn",
+    "woodwind": "recorder"
+   }
+  },
+  "drill": {
+   "score": 76.94,
+   "kits": {
+    "kick": "roomy",
+    "snare": "dnbsnare",
+    "hihat": "clave606",
+    "bass": "drillslide",
+    "piano": "clav",
+    "stab": "square-chord",
+    "woodwind": "duduk"
+   }
+  },
+  "afrobeats": {
+   "score": 63.26,
+   "kits": {
+    "kick": "gritty",
+    "snare": "lofisnare",
+    "hihat": "dark",
+    "perc": "tamborim",
+    "bass": "reese",
+    "guitar": "twelvestring",
+    "pad": "juno",
+    "stab": "bell-chord",
+    "organ": "gospel",
+    "marimba": "marimba",
+    "horn": "tuba",
+    "woodwind": "sopranosax"
+   }
+  },
+  "dubstep": {
+   "score": 74.71,
+   "kits": {
+    "kick": "jazzkick",
+    "snare": "layered",
+    "hihat": "halfopen",
+    "bass": "reese",
+    "stab": "fm-chord",
+    "vocal": "eee",
+    "fx": "siren",
+    "lead": "fm"
+   }
+  },
+  "rnb": {
+   "score": 71.49,
+   "kits": {
+    "kick": "tight",
+    "snare": "ghost",
+    "hihat": "analog",
+    "perc": "bongo",
+    "bass": "sub",
+    "piano": "grand",
+    "pad": "warm",
+    "sax": "breathy",
+    "strings": "cello",
+    "organ": "reedy",
+    "horn": "soft"
+   }
+  },
+  "phonk": {
+   "score": 70.36,
+   "kits": {
+    "kick": "hardstyle",
+    "snare": "brush",
+    "hihat": "lofi808",
+    "perc": "shaker",
+    "bass": "303",
+    "lead": "whistle",
+    "vocal": "oh",
+    "stab": "bell-chord",
+    "leadguitar": "overdrive"
+   }
+  },
+  "jerseyclub": {
+   "score": 67.21,
+   "kits": {
+    "kick": "house909",
+    "snare": "707",
+    "hihat": "clave606",
+    "bass": "pluck",
+    "vocal": "yeah",
+    "stab": "organ-chord",
+    "lead": "chip"
+   }
+  },
+  "dnb": {
+   "score": 68.86,
+   "kits": {
+    "kick": "tight",
+    "snare": "rimshot",
+    "hihat": "foot",
+    "bass": "pluck",
+    "pad": "sweep",
+    "stab": "square-chord",
+    "arp": "arp"
+   }
+  },
+  "synthwave": {
+   "score": 85.4,
+   "kits": {
+    "kick": "boombap",
+    "snare": "lofisnare",
+    "hihat": "tape",
+    "bass": "sh101",
+    "lead": "chip",
+    "pad": "jupiter8",
+    "stab": "saw-chord",
+    "arp": "arp"
+   }
+  },
+  "rap": {
+   "score": 72.09,
+   "kits": {
+    "kick": "trapkick",
+    "snare": "lofisnare",
+    "hihat": "ride",
+    "bass": "distorted",
+    "autolead": "moody",
+    "vocal": "vocoder",
+    "stab": "pluck-chord",
+    "fx": "riser"
+   }
+  },
+  "amapiano": {
+   "score": 73.72,
+   "kits": {
+    "kick": "linn",
+    "snare": "crack",
+    "hihat": "washy",
+    "perc": "tambourine",
+    "bass": "true808",
+    "piano": "electric",
+    "pad": "choir",
+    "vocal": "ohh",
+    "stab": "string-chord",
+    "woodwind": "oboe"
+   }
+  },
+  "ukgarage": {
+   "score": 73.26,
+   "kits": {
+    "kick": "sp1200",
+    "snare": "dnbsnare",
+    "hihat": "bright",
+    "perc": "woodblock",
+    "bass": "m1organbass",
+    "lead": "chip",
+    "organ": "bright16",
+    "vocal": "oh",
+    "stab": "vox-chord"
+   }
+  },
+  "techno": {
+   "score": 70.36,
+   "kits": {
+    "kick": "909",
+    "snare": "drillsnare",
+    "hihat": "909",
+    "perc": "talkingdrum",
+    "bass": "distorted",
+    "pad": "strings2",
+    "stab": "pluck-chord",
+    "arp": "pulse",
+    "fx": "riser"
+   }
+  },
+  "neosoul": {
+   "score": 70.72,
+   "kits": {
+    "kick": "606",
+    "snare": "snap",
+    "hihat": "metallic",
+    "perc": "shekere",
+    "bass": "upright",
+    "piano": "dx7ep",
+    "pad": "warm",
+    "guitar": "jazz",
+    "organ": "bright16",
+    "vocal": "vocoder",
+    "leadguitar": "wah"
+   }
+  }
+ }
+}

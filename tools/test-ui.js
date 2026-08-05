@@ -137,7 +137,7 @@ const path = require("path");
   const toolPanels = await page.$$eval("[data-tool-panel]", (ps) =>
     ps.filter((p) => !p.hidden).map((p) => p.dataset.toolPanel));
   check("one tools panel at a time", toolPanels.length === 1, toolPanels.join(","));
-  for (const t of ["taste", "chords", "sound", "export"]) {
+  for (const t of ["taste", "chords", "sound", "samples", "export"]) {
     await page.click(`.tools-tab[data-tool="${t}"]`);
     const shown = await page.$$eval("[data-tool-panel]", (ps) =>
       ps.filter((p) => !p.hidden).map((p) => p.dataset.toolPanel));
@@ -159,7 +159,36 @@ const path = require("path");
   check("space does not play while typing in a field",
     (await page.evaluate(() => engine.isPlaying)) === false);
 
-  console.log("\n6. No page errors");
+  console.log("\n6. The samples tab");
+  await page.click('.tools-tab[data-tool="samples"]');
+  const hasInput = await page.isVisible("#sample-files");
+  check("the sample loader is present", hasInput);
+  // Load a generated sample straight into the bank and assign it, which is
+  // the whole path the UI drives.
+  const sampleWired = await page.evaluate(async () => {
+    const SR = 44100;
+    const c = new OfflineAudioContext(1, SR, SR);
+    const b = c.createBuffer(1, Math.floor(SR * 0.4), SR);
+    const d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) {
+      d[i] = Math.exp(-(i / SR) * 9) * Math.sin(2 * Math.PI * 180 * (i / SR)) * 0.7;
+    }
+    const item = SampleBank.add("ui-test.wav", b, {});
+    renderSampleList();
+    const rows = document.querySelectorAll("#sample-list .sample-item").length;
+    currentFlavors.kick = item.flavor;
+    // And it must survive into a real render.
+    engine.ensureContext();
+    const before = currentFlavors.kick;
+    SampleBank.clear();
+    renderSampleList();
+    return { rows, assigned: before === item.flavor, clearedRows: document.querySelectorAll("#sample-list .sample-item").length };
+  });
+  check("a loaded sample appears in the list", sampleWired.rows === 1, `${sampleWired.rows} rows`);
+  check("it can be assigned to a track", sampleWired.assigned);
+  check("clearing empties the list", sampleWired.clearedRows === 0, `${sampleWired.clearedRows} rows`);
+
+  console.log("\n7. No page errors");
   check("no uncaught errors", errors.length === 0, errors.slice(0, 3).join(" | "));
 
   await browser.close();

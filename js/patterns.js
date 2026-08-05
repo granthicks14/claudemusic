@@ -3,23 +3,23 @@ const STEPS_PER_BAR = 16;
 const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14, arp: 18, autolead: 14, sax: 14, woodwind: 17, leadguitar: 14, talkbox: 14 };
 
 const FLAVOR_POOLS = {
-  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "909", "linn", "707", "606", "dmx", "sp1200", "lm1", "rz1", "hr16", "r8", "drumulator", "drumtraks", "rx5", "cr8000", "kr55", "dr110", "mpc60"],
-  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn", "707", "dmx", "sp1200", "rimclick", "gatedverb", "lm1", "rz1", "hr16", "r8", "drumulator", "drumtraks", "rx5", "cr8000", "kr55", "dr110", "mpc60"],
-  hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909", "707", "606", "ride", "lm1", "rz1", "r8", "drumulator", "rx5", "cr8000", "kr55", "dr110", "mpc60"],
+  kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "knock", "thump", "distorted", "tight", "woofer", "vinyl", "house909", "trapkick", "jazzkick", "breakkick", "softkick", "hardstyle", "909", "linn", "707", "606", "dmx", "sp1200", "lm1", "rz1", "hr16", "r8", "drumulator", "drumtraks", "rx5", "cr8000", "kr55", "dr110", "mpc60"],
+  snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn", "707", "dmx", "sp1200", "rimclick", "gatedverb", "lm1", "rz1", "hr16", "r8", "drumulator", "drumtraks", "rx5", "cr8000", "kr55", "dr110", "mpc60", "piccolo", "deepsnare", "crack", "roomsnare", "snap", "thicksnare", "brushswirl", "sidestick", "drillsnare", "housesnare", "dnbsnare", "lofisnare"],
+  hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909", "707", "606", "ride", "lm1", "rz1", "r8", "drumulator", "rx5", "cr8000", "kr55", "dr110", "mpc60", "trapclosed", "washy", "foot", "tick", "halfopen", "brushhat", "glassy", "dirty", "clave606", "shimmer"],
   perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78", "talkingdrum", "woodblock", "tabla", "cabasa", "guiro", "agogo", "vibraslap", "cajon", "djembe", "timbale", "shekere", "ganza", "caxixi", "udu", "pandeiro", "tamborim", "repinique", "surdo", "bata", "cuica"],
   tom: ["acoustic", "simmons", "roto", "taiko", "808tom", "floor", "gatedtom"],
   bass: ["warm", "synth", "808", "true808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog", "303", "slap", "sh101", "fretless", "m1organbass"],
   piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord", "dx7ep", "clav", "m1piano", "cp70", "honkytonk", "felt", "tack", "jazzgrand"],
   lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm", "whistle", "theremin", "panflute", "harmonica", "ocarina", "hoover", "ms20", "d50", "prophet", "obxa", "phasedist"],
-  pad: ["warm", "ensemble", "airy", "glass", "choir", "dark", "juno", "solina", "cs80", "voxhumana", "jupiter8", "polysix", "ppgwave"],
-  stab: ["pluck-chord", "square-chord", "bell-chord", "brass-chord", "organ-chord", "string-chord", "orchhit"],
+  pad: ["warm", "ensemble", "airy", "glass", "choir", "dark", "juno", "solina", "cs80", "voxhumana", "jupiter8", "polysix", "ppgwave", "strings2", "brassy", "breath", "crystal", "analogwarm", "sweep"],
+  stab: ["pluck-chord", "square-chord", "bell-chord", "brass-chord", "organ-chord", "string-chord", "orchhit", "saw-chord", "supersaw-chord", "fm-chord", "sine-chord", "pluck-stab", "hoover-chord", "vox-chord", "piano-chord"],
   guitar: ["clean", "power", "muted", "nylon", "acoustic", "jazz", "funk", "twelvestring", "sitar", "banjo", "mandolin", "ukulele", "slide", "openchord", "resonator", "baritone"],
-  strings: ["soul", "orchestral", "staccato", "synth", "pizzicato", "tremolo", "mellotron", "solina", "cello", "spiccato", "harp"],
-  horn: ["brass", "soft", "muted", "sax", "trumpetstab", "section", "clarinet", "frenchhorn", "oboe", "trombone", "tuba", "flugelhorn", "piccolo"],
-  organ: ["drawbar", "gospel", "church", "combo", "farfisa", "accordion", "harmonium", "m1organ"],
-  vocal: ["ooh", "ahh", "ay", "oh", "choir", "vocoder"],
-  kalimba: ["kalimba", "musicbox", "steeldrum", "glock", "hangdrum", "balafon", "kora"],
-  marimba: ["marimba", "vibraphone", "xylophone", "tubularbell"],
+  strings: ["soul", "orchestral", "staccato", "synth", "pizzicato", "tremolo", "mellotron", "solina", "cello", "spiccato", "harp", "solocello", "chamber", "cinematic", "marcato", "sulponte"],
+  horn: ["brass", "soft", "muted", "sax", "trumpetstab", "section", "clarinet", "frenchhorn", "oboe", "trombone", "tuba", "flugelhorn", "piccolo", "hornsection", "solotrumpet", "mellow", "stabbrass", "lowbrass"],
+  organ: ["drawbar", "gospel", "church", "combo", "farfisa", "accordion", "harmonium", "m1organ", "jazzorgan", "fullorgan", "flute8", "reedy", "bright16"],
+  vocal: ["ooh", "ahh", "ay", "oh", "choir", "vocoder", "eee", "ohh", "mmm", "aww", "yeah"],
+  kalimba: ["kalimba", "musicbox", "steeldrum", "glock", "hangdrum", "balafon", "kora", "thumbpiano", "mbira", "handpan", "gamelan", "musicboxhi"],
+  marimba: ["marimba", "vibraphone", "xylophone", "tubularbell", "bassmarimba", "crotales", "glassbar", "tonguedrum", "celestebar"],
   arp: ["arp", "pulse", "trance", "acid", "harp", "bellarp"],
   // A real mono hook instrument for the "Auto-Tune hook" modern rap/trap
   // production leans on - distinct from the existing "vocal" chordal
@@ -29,7 +29,7 @@ const FLAVOR_POOLS = {
   autolead: ["hard", "moody", "bright", "wide", "gritty"],
   // A real mono solo-line instrument - saxophone melodies are played one
   // note at a time, a different musical role from Horn's chord stabs.
-  sax: ["smooth", "breathy", "alto", "bari"],
+  sax: ["smooth", "breathy", "alto", "bari", "tenor", "soprano", "basssax", "subtone"],
   // The rest of the woodwind family - the sax's siblings. Every one of
   // these is a single-line solo instrument, and the family splits on one
   // acoustic fact (see playWoodwindVoice): a CONICAL bore (sax, oboe,

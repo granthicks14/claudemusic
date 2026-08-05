@@ -1139,3 +1139,20 @@ a.transport-btn { text-decoration: none; display: inline-flex; align-items: cent
 .summary-text small { display: block; font-weight: 400; opacity: 0.6; font-size: 0.82em; }
 .launcher.collapsed .launcher-tabs,
 .launcher.collapsed .launcher-body { display: none; }
+
+/* --- Sample bank ---------------------------------------------------------- */
+.sample-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+.sample-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line, #2a2f3a);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+}
+.sample-name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; }
+.sample-meta { opacity: 0.6; font-size: 0.85em; white-space: nowrap; }
+.sample-item canvas { border-radius: 5px; background: rgba(0, 0, 0, 0.3); flex: 0 0 auto; }
+.sample-item select, .sample-item button { font: inherit; font-size: 0.86em; }
+.sample-assign { min-width: 108px; }

@@ -19,6 +19,10 @@ const candidates = [
     : [],
 ];
 
+// Optional track names on the command line let the run be split up; with
+// none, everything is checked.
+const ONLY = process.argv.slice(2);
+
 (async () => {
   let failures = 0;
   const check = (name, ok, detail) => {
@@ -38,7 +42,8 @@ const candidates = [
 
   // Render one hit of a single voice in isolation, offline, and report its
   // energy plus a coarse spectral shape so two kits can be compared.
-  const results = await page.evaluate(async () => {
+  const results = await page.evaluate(async ({ ONLY_TRACKS, RENDER_SEC }) => {
+    const SR_TEST = 22050;   // half rate: this compares sounds, it does not master them
     const out = [];
     const VOICES = {
       tom: (e, t, v, f) => e.playTom(t, v, f),
@@ -62,18 +67,24 @@ const candidates = [
       talkbox: (e, t, v, f) => e.playTalkboxVoice(t, 262, 0.6, v, f),
       vocal: (e, t, v, f) => e.playVocalVoice(t, 330, 0.6, v, f),
       organ: (e, t, v, f) => e.playOrganVoice(t, 262, 0.6, v, f),
+      strings: (e, t, v, f) => e.playStringsVoice(t, 294, 1.2, v, f),
+      horn: (e, t, v, f) => e.playHornVoice(t, 349, 0.8, v, f),
+      pad: (e, t, v, f) => e.playPadVoice(t, 262, 1.4, v, f),
+      stab: (e, t, v, f) => e.playStabVoice(t, 330, 0.4, v, f),
+      guitar: (e, t, v, f) => e.playGuitarVoice(t, 196, 0.7, v, f),
     };
     // Render each kit TWICE. Many kits randomise pitch or noise per hit, so
     // two renders of one kit already differ; the only meaningful question is
     // whether two DIFFERENT kits differ by more than that. Comparing a single
     // render of each with a fixed threshold cannot answer it.
     for (const [track, play] of Object.entries(VOICES)) {
+      if (ONLY_TRACKS.length && !ONLY_TRACKS.includes(track)) continue;
       const flavors = FLAVOR_POOLS[track] || [];
       for (const flavor of flavors) {
         const takes = [];
         let err = null;
         for (let take = 0; take < 2; take++) {
-          const off = new OfflineAudioContext(2, 44100 * 1.2, 44100);
+          const off = new OfflineAudioContext(2, SR_TEST * RENDER_SEC, SR_TEST);
           const clone = new BeatEngine();
           clone.ensureContext(off);
           try { play(clone, 0.05, 0.9, flavor); } catch (e) { err = String(e.message || e); }
@@ -88,8 +99,8 @@ const candidates = [
           // of kits as identical.
           const mono = new Float64Array(d.length);
           for (let i = 0; i < d.length; i++) mono[i] = (d[i] + d2[i]) * 0.5;
-          const EDGES = [[0, 120], [120, 500], [500, 2000], [2000, 6000], [6000, 16000]];
-          const SR = 44100, FRAMES = 10;
+          const EDGES = [[0, 120], [120, 500], [500, 2000], [2000, 8000]];
+          const SR = SR_TEST, FRAMES = 8;
           const hop = Math.floor(mono.length / FRAMES);
           const feat = [];
           for (const [lo, hi] of EDGES) {
@@ -118,7 +129,7 @@ const candidates = [
       }
     }
     return out;
-  });
+  }, { ONLY_TRACKS: ONLY, RENDER_SEC: 1.1 });
 
   console.log(`\nRendered ${results.length} kits across ${new Set(results.map((r) => r.track)).size} tracks\n`);
 

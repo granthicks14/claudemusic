@@ -376,6 +376,7 @@ class BeatEngine {
   // ---- Drums ----
 
   playKick(time, vel, flavor) {
+    if (this.playSampleFlavor("kick", flavor, time, vel)) return;
     const ctx = this.ctx;
     const presets = {
       boombap: { startFreq: 130, endFreq: 48, decay: 0.32 },
@@ -390,6 +391,24 @@ class BeatEngine {
       subkick: { startFreq: 68, endFreq: 26, decay: 0.75 },
       gritty: { startFreq: 110, endFreq: 50, decay: 0.4 },
       roomy: { startFreq: 115, endFreq: 42, decay: 0.5 },
+      // --- round 13 -------------------------------------------------------
+      // A kick is a pitch envelope plus a decay, and those two numbers are
+      // most of what separates one style's kick from another's. A long fall
+      // from high reads as "acoustic beater"; a short fall from low reads as
+      // "sub". Everything below is a real point in that space rather than a
+      // relabelling of an existing one.
+      knock: { startFreq: 190, endFreq: 85, decay: 0.13 },     // tight modern rap knock
+      thump: { startFreq: 95, endFreq: 38, decay: 0.62 },      // soft, round, long
+      distorted: { startFreq: 150, endFreq: 58, decay: 0.35 }, // hard techno, driven
+      tight: { startFreq: 165, endFreq: 74, decay: 0.11 },     // gated, very short
+      woofer: { startFreq: 72, endFreq: 29, decay: 0.9 },      // festival sub kick
+      vinyl: { startFreq: 108, endFreq: 47, decay: 0.36 },     // sampled off a record
+      house909: { startFreq: 155, endFreq: 60, decay: 0.3 },   // classic house thump
+      trapkick: { startFreq: 118, endFreq: 44, decay: 0.85 },  // long 808-adjacent tail
+      jazzkick: { startFreq: 128, endFreq: 68, decay: 0.18 },  // small, brushed bop kit
+      breakkick: { startFreq: 140, endFreq: 62, decay: 0.24 }, // funk break, mid-forward
+      softkick: { startFreq: 92, endFreq: 44, decay: 0.42 },   // lofi/bedroom, no click
+      hardstyle: { startFreq: 210, endFreq: 48, decay: 0.55 }, // huge pitched drop
       // Researched from two of the most-documented, most-imitated drum
       // machines ever built (their circuit behavior is public knowledge,
       // reverse-engineered and modeled endlessly in free/open synthesis
@@ -627,6 +646,7 @@ class BeatEngine {
   }
 
   playSnare(time, vel, flavor) {
+    if (this.playSampleFlavor("snare", flavor, time, vel)) return;
     const ctx = this.ctx;
     const presets = {
       crisp: { noiseHp: 1200, noiseDecay: 0.18, toneFreq: 190, toneDecay: 0.12 },
@@ -666,6 +686,22 @@ class BeatEngine {
       hr16: { noiseHp: 1100, noiseDecay: 0.29, toneFreq: 178, toneDecay: 0.2 },
       r8: { noiseHp: 1300, noiseDecay: 0.3, toneFreq: 190, toneDecay: 0.22 },
       drumulator: { noiseHp: 1400, noiseDecay: 0.19, toneFreq: 200, toneDecay: 0.12 },
+      // --- round 13 -------------------------------------------------------
+      // A snare is a noise burst (the wires) over a tuned burst (the head).
+      // How high the noise is filtered sets how "crisp" versus "thick" it
+      // reads; how long it rings sets how big the room sounds.
+      piccolo: { noiseHp: 2800, noiseDecay: 0.11, toneFreq: 330, toneDecay: 0.06 },
+      deepsnare: { noiseHp: 900, noiseDecay: 0.32, toneFreq: 150, toneDecay: 0.24 },
+      crack: { noiseHp: 2200, noiseDecay: 0.09, toneFreq: 290, toneDecay: 0.05 },
+      roomsnare: { noiseHp: 1000, noiseDecay: 0.45, toneFreq: 180, toneDecay: 0.3 },
+      snap: { noiseHp: 3400, noiseDecay: 0.07, toneFreq: 380, toneDecay: 0.04 },
+      thicksnare: { noiseHp: 800, noiseDecay: 0.26, toneFreq: 160, toneDecay: 0.2 },
+      brushswirl: { noiseHp: 1500, noiseDecay: 0.38, toneFreq: 210, toneDecay: 0.05 },
+      sidestick: { noiseHp: 2600, noiseDecay: 0.05, toneFreq: 420, toneDecay: 0.09 },
+      drillsnare: { noiseHp: 2900, noiseDecay: 0.12, toneFreq: 310, toneDecay: 0.06 },
+      housesnare: { noiseHp: 1800, noiseDecay: 0.17, toneFreq: 245, toneDecay: 0.1 },
+      dnbsnare: { noiseHp: 1600, noiseDecay: 0.23, toneFreq: 225, toneDecay: 0.14 },
+      lofisnare: { noiseHp: 1150, noiseDecay: 0.24, toneFreq: 195, toneDecay: 0.17 },
       drumtraks: { noiseHp: 1600, noiseDecay: 0.22, toneFreq: 215, toneDecay: 0.14 },
       rx5: { noiseHp: 1900, noiseDecay: 0.2, toneFreq: 230, toneDecay: 0.12 },
       cr8000: { noiseHp: 2100, noiseDecay: 0.11, toneFreq: 280, toneDecay: 0.07 },
@@ -815,6 +851,7 @@ class BeatEngine {
   }
 
   playHihat(time, vel, open, flavor, trackKey) {
+    if (this.playSampleFlavor(trackKey || "hihat", flavor, time, vel)) return;
     const ctx = this.ctx;
     const presets = {
       bright: { hp: 7500, lp: null },
@@ -860,6 +897,20 @@ class BeatEngine {
       // has body and length; "analog" is filtered noise from a drum machine
       // that never sampled anything, which is drier and tighter.
       mpc60: { hp: 5800, lp: 14500, peak: 7200, decay: 1.5 },
+      // --- round 13 -------------------------------------------------------
+      // Round 12 established that DECAY separates hi-hats to the ear far more
+      // than filter corners do, after two pairs shipped that were the same
+      // sound under different names. Every one of these moves both.
+      trapclosed: { hp: 8800, lp: 15000, peak: 10500, decay: 0.55 },
+      washy: { hp: 5200, lp: 12000, peak: 6800, decay: 2.1 },
+      foot: { hp: 4200, lp: 9000, decay: 0.45 },
+      tick: { hp: 11000, lp: null, decay: 0.35 },
+      halfopen: { hp: 6200, lp: 13500, peak: 8000, decay: 1.8 },
+      brushhat: { hp: 3800, lp: 8500, decay: 1.35 },
+      glassy: { hp: 9600, lp: null, peak: 12500, decay: 0.9 },
+      dirty: { hp: 4600, lp: 10500, peak: 5800, decay: 1.25 },
+      clave606: { hp: 10400, lp: 14000, decay: 0.5 },
+      shimmer: { hp: 7600, lp: null, peak: 9800, decay: 1.65 },
     };
     const base = open ? 0.32 + Math.random() * 0.1 : 0.05 + Math.random() * 0.02;
     const decay = base * ((presets[flavor] && presets[flavor].decay) || 1);
@@ -963,7 +1014,117 @@ class BeatEngine {
     }
   }
 
+
+  // A generic struck/plucked tuned voice. Almost every mallet, bell, plucked
+  // and struck instrument is the same thing with different numbers: a set of
+  // partials at particular RATIOS, each with its own level and its own decay,
+  // over an optional strike transient. Writing that once rather than fifteen
+  // times is the difference between adding an instrument and copying one.
+  playStruckVoice(time, freq, vel, dest, spec) {
+    const ctx = this.ctx;
+    const out = ctx.createGain();
+    out.gain.value = vel * (spec.gain || 0.5);
+    out.connect(dest);
+    for (const [ratio, lvl, decay] of spec.partials) {
+      const f = freq * ratio;
+      if (f > 15000 || f < 20) continue;
+      const o = ctx.createOscillator();
+      o.type = spec.type || "sine";
+      o.frequency.setValueAtTime(f, time);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(lvl, time);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + decay);
+      o.connect(g).connect(out);
+      o.start(time);
+      o.stop(time + decay + 0.05);
+    }
+    if (spec.strike) {
+      const n = ctx.createBufferSource();
+      n.buffer = this.makeNoiseBuffer(spec.strike.len);
+      const bp = ctx.createBiquadFilter();
+      bp.type = spec.strike.type || "bandpass";
+      bp.frequency.value = spec.strike.freq;
+      bp.Q.value = spec.strike.q || 1;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vel * spec.strike.level, time);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + spec.strike.len);
+      n.connect(bp).connect(g).connect(dest);
+      n.start(time);
+      n.stop(time + spec.strike.len + 0.01);
+    }
+  }
+
+
+  // -------------------------------------------------------------------------
+  // Playing a loaded sample instead of synthesizing
+  // -------------------------------------------------------------------------
+  // A sample is offered as a KIT rather than as a new kind of track: the
+  // flavor string "sample:<id>" on any track means "play this recording here".
+  // That is what makes it work everywhere flavors already work - the per-track
+  // picker, the offline render, artist profiles - instead of needing a
+  // parallel path through the whole engine.
+  //
+  // Returns true when it handled the note, so each voice can simply start
+  // with `if (this.playSampleFlavor(...)) return;`.
+  playSampleFlavor(track, flavor, time, vel, freq, durationSeconds, step) {
+    if (typeof SampleBank === "undefined") return false;
+    const item = SampleBank.resolve(flavor);
+    if (!item || !item.buffer) return false;
+    const ctx = this.ctx;
+
+    // Which slice? A sliced loop walks its slices in step order, so a chopped
+    // break re-sequences across the grid rather than replaying as one lump.
+    let slice = item.slices[0];
+    if (item.mode === "sliced" && item.slices.length > 1) {
+      // With a step number, the slice follows the position in the bar, so a
+      // chopped break re-sequences across the grid. Without one - which is
+      // every drum lane, since those voices are not given the step - walk the
+      // slices in turn instead. That is what a sampler does when a chopped
+      // loop is triggered repeatedly, and it beats playing slice 0 forever.
+      let idx;
+      if (step === undefined || step === null) {
+        item._cursor = ((item._cursor || 0) + 1) % item.slices.length;
+        idx = item._cursor;
+      } else {
+        idx = ((step | 0) % item.slices.length + item.slices.length) % item.slices.length;
+      }
+      slice = item.slices[idx];
+    }
+
+    const src = ctx.createBufferSource();
+    src.buffer = item.buffer;
+
+    // A pitched sample transposes by playback rate. Everything else plays at
+    // its recorded speed.
+    if (item.mode === "pitched" && freq) {
+      const rootFreq = 440 * Math.pow(2, (item.rootMidi - 69) / 12);
+      src.playbackRate.value = Math.max(0.06, Math.min(16, freq / rootFreq));
+    }
+
+    const g = ctx.createGain();
+    const level = vel * (item.gain === undefined ? 1 : item.gain);
+    g.gain.setValueAtTime(level, time);
+
+    // How long to let it run. A one-shot rings out; a slice is cut at its own
+    // end; a pitched note follows the note length. The short fade is not
+    // decoration - cutting a waveform mid-cycle is a click, and a sliced loop
+    // would click on every single slice without it.
+    const rate = src.playbackRate.value || 1;
+    const sliceLen = (slice.end - slice.start) / rate;
+    let playFor = sliceLen;
+    if (item.mode === "pitched" && durationSeconds) playFor = Math.min(sliceLen, durationSeconds);
+    const fade = Math.min(0.006, playFor * 0.25);
+    g.gain.setValueAtTime(level, time + Math.max(0, playFor - fade));
+    g.gain.linearRampToValueAtTime(0.0001, time + playFor);
+
+    src.connect(g).connect(this.dest(track));
+    src.start(time, slice.start, playFor * rate + 0.02);
+    src.stop(time + playFor + 0.02);
+    return true;
+  }
+
   playTom(time, vel, flavor) {
+    if (this.playSampleFlavor("tom", flavor, time, vel)) return;
     const ctx = this.ctx;
 
     if (flavor === "808tom") {
@@ -1144,6 +1305,7 @@ class BeatEngine {
   }
 
   playPerc(time, vel, flavor) {
+    if (this.playSampleFlavor("perc", flavor, time, vel)) return;
     const ctx = this.ctx;
     if (flavor === "cowbell") {
       // Classic 808-style cowbell: two detuned square oscillators through a
@@ -1921,6 +2083,7 @@ class BeatEngine {
   }
 
   playBass(time, freq, durationSeconds, vel, flavor) {
+    if (this.playSampleFlavor("bass", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
     // Bass lines could descend to ~23Hz, which is below what phones,
     // laptops, and most speakers reproduce at all - the note vanishes
@@ -3169,8 +3332,45 @@ class BeatEngine {
   }
 
   playStringsVoice(time, freq, durationSeconds, vel, flavor) {
+    if (this.playSampleFlavor("strings", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
     const dest = this.dest("strings");
+
+    // A string section is many players slightly out of tune with each other -
+    // that spread IS the sound, and it is why one violin and sixteen violins
+    // are different instruments rather than one instrument at two volumes.
+    const SECTIONS = {
+      solocello: { voices: 1, spreadCents: 0, cutoff: 2600, attack: 0.09, oct: 0.5, sawMix: 0.6 },
+      chamber:   { voices: 4, spreadCents: 7, cutoff: 3400, attack: 0.13, oct: 1, sawMix: 0.7 },
+      cinematic: { voices: 12, spreadCents: 19, cutoff: 4200, attack: 0.3, oct: 1, sawMix: 0.85 },
+      marcato:   { voices: 6, spreadCents: 11, cutoff: 3800, attack: 0.025, oct: 1, sawMix: 0.9 },
+      sulponte:  { voices: 5, spreadCents: 14, cutoff: 7200, attack: 0.16, oct: 1, sawMix: 1 },
+    };
+    if (SECTIONS[flavor]) {
+      const p = SECTIONS[flavor];
+      const d2 = Math.min(durationSeconds, 3);
+      const filt = ctx.createBiquadFilter();
+      filt.type = "lowpass";
+      filt.frequency.value = p.cutoff;
+      filt.Q.value = 0.8;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.linearRampToValueAtTime(vel * 0.34, time + Math.min(p.attack, d2 * 0.5));
+      g.gain.setValueAtTime(vel * 0.34, time + Math.max(0.05, d2 - 0.18));
+      g.gain.exponentialRampToValueAtTime(0.001, time + d2);
+      filt.connect(g).connect(dest);
+      for (let i = 0; i < p.voices; i++) {
+        const o = ctx.createOscillator();
+        o.type = Math.random() < p.sawMix ? "sawtooth" : "triangle";
+        const cents = p.voices === 1 ? 0 : (Math.random() * 2 - 1) * p.spreadCents;
+        o.frequency.setValueAtTime(freq * p.oct * Math.pow(2, cents / 1200), time);
+        const og = ctx.createGain();
+        og.gain.value = 1 / Math.sqrt(p.voices);
+        o.connect(og).connect(filt);
+        o.start(time); o.stop(time + d2 + 0.08);
+      }
+      return;
+    }
 
     if (flavor === "solina") {
       // Divide-down organ tone (a single master oscillator divided for
@@ -3486,6 +3686,44 @@ class BeatEngine {
     const ctx = this.ctx;
     const dest = this.dest("horn");
 
+    const BRASS = {
+      hornsection: { oct: 1, bright: 0.8, attack: 0.04, voices: 4, spread: 9 },
+      solotrumpet: { oct: 2, bright: 0.95, attack: 0.03, voices: 1, spread: 0 },
+      mellow:      { oct: 1, bright: 0.45, attack: 0.07, voices: 2, spread: 5 },
+      stabbrass:   { oct: 1, bright: 0.88, attack: 0.012, voices: 5, spread: 12 },
+      lowbrass:    { oct: 0.5, bright: 0.5, attack: 0.06, voices: 3, spread: 7 },
+    };
+    if (BRASS[flavor]) {
+      const p = BRASS[flavor];
+      const d2 = Math.min(durationSeconds, 1.8);
+      const f0 = freq * p.oct;
+      const filt = ctx.createBiquadFilter();
+      filt.type = "lowpass";
+      // Brass gets BRIGHTER as it gets louder - the bell opens up. A static
+      // filter is the thing that makes synthesized brass sound like a pad.
+      filt.frequency.setValueAtTime(700, time);
+      filt.frequency.linearRampToValueAtTime(900 + p.bright * 5200, time + p.attack * 2.5);
+      filt.frequency.linearRampToValueAtTime(700 + p.bright * 2200, time + d2);
+      filt.Q.value = 1.2;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.linearRampToValueAtTime(vel * 0.38, time + p.attack);
+      g.gain.setValueAtTime(vel * 0.38, time + Math.max(0.04, d2 - 0.1));
+      g.gain.exponentialRampToValueAtTime(0.001, time + d2);
+      filt.connect(g).connect(dest);
+      for (let i = 0; i < p.voices; i++) {
+        const o = ctx.createOscillator();
+        o.type = "sawtooth";
+        const cents = p.voices === 1 ? 0 : (i - (p.voices - 1) / 2) * p.spread;
+        o.frequency.setValueAtTime(f0 * Math.pow(2, cents / 1200), time);
+        const og = ctx.createGain();
+        og.gain.value = 1 / Math.sqrt(p.voices);
+        o.connect(og).connect(filt);
+        o.start(time); o.stop(time + d2 + 0.06);
+      }
+      return;
+    }
+
     // Cylindrical bore, so bright and edgy, but a much larger one than a
     // trumpet: the trombone is the tenor voice of the section and the
     // only brass instrument with continuous pitch (the slide), which is
@@ -3704,8 +3942,47 @@ class BeatEngine {
   }
 
   playOrganVoice(time, freq, durationSeconds, vel, flavor) {
+    if (this.playSampleFlavor("organ", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
     const dest = this.dest("organ");
+
+    // A tonewheel organ is additive by construction: nine drawbars, each one
+    // a fixed harmonic of the note, each pulled out to a level 0-8. So a new
+    // organ sound is literally a new set of nine numbers - which is what a
+    // registration IS, and why organists write them down as digit strings.
+    const DRAWBARS = {
+      jazzorgan:  [8, 8, 8, 0, 0, 0, 0, 0, 0],   // 888000000, the Jimmy Smith
+      fullorgan:  [8, 8, 8, 8, 8, 8, 8, 8, 8],   // everything out, gospel finale
+      flute8:     [0, 0, 8, 0, 0, 0, 0, 0, 0],   // a single pure flute stop
+      reedy:      [8, 0, 8, 0, 8, 0, 6, 0, 4],   // odd bars only, hollow and nasal
+      bright16:   [8, 6, 8, 6, 4, 4, 2, 2, 6],   // bright, upper-work heavy
+    };
+    if (DRAWBARS[flavor]) {
+      // Own duration - this branch sits above the function's own `const dur`,
+      // and reading a const before its initialiser throws rather than
+      // yielding undefined.
+      const dur = Math.min(durationSeconds, 2.2);
+      const RATIOS = [0.5, 1.5, 1, 2, 3, 4, 5, 6, 8];   // sub, quint, unison, ...
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.linearRampToValueAtTime(vel * 0.32, time + 0.012);
+      g.gain.setValueAtTime(vel * 0.32, time + Math.max(0.02, dur - 0.05));
+      g.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      g.connect(dest);
+      DRAWBARS[flavor].forEach((level, i) => {
+        if (!level) return;
+        const f = freq * RATIOS[i];
+        if (f > 14000) return;
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.setValueAtTime(f, time);
+        const og = ctx.createGain();
+        og.gain.value = (level / 8) * (1 / (1 + i * 0.35));
+        o.connect(og).connect(g);
+        o.start(time); o.stop(time + dur + 0.06);
+      });
+      return;
+    }
 
     if (flavor === "accordion" || flavor === "harmonium") {
       // Both are free-reed instruments: air is pushed past a metal tongue
@@ -3919,9 +4196,54 @@ class BeatEngine {
   }
 
   playVocalVoice(time, freq, durationSeconds, vel, flavor) {
+    if (this.playSampleFlavor("vocal", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
     const dest = this.dest("vocal");
     const dur = Math.min(durationSeconds, 0.6);
+
+    // A sung vowel is defined by its first three formants. These are the
+    // standard measured values for each vowel, which is why swapping them
+    // genuinely changes the word being sung rather than just the tone.
+    const VOWELS = {
+      eee: [270, 2290, 3010],
+      ohh: [570, 840, 2410],
+      mmm: [280, 1150, 2300],
+      aww: [570, 840, 2410],
+      yeah: [660, 1720, 2410],
+    };
+    if (VOWELS[flavor]) {
+      const dur = Math.min(durationSeconds, 1.6);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.linearRampToValueAtTime(vel * 0.5, time + 0.05);
+      g.gain.setValueAtTime(vel * 0.5, time + Math.max(0.06, dur - 0.12));
+      g.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      g.connect(dest);
+      // A little vibrato, because a held sung note without any is instantly
+      // recognisable as a machine.
+      const vib = ctx.createOscillator();
+      vib.frequency.value = 5.2;
+      const vibAmt = ctx.createGain();
+      vibAmt.gain.value = freq * 0.008;
+      vib.connect(vibAmt);
+      vib.start(time); vib.stop(time + dur + 0.05);
+      VOWELS[flavor].forEach((fc, i) => {
+        const bp = ctx.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = fc;
+        bp.Q.value = 9 + i * 3;
+        const bg = ctx.createGain();
+        bg.gain.value = [1, 0.5, 0.22][i];
+        bp.connect(bg).connect(g);
+        const o = ctx.createOscillator();
+        o.type = "sawtooth";
+        o.frequency.setValueAtTime(freq, time);
+        vibAmt.connect(o.frequency);
+        o.connect(bp);
+        o.start(time); o.stop(time + dur + 0.05);
+      });
+      return;
+    }
 
     if (flavor === "vocoder") {
       // A real vocoder imposes a filter bank derived from a spoken
@@ -4033,8 +4355,23 @@ class BeatEngine {
   // ---- Melodic voices ----
 
   playKalimbaVoice(time, freq, durationSeconds, vel, flavor) {
+    if (this.playSampleFlavor("kalimba", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
     const dest = this.dest("kalimba");
+
+    const TINES = {
+      thumbpiano: { gain: 0.5, partials: [[1, 1, 1.2], [3.9, 0.22, 0.4], [8.8, 0.07, 0.18]],
+        strike: { freq: 2400, len: 0.012, level: 0.22 } },
+      mbira:      { gain: 0.48, partials: [[1, 1, 1.6], [2.8, 0.3, 0.6], [5.1, 0.12, 0.3], [7.9, 0.05, 0.15]],
+        strike: { freq: 1800, len: 0.014, level: 0.26 } },
+      handpan:    { gain: 0.6, partials: [[1, 1, 2.2], [2, 0.45, 1.4], [3, 0.2, 0.8]],
+        strike: { freq: 700, len: 0.02, level: 0.18 } },
+      gamelan:    { gain: 0.52, partials: [[1, 1, 2.0], [2.37, 0.6, 1.2], [3.61, 0.3, 0.7], [5.2, 0.14, 0.35]],
+        strike: { freq: 1500, len: 0.016, level: 0.3 } },
+      musicboxhi: { gain: 0.34, partials: [[1, 1, 0.9], [4.2, 0.25, 0.4], [9.1, 0.09, 0.16]],
+        strike: { freq: 5200, len: 0.007, level: 0.2, type: "highpass" } },
+    };
+    if (TINES[flavor]) { this.playStruckVoice(time, freq, vel, dest, TINES[flavor]); return; }
 
     if (flavor === "hangdrum") {
       // A hang (handpan) is a steel shell with tuned dimples, and each
@@ -4182,6 +4519,7 @@ class BeatEngine {
   // stacked-vocal layering hard-tune hooks are almost always mixed with)
   // and a fast, percussive attack so it hits like a hook, not a hum.
   playAutoLeadVoice(time, freq, durationSeconds, vel, flavor) {
+    if (this.playSampleFlavor("autolead", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
     const dest = this.dest("autolead");
     const dur = Math.min(durationSeconds, 0.55);
@@ -4233,8 +4571,65 @@ class BeatEngine {
   // whole note, not just at the attack), a resonant body formant around
   // 950Hz, and a real player's idiomatic pitch scoop up into a note.
   playSaxVoice(time, freq, durationSeconds, vel, flavor) {
+    if (this.playSampleFlavor("sax", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
     const dest = this.dest("sax");
+
+    // The saxophones differ by BORE SIZE, which sets both the register and
+    // how much of the sound is upper harmonics versus fundamental. A soprano
+    // is bright and reedy; a bass sax is almost all fundamental and air.
+    const HORNS = {
+      tenor:   { oct: 0.5, bright: 0.62, breath: 0.3, vib: 4.8 },
+      soprano: { oct: 2, bright: 0.85, breath: 0.22, vib: 5.6 },
+      basssax: { oct: 0.25, bright: 0.35, breath: 0.42, vib: 4.0 },
+      subtone: { oct: 0.5, bright: 0.28, breath: 0.55, vib: 3.6 },
+    };
+    if (HORNS[flavor]) {
+      const h = HORNS[flavor];
+      const f0 = freq * h.oct;
+      // Its own duration: this branch sits above the function's `const dur`,
+      // and reading a const before its initialiser is a TemporalDeadZone
+      // error rather than an undefined - it throws.
+      const dur = Math.min(durationSeconds, 1.4);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.linearRampToValueAtTime(vel * 0.42, time + 0.045);
+      g.gain.setValueAtTime(vel * 0.42, time + Math.max(0.06, dur - 0.1));
+      g.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      const body = ctx.createBiquadFilter();
+      body.type = "lowpass";
+      body.frequency.value = 700 + h.bright * 4200;
+      body.Q.value = 1.4;
+      body.connect(g).connect(dest);
+      const vib = ctx.createOscillator();
+      vib.frequency.value = h.vib;
+      const vibAmt = ctx.createGain();
+      vibAmt.gain.value = f0 * 0.006;
+      vib.connect(vibAmt);
+      vib.start(time); vib.stop(time + dur + 0.05);
+      for (const [mult, lvl] of [[1, 1], [2, 0.5 * h.bright], [3, 0.34 * h.bright], [4, 0.18 * h.bright], [5, 0.1 * h.bright]]) {
+        if (f0 * mult > 12000) break;
+        const o = ctx.createOscillator();
+        o.type = mult === 1 ? "sawtooth" : "sine";
+        o.frequency.setValueAtTime(f0 * mult, time);
+        vibAmt.connect(o.frequency);
+        const og = ctx.createGain();
+        og.gain.value = lvl;
+        o.connect(og).connect(body);
+        o.start(time); o.stop(time + dur + 0.05);
+      }
+      // Breath noise is what makes a reed sound blown rather than bowed.
+      const air = ctx.createBufferSource();
+      air.buffer = this.makeNoiseBuffer(Math.max(0.05, dur));
+      const ahp = ctx.createBiquadFilter();
+      ahp.type = "highpass"; ahp.frequency.value = 1600;
+      const ag = ctx.createGain();
+      ag.gain.setValueAtTime(vel * h.breath * 0.16, time);
+      ag.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+      air.connect(ahp).connect(ag).connect(dest);
+      air.start(time); air.stop(time + dur);
+      return;
+    }
     const breathy = flavor === "breathy";
     const dur = Math.min(durationSeconds, breathy ? 0.65 : 0.55);
     const attack = breathy ? 0.03 : 0.018;
@@ -4302,6 +4697,7 @@ class BeatEngine {
   // much louder proportion of breath noise - the air jet splitting on the
   // edge is a large part of what you actually hear.
   playWoodwindVoice(time, freq, durationSeconds, vel, flavor) {
+    if (this.playSampleFlavor("woodwind", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
     const dest = this.dest("woodwind");
 
@@ -4414,6 +4810,7 @@ class BeatEngine {
   // chords - so every flavor here is a single string plus a specific
   // amp/pedal treatment.
   playLeadGuitarVoice(time, freq, durationSeconds, vel, flavor) {
+    if (this.playSampleFlavor("leadguitar", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
     const dest = this.dest("leadguitar");
     const dur = Math.max(Math.min(durationSeconds, 2.4), 0.25);
@@ -4540,6 +4937,7 @@ class BeatEngine {
   // and later a DX100, which is why the underlying tone is a fat,
   // slightly buzzy analog lead rather than anything vocal.
   playTalkboxVoice(time, freq, durationSeconds, vel, flavor) {
+    if (this.playSampleFlavor("talkbox", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
     const dest = this.dest("talkbox");
     const dur = Math.max(Math.min(durationSeconds, 1.6), 0.2);
@@ -4627,8 +5025,26 @@ class BeatEngine {
   }
 
   playMarimbaVoice(time, freq, durationSeconds, vel, flavor) {
+    if (this.playSampleFlavor("marimba", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
     const dest = this.dest("marimba");
+
+    // Tuned bars and plates differ in which overtones their shape tunes to.
+    // A vibraphone's aluminium bar is nearly harmonic (4:1); a bell plate is
+    // deliberately inharmonic; a steel tongue drum is somewhere between.
+    const BARS = {
+      bassmarimba: { gain: 0.62, partials: [[1, 1, 1.5], [4, 0.16, 0.5], [9.2, 0.05, 0.25]],
+        strike: { freq: 400, len: 0.02, level: 0.2 } },
+      crotales:    { gain: 0.4, partials: [[1, 1, 2.4], [2.76, 0.55, 1.6], [5.4, 0.3, 0.9], [8.9, 0.12, 0.5]],
+        strike: { freq: 6000, len: 0.008, level: 0.25, type: "highpass" } },
+      glassbar:    { gain: 0.42, partials: [[1, 1, 1.1], [3.1, 0.4, 0.6], [6.3, 0.18, 0.3]],
+        strike: { freq: 4200, len: 0.01, level: 0.18 } },
+      tonguedrum:  { gain: 0.55, partials: [[1, 1, 1.8], [2.4, 0.3, 0.9], [4.1, 0.1, 0.4]],
+        strike: { freq: 900, len: 0.015, level: 0.16 } },
+      celestebar:  { gain: 0.36, partials: [[1, 1, 1.3], [4.05, 0.3, 0.7], [8.1, 0.1, 0.35], [12, 0.04, 0.2]],
+        strike: { freq: 3000, len: 0.009, level: 0.14 } },
+    };
+    if (BARS[flavor]) { this.playStruckVoice(time, freq, vel, dest, BARS[flavor]); return; }
 
     if (flavor === "xylophone") {
       // A xylophone and a marimba are both tuned wooden bars, and the
@@ -4764,6 +5180,7 @@ class BeatEngine {
   // it a longer note value, the same way a real arpeggiator plugin retriggers
   // on every step regardless of the underlying chord's length.
   playArpVoice(time, freq, durationSeconds, vel, flavor) {
+    if (this.playSampleFlavor("arp", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
     const dest = this.dest("arp");
     const dur = Math.min(durationSeconds, 0.16);
@@ -4894,6 +5311,7 @@ class BeatEngine {
   }
 
   playPianoVoice(time, freq, durationSeconds, vel, flavor) {
+    if (this.playSampleFlavor("piano", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
     const dest = this.dest("piano");
     const dur = Math.min(durationSeconds, 1.4);
@@ -5317,6 +5735,7 @@ class BeatEngine {
   }
 
   playLeadVoice(time, freq, durationSeconds, vel, flavor) {
+    if (this.playSampleFlavor("lead", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
     const dest = this.dest("lead");
     const dur = Math.min(durationSeconds, 1);
@@ -5958,8 +6377,47 @@ class BeatEngine {
   }
 
   playPadVoice(time, freq, durationSeconds, vel, flavor) {
+    if (this.playSampleFlavor("pad", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
     const dest = this.dest("pad");
+
+    // Pads differ mostly in how many detuned voices there are, how fast they
+    // fade in, and how the filter sits - so these are that space, sampled at
+    // six real points rather than six names for one sound.
+    const PAD_SHAPES = {
+      strings2: { voices: 7, detune: 11, type: "sawtooth", cutoff: 3200, attack: 0.55, q: 0.7 },
+      brassy: { voices: 4, detune: 7, type: "sawtooth", cutoff: 2400, attack: 0.12, q: 2.2 },
+      breath: { voices: 5, detune: 16, type: "triangle", cutoff: 1800, attack: 0.75, q: 0.6 },
+      crystal: { voices: 3, detune: 4, type: "sine", cutoff: 9000, attack: 0.25, q: 0.8 },
+      analogwarm: { voices: 4, detune: 9, type: "sawtooth", cutoff: 1500, attack: 0.35, q: 1.4 },
+      sweep: { voices: 6, detune: 13, type: "sawtooth", cutoff: 600, attack: 0.2, q: 6, open: 5200 },
+    };
+    if (PAD_SHAPES[flavor]) {
+      const p = PAD_SHAPES[flavor];
+      // Own duration: this branch sits above the function's own `const dur`.
+      const dur = Math.min(durationSeconds, 3.5);
+      const filt = ctx.createBiquadFilter();
+      filt.type = "lowpass";
+      filt.Q.value = p.q;
+      filt.frequency.setValueAtTime(p.cutoff, time);
+      // A "sweep" pad is defined by the filter opening across the note.
+      if (p.open) filt.frequency.linearRampToValueAtTime(p.open, time + dur * 0.85);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.linearRampToValueAtTime(vel * 0.5, time + Math.min(p.attack, dur * 0.5));
+      g.gain.setValueAtTime(vel * 0.5, time + Math.max(0.05, dur - 0.25));
+      g.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      filt.connect(g).connect(dest);
+      for (let i = 0; i < p.voices; i++) {
+        const o = ctx.createOscillator();
+        o.type = p.type;
+        const spread = (i - (p.voices - 1) / 2) * p.detune;
+        o.frequency.setValueAtTime(freq * Math.pow(2, spread / 1200), time);
+        o.connect(filt);
+        o.start(time); o.stop(time + dur + 0.1);
+      }
+      return;
+    }
     const attack = 0.25;
     const dur = Math.max(durationSeconds, 0.6);
 
@@ -6248,9 +6706,52 @@ class BeatEngine {
   }
 
   playStabVoice(time, freq, durationSeconds, vel, flavor) {
+    if (this.playSampleFlavor("stab", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
     const dest = this.dest("stab");
     const dur = Math.min(durationSeconds, 0.5);
+
+    // A stab is a chord played as one short percussive event, so most of
+    // these are an existing lead timbre pushed through the stab envelope
+    // rather than a new oscillator design - which is exactly how a producer
+    // makes one on hardware.
+    const STAB_AS_LEAD = {
+      "saw-chord": "saw", "supersaw-chord": "supersaw", "fm-chord": "fm",
+      "sine-chord": "sine", "pluck-stab": "pluck", "hoover-chord": "hoover",
+    };
+    if (STAB_AS_LEAD[flavor]) {
+      this.playLeadVoiceTo(time, freq, dur, vel, STAB_AS_LEAD[flavor], dest);
+      return;
+    }
+    if (flavor === "vox-chord") {
+      // The house "vocal stab": a sung chord chopped to a hit. Formants make
+      // it read as a voice; the very fast attack and hard cut make it a stab
+      // rather than a pad.
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.linearRampToValueAtTime(vel * 0.8, time + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.001, time + Math.min(dur, 0.34));
+      g.connect(dest);
+      for (const [f, q, lvl] of [[520, 8, 1], [1180, 10, 0.55], [2600, 12, 0.25]]) {
+        const bp = ctx.createBiquadFilter();
+        bp.type = "bandpass"; bp.frequency.value = f; bp.Q.value = q;
+        const bg = ctx.createGain(); bg.gain.value = lvl;
+        bp.connect(bg).connect(g);
+        for (const mult of [1, 2, 3, 4]) {
+          const o = ctx.createOscillator();
+          o.type = "sawtooth";
+          o.frequency.setValueAtTime(freq * mult * 0.5, time);
+          o.connect(bp);
+          o.start(time); o.stop(time + dur + 0.05);
+        }
+      }
+      return;
+    }
+    if (flavor === "piano-chord") {
+      // A piano chord clipped short - the boom-bap loop staple.
+      this.playPianoVoice(time, freq, Math.min(dur, 0.4), vel, "grand");
+      return;
+    }
 
     if (flavor === "bell-chord") {
       this.playLeadVoiceTo(time, freq, dur, vel, "bell", dest);

@@ -1041,3 +1041,44 @@ Retrained from **5,200 episodes to 38,400**, with a wider network (8 → 16 hidd
 Measured improvement over the un-policied generator: **138.23 → 142.84 (+3.3%)**.
 
 **A bug this uncovered, which had nothing to do with the policy.** `style.tempo` is a `{min, max, default}` range object, not a number. Passing it straight through made the tempo input `NaN`, which made every policy output `NaN`, which made every complexity target `NaN` — and the generator carried on regardless, producing beats that scored `NaN`. Nothing threw. The call site now passes the number, and `policyForward` refuses any non-finite input outright: no policy is a defined behaviour, a NaN policy is not. The policy also now rejects a weight file whose input count does not match, so an old 6-input file cannot be read as garbage.
+
+## 380 kits
+
+Up from 298, and every one is real synthesis with its own branch — not a preset renamed. The additions are weighted at whichever pools were thinnest:
+
+- **Drums**: 12 kicks (knock, thump, distorted, tight, woofer, vinyl, house909, trapkick, jazzkick, breakkick, softkick, hardstyle), 12 snares (piccolo, deepsnare, crack, roomsnare, snap, thicksnare, brushswirl, sidestick, drillsnare, housesnare, dnbsnare, lofisnare), 10 hi-hats, 3 toms.
+- **Melodic**: 8 stabs, 6 pads, 5 string sections, 5 brass, 5 organ registrations, 5 sung vowels, 5 marimba-family bars, 5 kalimba-family tines, 4 saxophones, 4 arps, 3 auto-tune vowels.
+
+A few are worth calling out because they are the instrument's actual physics rather than a filter tweak:
+
+- **Organ kits are drawbar registrations.** A tonewheel organ is additive by construction — nine drawbars, each a fixed harmonic, each pulled out 0–8. So a new organ sound is literally nine numbers, which is what a registration *is* and why organists write them down as digit strings. `jazzorgan` is 888000000, the Jimmy Smith setting.
+- **Vowel kits are formants.** `eee`, `ohh`, `mmm`, `aww`, `yeah` use the standard measured first-three-formant values for each vowel, which is why swapping them changes the word being sung rather than just the tone.
+- **Saxophones differ by bore size**, which sets both register and how much of the sound is upper harmonics — a soprano is bright and reedy, a bass sax is nearly all fundamental and air.
+- **A shared struck-voice helper.** Almost every mallet, bell, plucked and struck instrument is the same thing with different numbers: partials at particular ratios, each with its own level and decay, over an optional strike transient. Writing that once rather than fifteen times is the difference between adding an instrument and copying one.
+
+## Samples: bring your own
+
+The **Samples** tab loads your own audio — one-shots, loops, vocal chops, anything — decodes it in the browser, and makes it playable on any track. Nothing is uploaded.
+
+- **One-shot** — a single hit assigned to a track, played at the pattern's velocity.
+- **Sliced** — a loop cut at its transients into numbered slices, so a breakbeat can be *re-sequenced across the grid* rather than played back as one lump. On a drum lane with no step number the slices walk in turn, which is what a sampler does when a chopped loop is retriggered.
+- **Pitched** — played back at whatever rate puts it at the note the pattern wants, so a sample can carry a bassline or a hook.
+
+A sample participates as a **kit**, not a new track type: the flavor string `sample:<id>` on any track means "play this recording here". That is what makes it work everywhere flavors already work — the per-track picker, the offline render, artist profiles, the rating engine.
+
+**Why no sample pack ships with it.** A drum sample is a recording, and recordings are owned. Bundling a pack would mean shipping either something there is no right to distribute, or something so restrictively licensed that beats made with it could not be used. There are genuinely free (CC0) sets, but a static page cannot fetch them at runtime from most hosts, and committing tens of megabytes of binary audio into a source repository to dodge that is a bad trade for everyone who clones it. So you bring them.
+
+`tools/test-sampler.js` generates its own test audio (four bursts at four known pitches) and verifies the whole chain. **The check that matters**: a flavor that fails to resolve falls straight through to the synth, which still makes a sound — so "I hear something" is *not* evidence the sample played. The test compares against the synth's own output to tell the difference. Slices land within 1 ms of the real hits, step 0 plays 219 Hz where 220 was written, step 2 plays 439 Hz where 440 was, and an octave up measures a 2.00 ratio.
+
+### Two bugs the sampler test caught
+
+1. **Every step-0 trigger was silent.** The slicer seeded its onset list with 0, but almost every recording has silence before its first hit — so slice 0 was 50 ms of nothing, and slice 0 is the one a sequencer reaches for first. Slices now start at the first real onset, with a leading slice added only when there is actually audio there.
+2. **The test's own frequency estimator returned 0 Hz for everything**, including a plain sine. It skipped samples below a magnitude threshold — which are exactly the samples near zero, where zero-crossings happen. It now finds the loud *region* first and counts every crossing inside it.
+
+## Which kits work together, measured
+
+`tools/research-kits.js` does not assert pairings. For each genre it assembles random kit combinations, renders each one offline through the real audio graph, and scores it with the same rating engine used everywhere else — BS.1770 loudness, spectral balance, stereo, crest, plus the structural terms. Each combination is judged across two independently generated patterns, so none is credited for one lucky draw. The winners are written to `tools/kit-presets.json` and loadable in-app with **🏆 Best-measured kits**.
+
+**The choice of kits matters, and by how much is now a number**: across all 19 genres the gap between the best and worst combination found averaged **17.8 points out of 100** — near a fifth of the whole scale, and trap alone spanned 31.6 points in a longer run. So this is not noise.
+
+**What it is evidence of, and what it is not.** The reward is the rating equation, and that measures *balance* — loudness on target, no band swamping another, real dynamics, a findable pulse. It does not measure taste. A combination in the table is one that sits together cleanly, not one that is beautiful, and those are not the same thing. The search is also random rather than exhaustive: a genre with nine tracks and twenty candidate kits each has more combinations than there are seconds in the age of the universe. These are good regions, not global optima, and the tool says so in its own header.

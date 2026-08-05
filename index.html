@@ -155,6 +155,7 @@
           <button class="tools-tab" role="tab" data-tool="taste">Your taste</button>
           <button class="tools-tab" role="tab" data-tool="chords">Chords</button>
           <button class="tools-tab" role="tab" data-tool="sound">Feel &amp; mix</button>
+          <button class="tools-tab" role="tab" data-tool="samples">Samples</button>
           <button class="tools-tab" role="tab" data-tool="export">Export</button>
         </div>
 
@@ -206,10 +207,23 @@
                 <input type="range" id="swing-slider" min="0" max="30" value="10">
               </div>
               <button id="sidechain-btn" class="transport-btn toggle" title="Duck everything but drums when the kick hits">Sidechain</button>
+              <button id="best-kits-btn" class="transport-btn" title="Load the kit combination that measured best for this genre">🏆 Best-measured kits</button>
+              <span id="best-kits-status" class="taste-status"></span>
             </div>
             <p class="tools-hint">Swing pushes the off-beats late, the way a human player does. Sidechain ducks everything but the drums each time the kick lands — the pumping that holds dance mixes together.</p>
           </div>
 
+
+          <div class="tools-panel" role="tabpanel" data-tool-panel="samples" hidden>
+            <div class="tools-row">
+              <input type="file" id="sample-files" accept="audio/*" multiple>
+              <button id="sample-clear" class="transport-btn">Remove all</button>
+              <span id="sample-status" class="taste-status"></span>
+            </div>
+            <p class="tools-hint">Drop in your own audio — one-shots, loops, vocal chops, anything. A short file becomes a one-shot; a longer one is cut at its transients into numbered slices you can re-sequence across the grid, which is what a sampler is for. Assign a sample to any track and it plays there instead of the synth. <strong>Everything is decoded in your browser and never uploaded.</strong></p>
+            <p class="tools-hint"><strong>No sample pack ships with the program</strong>, and that is deliberate: a drum sample is a recording, and recordings are owned. Bundling a pack would mean shipping either something I have no right to distribute or something so restrictively licensed that the beats made with it could not be used. Bring your own, or a CC0 set.</p>
+            <ul id="sample-list" class="sample-list"></ul>
+          </div>
           <div class="tools-panel" role="tabpanel" data-tool-panel="export" hidden>
             <div class="tools-row">
               <div class="transport-field">
@@ -278,6 +292,8 @@
   <script src="js/audio-analysis.js"></script>
   <script src="js/rating.js"></script>
   <script src="js/songs.js"></script>
+  <script src="js/sampler.js"></script>
+  <script src="js/kit-presets.js"></script>
   <script src="js/artists.js"></script>
   <script src="js/midi-export.js"></script>
   <script src="js/patterns.js"></script>

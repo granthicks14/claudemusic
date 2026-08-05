@@ -4177,3 +4177,151 @@ if (top10Run) {
   top10Run.addEventListener("click", runTop10);
   renderTop10();
 }
+
+// ===========================================================================
+// Character controls and reproducible seeds
+// ===========================================================================
+// "Darker", "more energetic", "more aggressive" are not vague requests - each
+// is a specific set of musical decisions, and the engine already had every one
+// of those decisions as a knob. What was missing was the mapping from the word
+// a producer uses to the knobs that word means.
+//
+// The presets below are that mapping written down. Each is a point in the same
+// five-dimensional space the sliders move, so a preset and a hand-set slider
+// are the same kind of thing rather than two parallel systems.
+
+const CHAR_IDS = ["darkness", "energy", "groove", "density", "variation"];
+const charSliders = {};
+for (const id of CHAR_IDS) charSliders[id] = document.getElementById("ch-" + id);
+const chSeed = document.getElementById("ch-seed");
+const chLock = document.getElementById("ch-lock");
+const chApply = document.getElementById("ch-apply");
+const chStatus = document.getElementById("ch-status");
+
+// Only the axes a preset actually means are set; the rest stay where the user
+// left them, so "add swing" does not quietly undo "make darker".
+const CHAR_PRESETS = {
+  darker:      { darkness: 0.9 },
+  energetic:   { energy: 0.85, density: 0.7 },
+  // Emotional is not the same as sad: it is more space and more movement
+  // between ideas, so a phrase has room to land.
+  emotional:   { darkness: 0.68, density: 0.35, variation: 0.75, energy: 0.35 },
+  aggressive:  { darkness: 0.85, energy: 0.9, groove: 0.35, density: 0.7 },
+  // Atmospheric is the opposite trade: very few notes, very little push.
+  atmospheric: { density: 0.15, energy: 0.2, variation: 0.3, darkness: 0.6 },
+  swing:       { groove: 0.85 },
+  simplify:    { density: 0.2, variation: 0.25 },
+  // Bounce is groove plus energy without the density that would clutter it.
+  bounce:      { groove: 0.8, energy: 0.65, density: 0.45 },
+  reset:       { darkness: 0.5, energy: 0.5, groove: 0.5, density: 0.5, variation: 0.5 },
+};
+
+// Words rather than numbers: "0.72" says nothing about what you will hear.
+function charLabel(id, v) {
+  if (Math.abs(v - 0.5) < 0.06) return "genre";
+  const WORDS = {
+    darkness: ["brighter", "darker"],
+    energy: ["calmer", "harder"],
+    groove: ["straighter", "swung"],
+    density: ["sparser", "busier"],
+    variation: ["more repeated", "more varied"],
+  };
+  const [lo, hi] = WORDS[id];
+  const amt = Math.round(Math.abs(v - 0.5) * 200);
+  return `${v < 0.5 ? lo : hi} ${amt}%`;
+}
+
+function readCharacter() {
+  const out = {};
+  for (const id of CHAR_IDS) out[id] = Number(charSliders[id].value) / 100;
+  return out;
+}
+
+function refreshCharLabels() {
+  for (const id of CHAR_IDS) {
+    const out = document.getElementById(`ch-${id}-out`);
+    if (out) out.textContent = charLabel(id, Number(charSliders[id].value) / 100);
+  }
+}
+
+function applyCharacter(regenerate) {
+  const c = readCharacter();
+  if (typeof setCharacter === "function") setCharacter(c);
+  // Groove is the one axis that also moves a transport control, because swing
+  // is a playback parameter as well as a compositional one. Kept in sync so
+  // the swing slider never disagrees with what is being heard.
+  const g = c.groove - 0.5;
+  if (Math.abs(g) > 0.06 && baseStyle) {
+    const base = (baseStyle.swing || 0) * 100;
+    const pct = Math.max(0, Math.min(60, Math.round(base + g * 34)));
+    swingSlider.value = pct;
+    swingValue.textContent = pct;
+    engine.setSwing(pct / 100);
+  }
+  refreshCharLabels();
+  if (regenerate && selectedStyleId) generatePattern();
+  const changed = CHAR_IDS.filter((id) => Math.abs(c[id] - 0.5) > 0.06);
+  chStatus.textContent = changed.length
+    ? changed.map((id) => `${id} ${charLabel(id, c[id])}`).join(", ")
+    : "Back to the genre's own settings.";
+}
+
+for (const id of CHAR_IDS) {
+  if (!charSliders[id]) continue;
+  charSliders[id].addEventListener("input", refreshCharLabels);
+  charSliders[id].addEventListener("change", () => applyCharacter(true));
+}
+for (const btn of document.querySelectorAll("#character-presets .example-chip")) {
+  btn.addEventListener("click", () => {
+    const preset = CHAR_PRESETS[btn.dataset.preset];
+    if (!preset) return;
+    for (const [k, v] of Object.entries(preset)) {
+      if (charSliders[k]) charSliders[k].value = Math.round(v * 100);
+    }
+    applyCharacter(true);
+  });
+}
+if (chApply) chApply.addEventListener("click", () => applyCharacter(true));
+if (chLock) {
+  chLock.addEventListener("click", () => {
+    // Lock what is on screen right now, so the beat you are listening to is
+    // the one the seed reproduces.
+    if (lastUsedSeed === null) {
+      chStatus.textContent = "Generate a beat first, then lock its seed.";
+      return;
+    }
+    chSeed.value = String(lastUsedSeed);
+    chStatus.textContent = `Seed ${lastUsedSeed} locked — regenerating now gives this beat back.`;
+  });
+}
+if (chSeed) {
+  chSeed.addEventListener("change", () => {
+    chStatus.textContent = chSeed.value.trim()
+      ? `Seed ${chSeed.value.trim()} — hit Apply to hear it.`
+      : "Seed cleared: every generation is fresh again.";
+  });
+}
+refreshCharLabels();
+
+// Every generation runs under a seed, whether or not the user chose one.
+//
+// A generation with no seed still gets one - a random 32-bit number recorded
+// as it is used - because "the beat I just heard" is not reproducible unless
+// something wrote down which beat it was. That is what makes "lock this
+// seed" possible at all: the seed already exists, the button only pins it.
+let lastUsedSeed = null;
+const _generatePatternSeeded = generatePattern;
+generatePattern = function () {
+  const typed = chSeed && chSeed.value.trim();
+  const seed = typed && /^\d+$/.test(typed)
+    ? (Number(typed) >>> 0)
+    : (Math.floor(Math.random() * 0xFFFFFFFF) >>> 0);
+  lastUsedSeed = seed;
+  if (typeof setGenerationSeed === "function") setGenerationSeed(seed);
+  if (typeof withSeed === "function") {
+    withSeed(seed, () => _generatePatternSeeded.apply(this, arguments));
+  } else {
+    _generatePatternSeeded.apply(this, arguments);
+  }
+  if (chSeed && !typed) chSeed.placeholder = String(seed);
+};

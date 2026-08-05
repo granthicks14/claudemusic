@@ -233,6 +233,7 @@
           <button class="tools-tab selected" role="tab" data-tool="score">Score</button>
           <button class="tools-tab" role="tab" data-tool="plan">Production plan</button>
           <button class="tools-tab" role="tab" data-tool="top10">Top 10</button>
+          <button class="tools-tab" role="tab" data-tool="character">Character</button>
           <button class="tools-tab" role="tab" data-tool="taste">Your taste</button>
           <button class="tools-tab" role="tab" data-tool="chords">Chords</button>
           <button class="tools-tab" role="tab" data-tool="sound">Feel &amp; mix</button>
@@ -241,6 +242,56 @@
         </div>
 
         <div class="tools-body">
+          <div class="tools-panel" role="tabpanel" data-tool-panel="character" hidden>
+            <p class="tools-hint">The qualities a producer actually asks for. Each one is a specific set of musical decisions rather than an effect: darkness bends which mode gets drawn and how low the parts sit, energy moves onset density, groove moves swing and the pocket. They ride on top of the genre rather than replacing it, so a dark trap beat is still trap.</p>
+
+            <div class="chip-row" id="character-presets">
+              <span class="chip-row-label">One click:</span>
+              <button class="example-chip" type="button" data-preset="darker">Make darker</button>
+              <button class="example-chip" type="button" data-preset="energetic">More energetic</button>
+              <button class="example-chip" type="button" data-preset="emotional">More emotional</button>
+              <button class="example-chip" type="button" data-preset="aggressive">More aggressive</button>
+              <button class="example-chip" type="button" data-preset="atmospheric">More atmospheric</button>
+              <button class="example-chip" type="button" data-preset="swing">Add swing</button>
+              <button class="example-chip" type="button" data-preset="simplify">Simplify melody</button>
+              <button class="example-chip" type="button" data-preset="bounce">Increase bounce</button>
+              <button class="example-chip" type="button" data-preset="reset">Back to genre</button>
+            </div>
+
+            <div class="mystyle-rows char-rows">
+              <label class="mystyle-row"><span>Darkness</span>
+                <input type="range" id="ch-darkness" min="0" max="100" value="50">
+                <output id="ch-darkness-out">genre</output>
+              </label>
+              <label class="mystyle-row"><span>Energy</span>
+                <input type="range" id="ch-energy" min="0" max="100" value="50">
+                <output id="ch-energy-out">genre</output>
+              </label>
+              <label class="mystyle-row"><span>Groove</span>
+                <input type="range" id="ch-groove" min="0" max="100" value="50">
+                <output id="ch-groove-out">genre</output>
+              </label>
+              <label class="mystyle-row"><span>Melody density</span>
+                <input type="range" id="ch-density" min="0" max="100" value="50">
+                <output id="ch-density-out">genre</output>
+              </label>
+              <label class="mystyle-row"><span>Variation</span>
+                <input type="range" id="ch-variation" min="0" max="100" value="50">
+                <output id="ch-variation-out">genre</output>
+              </label>
+            </div>
+
+            <div class="tools-row char-seed-row">
+              <label class="transport-field">Seed
+                <input type="text" id="ch-seed" inputmode="numeric" placeholder="random" size="11">
+              </label>
+              <button id="ch-lock" class="transport-btn">Lock this beat's seed</button>
+              <button id="ch-apply" class="transport-btn play">Apply &amp; regenerate</button>
+              <span id="ch-status" class="taste-status"></span>
+            </div>
+            <p class="tools-hint">A seed makes generation reproducible: the same seed, genre and settings give back byte-for-byte the same beat. Leave it blank for a fresh one each time; lock it when you have something worth keeping and want to hear what one slider does to it.</p>
+          </div>
+
           <div class="tools-panel" role="tabpanel" data-tool-panel="top10" hidden>
             <div class="tools-row">
               <button id="top10-run" class="transport-btn play">Find my best beats</button>

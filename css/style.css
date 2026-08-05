@@ -1359,3 +1359,17 @@ a.transport-btn { text-decoration: none; display: inline-flex; align-items: cent
   overflow: hidden;
 }
 .top10-bar i { display: block; height: 100%; background: var(--accent, #6ee7ff); }
+
+/* The character controls: sliders plus one-click presets. */
+.char-rows { margin: 14px 0 12px; }
+.char-rows .mystyle-row output { min-width: 76px; opacity: 0.6; font-size: 0.85em; }
+.char-seed-row { align-items: center; gap: 10px; flex-wrap: wrap; }
+.char-seed-row input[type="text"] {
+  background: #1d1d2b;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 7px;
+  padding: 0.4rem 0.6rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.85em;
+}

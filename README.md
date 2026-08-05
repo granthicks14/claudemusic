@@ -1352,3 +1352,47 @@ Everything is deep-copied into the entry. These are the live objects the generat
 Each render builds an `OfflineAudioContext`, and a browser only hands out so many before it starts refusing or stalling. In a session that had already scored and re-scored, a render would simply never resolve — and unguarded that is not a slow run, it is **a hang with a spinner**, because the loop waits forever on a promise with no reason to settle. Renders are now raced against a timeout and a beat that will not come back is skipped and reported, rather than taking the run down with it.
 
 Caught because the test suite runs its sections on one shared page, and the Top 10 section timed out there while passing in 13 seconds on its own.
+
+## Character controls, and beats you can get back
+
+### The audit
+
+Against the full architecture brief, most of the theory and genre work already existed and is documented above: nine modes, progressions scored by functional harmony, voice leading, inversions, extensions, cadences, motif development, phrase structure, pentatonic resting notes, stepwise melodic motion, real instrument ranges, a genre gate that *rejects* a wrong instrument and redraws the line-up, root-following 808s with slides, ghost notes and humanisation, full song structure, sidechain, stereo width, compression, MIDI and WAV export, offline scoring and a Top 10 board.
+
+Genuinely absent: **seeds and determinism, undo/history, the character controls, stem export, and twelve of the named genres.** This round does the first and third of those, because they are one coherent piece of work and they hand over control of exactly the quality that has been wrong most often.
+
+### Seeds
+
+Every generation drew from `Math.random`, so a beat could be heard once and was then gone — no way to get it back, compare two settings honestly, or report a bug in terms anyone could reproduce.
+
+Rather than thread a generator object through several hundred call sites — which is where this kind of change usually dies — `Math.random` is swapped for a seeded mulberry32 for the duration of a generation and restored afterwards, in a `finally` so a throw cannot leave the seeded one installed globally. Blunt, but complete: nothing can accidentally reach past it, which is exactly the failure mode a threaded-through RNG has.
+
+**Every generation gets a seed whether or not you choose one**, recorded as it is used, because "the beat I just heard" is not reproducible unless something wrote down which beat it was. That is what makes *Lock this beat's seed* possible at all — the seed already exists, the button only pins it.
+
+### Character
+
+"Darker", "more energetic", "more aggressive" are not vague. Each is a specific set of musical decisions, and the engine already had every one of those decisions as a knob — what was missing was the mapping from the word a producer uses to the knobs that word means.
+
+| control | what it actually changes |
+|---|---|
+| Darkness | which mode is drawn from the genre's pool, and how often parts drop an octave |
+| Energy | onset density and syncopation target |
+| Groove | swing, and how far behind the grid the pocket sits |
+| Melody density | rest probability — which is what density physically is for a melodic part |
+| Variation | how far each repeat of a motif departs from it |
+
+Darkness **bends the genre's own mode pool rather than overriding it**: at the default it draws exactly the weights written for the genre, and turned up it makes the darker modes *in that pool* likelier. Trap turned dark reaches for its Phrygian more often (measured: 1 draw in 24 → 6 in 24); it does not become a different genre, because there is nothing darker in its pool to reach for.
+
+Nine one-click presets sit on the same five axes, so a preset and a hand-set slider are the same kind of thing rather than two parallel systems. Each sets only the axes it means, so "add swing" does not quietly undo "make darker".
+
+### A regression this found in my own work
+
+Lowering `REGISTER.lead` from 21 to 14 — the register fix two rounds ago — silently broke `planRegisterJitters`, which brackets instruments by home register using thresholds written against the **old** table. At 21 the lead was caught by the "never raise this" bracket. At 14 it fell into the middle bracket, where the first melodic voice was given a **20% chance of being pushed up an octave** — putting it back at 21, the exact placement that made every genre sound bright and thin, reintroduced as a side effect of fixing it.
+
+It was invisible because the range ceilings added afterwards clamped the top note, so the guard still passed; only the *mean* moved. Caught by measuring mean pitch while testing whether darkness reached the music: darkness appeared to do nothing (D#4 → E4 → D#4), and the reason was that the jitter it was fighting was pulling the other way.
+
+Thresholds are relative to the register table now rather than to numbers that used to be in it. With it fixed, darkness moves the mean a fifth (D4 → G#3), and the default sits at C4 rather than E4 — the register fix finally taking full effect.
+
+### Still open
+
+Stem export, undo/version history, and the twelve missing genres (rage, pluggnb, pop, metal, jazz, EDM, country, orchestral, cinematic, funk, soul, ambient). The genres are the largest single piece: the suite requires every genre to carry at least eight reference songs and four artist profiles, and those invariants are worth keeping.

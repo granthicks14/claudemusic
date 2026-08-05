@@ -338,7 +338,68 @@ const path = require("path");
     label.hat === "Bright" && label.talkbox === "Bright Talkbox" && label.clarinet === "Clarinet",
     `hi-hat "${label.hat}", talkbox "${label.talkbox}", clarinet "${label.clarinet}"`);
 
-  console.log("\n9. Top 10");
+  console.log("\n9. Character and seeds");
+  await page.click('.tools-tab[data-tool="character"]');
+  // A seed is only worth having if it actually reproduces the beat.
+  const seedRes = await page.evaluate(() => {
+    const sig = () => JSON.stringify(currentPattern.instruments);
+    document.getElementById("ch-seed").value = "4242";
+    generatePattern(); const a = sig();
+    generatePattern(); const b = sig();
+    document.getElementById("ch-seed").value = "777";
+    generatePattern(); const c = sig();
+    document.getElementById("ch-seed").value = "";
+    return { same: a === b, different: a !== c };
+  });
+  check("the same seed gives back the same beat", seedRes.same);
+  check("a different seed gives a different beat", seedRes.different);
+
+  // Each preset has to move the knobs it names.
+  await page.click('#character-presets [data-preset="reset"]');
+  await page.waitForTimeout(200);
+  await page.click('#character-presets [data-preset="darker"]');
+  await page.waitForTimeout(250);
+  const dark = await page.evaluate(() => getCharacter().darkness);
+  check("“Make darker” raises darkness", dark > 0.8, `darkness ${dark}`);
+  await page.click('#character-presets [data-preset="atmospheric"]');
+  await page.waitForTimeout(250);
+  const atmo = await page.evaluate(() => getCharacter());
+  check("“More atmospheric” thins the melody out",
+    atmo.density < 0.3 && atmo.energy < 0.3, `density ${atmo.density}, energy ${atmo.energy}`);
+
+  // And darkness has to reach the music, not just the state object.
+  const pitch = await page.evaluate(() => {
+    const mean = (dk) => {
+      document.getElementById("ch-darkness").value = String(Math.round(dk * 100));
+      applyCharacter(false);
+      let sum = 0, n = 0;
+      for (let i = 0; i < 14; i++) {
+        generatePattern();
+        const gs = currentPattern.genStyle || activeStyle;
+        const root = noteNameToMidi(activeStyle.key);
+        for (const inst of ["lead", "autolead", "piano"]) {
+          const arr = currentPattern.instruments[inst];
+          if (!Array.isArray(arr)) continue;
+          for (const x of arr) {
+            if (!x || x.degree === undefined) continue;
+            sum += scaleDegreeToMidi(root, gs.scale, x.degree); n++;
+          }
+        }
+      }
+      return n ? sum / n : 0;
+    };
+    const bright = mean(0);
+    const darkP = mean(1);
+    document.getElementById("ch-darkness").value = "50";
+    applyCharacter(false);
+    return { bright, darkP };
+  });
+  check("darkness actually lowers the register",
+    pitch.darkP < pitch.bright - 1.5,
+    `mean MIDI ${pitch.bright.toFixed(1)} bright vs ${pitch.darkP.toFixed(1)} dark`);
+  await page.click('#character-presets [data-preset="reset"]');
+
+  console.log("\n10. Top 10");
   // On its own page. The run builds an OfflineAudioContext per beat, and by
   // this point the shared page has already built a good many for the score
   // panel and the sample editor - enough that a render can stop resolving.
@@ -397,7 +458,7 @@ const path = require("path");
 
   await page2.close();
 
-  console.log("\n10. No page errors");
+  console.log("\n11. No page errors");
   check("no uncaught errors", errors.length === 0, errors.slice(0, 3).join(" | "));
 
   await browser.close();

@@ -655,14 +655,36 @@ function planRegisterJitters(monoInstruments) {
       plan[inst] = 0;
       continue;
     }
-    // Jitter direction is home-register aware. Instruments that already
-    // live high (lead at 21, arp at 18) must never be pushed higher -
-    // that was sending leads to ~2.5-2.8kHz, well above where any real
-    // hook sits - while low-homed voices must not sink toward the bass.
+    // Jitter direction is home-register aware: a voice that already lives
+    // high must not be pushed higher, and one that lives low must not sink
+    // toward the bass.
+    //
+    // The thresholds here were written against the OLD register table, where
+    // the lead sat at 21 and was caught by the "never raise" bracket. Lowering
+    // it to 14 - the whole point of the register fix - quietly moved it into
+    // the middle bracket, where the FIRST melodic voice was given a 20% chance
+    // of being pushed up an octave. That is 21 again: the exact placement that
+    // made every genre sound bright and thin, reintroduced as a side effect of
+    // fixing it. Thresholds are relative to the table now rather than to
+    // numbers that used to be in it.
     const home = REGISTER[inst] || 14;
-    if (home >= 18) plan[inst] = pickWeighted([[0, 4], [-7, 1]]);
-    else if (home <= 7) plan[inst] = pickWeighted([[0, 4], [7, 1]]);
-    else plan[inst] = melodicIdx === 0 ? pickWeighted([[0, 4], [7, 1]]) : pickWeighted([[0, 4], [-7, 1]]);
+    const SOLO_HOME = 12;      // where the lead voices now sit
+    // Darkness pulls everything down and closes off the upward option.
+    const dark = typeof ch === "function" ? Math.max(0, ch("darkness")) : 0;
+    const bright = typeof ch === "function" ? Math.max(0, -ch("darkness")) : 0;
+    const down = 1 + dark * 3;
+    const stay = 4 - dark * 1.2;
+    if (home >= SOLO_HOME) {
+      // Solo voices only ever drop. There is nothing above them worth
+      // reaching for - that is what placing them correctly means.
+      plan[inst] = pickWeighted([[0, stay], [-7, down]]);
+    } else if (home <= 7) {
+      // Low-homed parts (pads, organ, guitar) may rise, and do so less as the
+      // beat is asked to get darker.
+      plan[inst] = pickWeighted([[0, 4], [7, 1 + bright * 2 - dark * 0.8]]);
+    } else {
+      plan[inst] = pickWeighted([[0, stay], [-7, down]]);
+    }
     melodicIdx++;
   }
   return plan;
@@ -732,6 +754,12 @@ function generateMonoMelody(register, structure, barRootDegrees, rawParams, tota
     restProbability: Math.max(0.05, Math.min(0.85, rawParams.restProbability + cx.restBias)),
     variationProbability: Math.max(0, Math.min(0.9, rawParams.variationProbability + cx.variationBoost)),
     chordToneProbability: Math.max(0.35, Math.min(0.98, rawParams.chordToneProbability - cx.passingToneBoost)),
+    // The melody-density control, applied as rest probability because that is
+    // what density physically is for a melodic part: fewer rests is more
+    // notes. Clamped well short of both ends - a melody with no rests at all
+    // has no phrasing, and one that is all rests is not a melody.
+    restProbability: Math.max(0.08, Math.min(0.8,
+      (rawParams.restProbability !== undefined ? rawParams.restProbability : 0.45) - ch("density") * 0.22)),
   };
 
   const arr = new Array(totalSteps).fill(null);
@@ -925,7 +953,14 @@ function applyChorusHook(melody, inst, style, barMetas, barRootDegrees) {
   // there was the beat getting thinner and brighter, which is the one
   // direction this program has been repeatedly wrong in. Dropping an octave
   // still gives the variety the jitter was for.
-  const registerJitter = inst === "bass" ? 0 : pickWeighted([[0, 3], [-7, 1]]);
+  // Darkness drops parts an octave more often. Register is the single most
+  // effective lever on how dark an arrangement reads - more than the mode, and
+  // far more than the kit - which is the lesson of this program's own history:
+  // leads sitting an octave too high made every genre sound cheerful no matter
+  // what scale it was in.
+  const darkPull = Math.max(0, ch("darkness"));
+  const registerJitter = inst === "bass" ? 0
+    : pickWeighted([[0, 3 - darkPull * 1.5], [-7, 1 + darkPull * 2.5]]);
   const effectiveRegister = register + registerJitter;
   const hookParams = {
     ...params,
@@ -2616,6 +2651,75 @@ function setBeatComplexity(n) {
   BEAT_COMPLEXITY = Math.max(1, Math.min(10, Math.round(n)));
 }
 
+// ---------------------------------------------------------------------------
+// Determinism: the same seed makes the same beat
+// ---------------------------------------------------------------------------
+// Every generation drew from Math.random, so a beat could be heard once and
+// then was gone - there was no way to get it back, compare two settings
+// honestly, or report a bug in terms anyone could reproduce. The Top 10 board
+// had to deep-copy whole patterns purely because there was no other way to
+// hold onto one.
+//
+// Rather than thread a generator object through several hundred call sites -
+// which is where this kind of change usually dies - Math.random is swapped for
+// a seeded one for the duration of a generation and restored afterwards. It is
+// blunt, but it is complete: nothing can accidentally reach past it, which is
+// exactly the failure mode a threaded-through RNG has.
+//
+// mulberry32: 32 bits of state, one multiply and a few shifts. Short enough to
+// read and far better distributed than anything hand-rolled.
+function makeSeededRandom(seed) {
+  let a = (seed >>> 0) || 1;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), 1 | t);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+let CURRENT_SEED = null;
+function setGenerationSeed(seed) {
+  CURRENT_SEED = (seed === null || seed === undefined) ? null : (seed >>> 0);
+}
+function currentGenerationSeed() { return CURRENT_SEED; }
+
+// Run fn with the seeded generator in place. Restores Math.random even if fn
+// throws - leaving a seeded Math.random installed globally would make every
+// later beat identical, which is a far worse bug than the one it fixes.
+function withSeed(seed, fn) {
+  if (seed === null || seed === undefined) return fn();
+  const real = Math.random;
+  Math.random = makeSeededRandom(seed);
+  try { return fn(); } finally { Math.random = real; }
+}
+
+// ---------------------------------------------------------------------------
+// Character: the qualities a producer actually asks for
+// ---------------------------------------------------------------------------
+// "Darker", "more energetic", "more aggressive" are not vague - each one is a
+// specific set of musical decisions, and the engine already has every one of
+// those decisions as a knob. What was missing was the mapping.
+//
+//   darkness   which mode is drawn, how low the parts sit, how driven the
+//              bass kit is, how bright the kits are chosen
+//   energy     onset density, tempo within the genre's range, layer count
+//   groove     swing and how far behind the grid the pocket sits
+//   density    how much of the melodic grid carries a note
+//   variation  how far each repeat of a motif departs from it
+//
+// All default to 0.5, meaning "whatever the genre says", so a fresh beat is
+// exactly what it was before any of this existed.
+const CHARACTER_DEFAULTS = { darkness: 0.5, energy: 0.5, groove: 0.5, density: 0.5, variation: 0.5 };
+let CHARACTER = { ...CHARACTER_DEFAULTS };
+function setCharacter(next) {
+  CHARACTER = { ...CHARACTER_DEFAULTS, ...(next || {}) };
+}
+function getCharacter() { return { ...CHARACTER }; }
+// Centred so 0.5 reads as zero adjustment and the ends are +/-1.
+function ch(name) { return (CHARACTER[name] - 0.5) * 2; }
+
 function complexityProfile(c = BEAT_COMPLEXITY) {
   const t = (c - 1) / 9;   // 0 at simplest, 1 at most complex
   // Two learned sources lean the same knobs the dial moves, and both are
@@ -2643,9 +2747,14 @@ function complexityProfile(c = BEAT_COMPLEXITY) {
     // Target LHL syncopation per bar, summed across the drum lanes. At 1
     // the beat should sit almost entirely on the grid; at 10 it should
     // be pushing against it constantly.
-    syncTarget: Math.max(0.5, 1 + t * 16 + bias.syncopation + P.syncopation + A.sync),
+    // Character rides on top of everything else rather than replacing it: a
+    // genre's own shape, what the user has rated up, and the trained policy
+    // all still apply, and these move the result from there.
+    syncTarget: Math.max(0.5, 1 + t * 16 + bias.syncopation + P.syncopation + A.sync
+                         + ch("groove") * 3 + ch("energy") * 2),
     // Fraction of the grid that carries an onset, across all drums.
-    densityTarget: Math.max(0.06, Math.min(0.55, 0.13 + t * 0.26 + bias.density + P.density + A.density)),
+    densityTarget: Math.max(0.06, Math.min(0.55, 0.13 + t * 0.26 + bias.density + P.density + A.density
+                            + ch("energy") * 0.08)),
     // The finest subdivision allowed to carry an onset. Simple beats are
     // simple partly because they do not use 16ths at all. A hard bucket
     // per subdivision made whole pairs of levels identical (1 and 2 were
@@ -3419,10 +3528,32 @@ function ceilingDegreeFor(inst, rootMidi, scaleName) {
 }
 
 
+// How dark each mode is, on the same 0-1 scale the darkness control uses.
+// Ordered by the interval that gives each one its character: a raised 4th and
+// a leading tone read bright, a flat 2nd reads darkest of all.
+const MODE_DARKNESS = {
+  lydian: 0.0, major: 0.15, mixolydian: 0.3, dorian: 0.45,
+  melodicminor: 0.55, minor: 0.65, harmonicminor: 0.8,
+  phrygian: 0.9, phrygiandominant: 1.0,
+};
+
 function pickMode(style) {
   const pool = GENRE_MODES[style.id];
   if (!pool) return style.scale;
-  return pickWeighted(pool);
+  // The darkness control bends the genre's own mode pool rather than
+  // overriding it: at the default it draws exactly the weights written for the
+  // genre, and turning it up makes the darker modes in THAT pool likelier
+  // without ever offering one the genre does not use. Trap turned dark reaches
+  // for its Phrygian more often; it does not suddenly become a different
+  // genre, because there is nothing darker in its pool to reach for.
+  const d = ch("darkness");
+  if (Math.abs(d) < 0.05) return pickWeighted(pool);
+  const bent = pool.map(([mode, w]) => {
+    const md = MODE_DARKNESS[mode] !== undefined ? MODE_DARKNESS[mode] : 0.5;
+    // Positive darkness favours high-darkness modes, negative favours low.
+    return [mode, Math.max(0.05, w * (1 + d * (md - 0.5) * 3))];
+  });
+  return pickWeighted(bent);
 }
 
 function resolveGenerationStyle(style, plan) {

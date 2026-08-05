@@ -1127,6 +1127,81 @@ class BeatEngine {
     if (this.playSampleFlavor("tom", flavor, time, vel)) return;
     const ctx = this.ctx;
 
+    // A drum tom is a pitched membrane: a fundamental that drops as the head
+    // relaxes, a couple of inharmonic modes above it, and a stick transient.
+    // Those four numbers are all that separates most toms from each other, so
+    // the newer ones are a table.
+    //
+    //   base    fundamental in Hz, plus a little randomness per hit so a fill
+    //           does not sound like the same sample five times
+    //   bend    how far above the fundamental the attack starts
+    //   decay   length of the body
+    //   modes   [ratio, level] for the inharmonic partials
+    //   stick   [level, highpass Hz, length]
+    const TOMS = {
+      // The LinnDrum's toms, which are short, dry and slightly boxy.
+      linn:     { base: 150, spread: 20, bend: 1.5, decay: 0.3, modes: [[1, 1], [1.58, 0.24]], stick: [0.24, 2600, 0.01] },
+      // The 909's tom: more noise in the shell than the 808's, still analog.
+      "909tom": { base: 128, spread: 24, bend: 1.7, decay: 0.36, modes: [[1, 1], [1.72, 0.2]], stick: [0.3, 1400, 0.02], noise: 0.14 },
+      // Deliberately synthetic, tuned high and short - the electro tom.
+      electro:  { base: 210, spread: 40, bend: 2.4, decay: 0.2, modes: [[1, 1], [2.4, 0.3], [3.9, 0.12]], stick: [0.35, 3000, 0.008] },
+      // Very low and long, for the tom that lands under a whole bar.
+      deeptom:  { base: 62, spread: 6, bend: 1.28, decay: 0.85, modes: [[1, 1], [1.5, 0.3], [2.05, 0.12]], stick: [0.2, 1500, 0.02] },
+      // A concert tom: tuned, resonant, almost melodic, with little bend.
+      concert:  { base: 118, spread: 12, bend: 1.12, decay: 0.7, modes: [[1, 1], [1.59, 0.4], [2.14, 0.18], [2.92, 0.07]], stick: [0.26, 2200, 0.014] },
+      // A tight rack tom with heavy damping - the muffled 70s sound.
+      damped:   { base: 165, spread: 15, bend: 1.35, decay: 0.16, modes: [[1, 1], [1.6, 0.18]], stick: [0.3, 2400, 0.012] },
+      // Hard, bright and hybrid: an acoustic tom layered with a synth blip.
+      hybridtom:{ base: 140, spread: 22, bend: 2.0, decay: 0.34, modes: [[1, 1], [1.55, 0.3], [4.2, 0.14]], stick: [0.42, 3400, 0.01], noise: 0.1 },
+    };
+    if (TOMS[flavor]) {
+      const p = TOMS[flavor];
+      const base = p.base + Math.random() * p.spread;
+      const dest = this.dest("tom");
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vel, time);
+      g.gain.exponentialRampToValueAtTime(0.001, time + p.decay);
+      g.connect(dest);
+      for (const [ratio, lvl] of p.modes) {
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.setValueAtTime(base * ratio * p.bend, time);
+        o.frequency.exponentialRampToValueAtTime(base * ratio, time + p.decay * 0.35);
+        const pg = ctx.createGain();
+        pg.gain.value = lvl;
+        o.connect(pg).connect(g);
+        o.start(time);
+        o.stop(time + p.decay + 0.05);
+      }
+      if (p.noise) {
+        const n = ctx.createBufferSource();
+        n.buffer = this.makeNoiseBuffer(p.decay);
+        const bp = ctx.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = base * 3;
+        bp.Q.value = 0.7;
+        const ng = ctx.createGain();
+        ng.gain.setValueAtTime(vel * p.noise, time);
+        ng.gain.exponentialRampToValueAtTime(0.0001, time + p.decay * 0.5);
+        n.connect(bp).connect(ng).connect(dest);
+        n.start(time);
+        n.stop(time + p.decay);
+      }
+      const [slv, shp, slen] = p.stick;
+      const stick = ctx.createBufferSource();
+      stick.buffer = this.makeNoiseBuffer(slen);
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = shp;
+      const sg = ctx.createGain();
+      sg.gain.setValueAtTime(vel * slv, time);
+      sg.gain.exponentialRampToValueAtTime(0.0001, time + slen);
+      stick.connect(hp).connect(sg).connect(dest);
+      stick.start(time);
+      stick.stop(time + slen + 0.005);
+      return;
+    }
+
     if (flavor === "808tom") {
       // The 808's tom is the same circuit as its kick with the decay shortened
       // and the pitch raised - a pure sine with an exponential pitch drop and
@@ -1973,6 +2048,147 @@ class BeatEngine {
   // switch or a hard downbeat).
   playFxRiser(time, vel, flavor) {
     const ctx = this.ctx;
+    const fxDest = this.dest("fx");
+
+    // Noise-based transitions. A riser, a downlifter and a reverse swell are
+    // the same object - filtered noise with a moving cutoff and a moving
+    // level - so they share one implementation and differ only in which way
+    // the two curves run.
+    //
+    //   from/to   bandpass centre in Hz, start and end
+    //   swell     true = level rises into the hit, false = it falls away
+    //   q         narrow reads as a whistle, wide as wind
+    const NOISE_FX = {
+      downlifter: { dur: 1.8, from: 6000, to: 260,  swell: false, q: 2.2, level: 0.42 },
+      uplifter:   { dur: 2.0, from: 300,  to: 9000, swell: true,  q: 2.6, level: 0.4 },
+      reverse:    { dur: 1.4, from: 1200, to: 5200, swell: true,  q: 1.1, level: 0.45 },
+      wind:       { dur: 2.6, from: 500,  to: 1800, swell: true,  q: 0.8, level: 0.3 },
+      // A very narrow band sweeping up: the whistle riser under a drop.
+      whistle:    { dur: 1.6, from: 900,  to: 7000, swell: true,  q: 12,  level: 0.3 },
+      // Broadband white noise straight down, the "vinyl brake" texture.
+      sweepdown:  { dur: 1.0, from: 8000, to: 400,  swell: false, q: 0.7, level: 0.4 },
+    };
+    if (NOISE_FX[flavor]) {
+      const p = NOISE_FX[flavor];
+      const n = ctx.createBufferSource();
+      n.buffer = this.makeNoiseBuffer(p.dur);
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.Q.value = p.q;
+      bp.frequency.setValueAtTime(p.from, time);
+      bp.frequency.exponentialRampToValueAtTime(p.to, time + p.dur);
+      const g = ctx.createGain();
+      if (p.swell) {
+        g.gain.setValueAtTime(0.0001, time);
+        g.gain.exponentialRampToValueAtTime(vel * p.level, time + p.dur * 0.92);
+        g.gain.linearRampToValueAtTime(0.0001, time + p.dur);
+      } else {
+        g.gain.setValueAtTime(vel * p.level, time);
+        g.gain.exponentialRampToValueAtTime(0.0001, time + p.dur);
+      }
+      n.connect(bp).connect(g).connect(fxDest);
+      n.start(time);
+      n.stop(time + p.dur + 0.02);
+      return;
+    }
+
+    if (flavor === "subdrop") {
+      // The sub drop: a sine falling off the bottom of the register. It is
+      // the simplest effect here and one of the most used, because it marks a
+      // section change with nothing but weight.
+      const dur = 1.6;
+      const o = ctx.createOscillator();
+      o.type = "sine";
+      o.frequency.setValueAtTime(180, time);
+      o.frequency.exponentialRampToValueAtTime(24, time + dur * 0.8);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.linearRampToValueAtTime(vel * 0.85, time + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      o.connect(g).connect(fxDest);
+      o.start(time);
+      o.stop(time + dur + 0.05);
+      return;
+    }
+
+    if (flavor === "vinylstop") {
+      // A record being stopped by hand: everything slows and drops in pitch
+      // together over about half a second, with surface noise underneath.
+      const dur = 0.75;
+      const o = ctx.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.setValueAtTime(220, time);
+      o.frequency.exponentialRampToValueAtTime(28, time + dur);
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.setValueAtTime(4000, time);
+      lp.frequency.exponentialRampToValueAtTime(300, time + dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vel * 0.5, time);
+      g.gain.exponentialRampToValueAtTime(0.001, time + dur);
+      o.connect(lp).connect(g).connect(fxDest);
+      o.start(time);
+      o.stop(time + dur + 0.03);
+
+      const n = ctx.createBufferSource();
+      n.buffer = this.makeNoiseBuffer(dur);
+      const nlp = ctx.createBiquadFilter();
+      nlp.type = "lowpass";
+      nlp.frequency.setValueAtTime(3000, time);
+      nlp.frequency.exponentialRampToValueAtTime(200, time + dur);
+      const ng = ctx.createGain();
+      ng.gain.setValueAtTime(vel * 0.2, time);
+      ng.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+      n.connect(nlp).connect(ng).connect(fxDest);
+      n.start(time);
+      n.stop(time + dur);
+      return;
+    }
+
+    if (flavor === "zap") {
+      // A short descending laser blip - the punctuation mark of jersey club
+      // and of a lot of plugg.
+      const dur = 0.22;
+      const o = ctx.createOscillator();
+      o.type = "square";
+      o.frequency.setValueAtTime(2600, time);
+      o.frequency.exponentialRampToValueAtTime(180, time + dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(vel * 0.35, time);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+      o.connect(g).connect(fxDest);
+      o.start(time);
+      o.stop(time + dur + 0.02);
+      return;
+    }
+
+    if (flavor === "airhorn") {
+      // Three stacked detuned saws through a resonant bandpass, held flat
+      // and cut off hard. Unmistakable, and a genuine fixture of the genre.
+      const dur = 1.1;
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = 900;
+      bp.Q.value = 1.6;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.linearRampToValueAtTime(vel * 0.4, time + 0.04);
+      g.gain.setValueAtTime(vel * 0.4, time + dur - 0.06);
+      g.gain.linearRampToValueAtTime(0.0001, time + dur);
+      bp.connect(g).connect(fxDest);
+      for (const f of [233, 311, 466, 622]) {
+        const o = ctx.createOscillator();
+        o.type = "sawtooth";
+        o.frequency.value = f;
+        o.detune.value = (Math.random() - 0.5) * 14;
+        const og = ctx.createGain();
+        og.gain.value = 0.3;
+        o.connect(og).connect(bp);
+        o.start(time);
+        o.stop(time + dur + 0.05);
+      }
+      return;
+    }
 
     if (flavor === "siren") {
       // A classic trap "police siren": a sawtooth sweeping up and back
@@ -2090,7 +2306,17 @@ class BeatEngine {
     // while still eating headroom on the master. Anything under ~33Hz
     // (roughly C1) is lifted an octave so it stays audible; real
     // engineers do the same thing rather than let a sub note disappear.
-    while (freq < 33) freq *= 2;
+    //
+    // The 808 family is the exception, and it is allowed almost an octave
+    // lower. The reason the lift exists is that a note nobody's speakers can
+    // reproduce is a wasted note - but an 808's grit path deliberately puts
+    // most of its audible energy in the harmonics, well above where any
+    // speaker gives up, so the ear infers a fundamental it never actually
+    // hears. That is the entire trick, and lifting a low C an octave threw it
+    // away: rap 808s live at C1 and below, and moving them to C2 is exactly
+    // what makes an 808 stop sounding like one.
+    const floorHz = /808$/.test(flavor || "") ? 24 : 33;
+    while (freq < floorHz) freq *= 2;
 
     if (flavor === "sh101") {
       // Roland SH-101: one oscillator, one filter, and that is the whole
@@ -2185,15 +2411,83 @@ class BeatEngine {
     // saturation sits on top. Saturation is what makes an 808 audible on a
     // phone speaker that cannot reproduce 40Hz at all - the harmonics it adds
     // are heard and the ear infers the missing fundamental.
+    // Rebuilt, because measurement said the previous version was a sine wave
+    // wearing a distortion's name. tools/measure-808.js renders each kit and
+    // reports what share of its energy sits above 100Hz: the kit literally
+    // called "dirty808" scored 0.043, i.e. it was 96% pure fundamental, and
+    // every one of the fifteen 808-family kits came in under the bar.
+    //
+    // The reason is worth writing down, because it is not obvious and it is
+    // why the round before this one did not fix it either. That version put
+    // a waveshaper in PARALLEL with the clean sine and mixed it back in at
+    // 60%, which sounds like the textbook answer. But clipping a sine does
+    // not mostly produce harmonics - it mostly produces MORE SINE. A square
+    // wave is 4/pi of fundamental against 1/3, 1/5, 1/7 for its harmonics,
+    // so only about a tenth of its energy is the part you can actually hear
+    // as distortion. Blending that against a clean copy buries the tenth
+    // under two servings of the thing it was meant to add character to.
+    //
+    // What producers actually do - and what every "distort your 808" guide
+    // describes - is a MULTIBAND split: keep the sub clean below ~90Hz, and
+    // drive a copy that has been high-passed so its own fundamental is gone
+    // before it is mixed back. Then the only thing the wet path contributes
+    // is harmonics, which is the entire point.
+    //
+    //   sub path   osc -> env -> lowpass 90Hz  -> level
+    //   grit path  osc -> env -> pre-gain -> shaper -> highpass -> tone -> level
+    //
+    // The pre-gain matters as much as the curve: without it the grit fades
+    // out of clipping as the note decays and the tail goes clean, which is
+    // the opposite of how an 808 into a clipper behaves.
     const EIGHT08 = {
-      glide808:   { ring: 2.2, glide: 0.16, drive: 1.4, click: 0.10, sweep: 1.35 },
-      punch808:   { ring: 1.1, glide: 0.02, drive: 2.2, click: 0.45, sweep: 2.1 },
-      long808:    { ring: 3.2, glide: 0.05, drive: 1.1, click: 0.16, sweep: 1.5 },
-      clean808:   { ring: 1.8, glide: 0.03, drive: 0,   click: 0.12, sweep: 1.4 },
-      dirty808:   { ring: 1.6, glide: 0.04, drive: 4.5, click: 0.3,  sweep: 1.8 },
-      knock808:   { ring: 0.85, glide: 0.01, drive: 3.0, click: 0.6, sweep: 2.6 },
-      rumble808:  { ring: 4.0, glide: 0.09, drive: 0.8, click: 0.06, sweep: 1.25 },
-      detuned808: { ring: 2.0, glide: 0.06, drive: 1.6, click: 0.18, sweep: 1.45, detune: 12 },
+      // --- the originals, now with a real grit stage ------------------------
+      "808":       { ring: 1.4, glide: 0.04, drive: 24,  grit: 0.85,  mode: "soft", click: 0.25, sweep: 1.8, hp: 130, tone: 4200 },
+      true808:     { ring: 1.9, glide: 0.09, drive: 30,  grit: 0.9, mode: "soft", click: 0.22, sweep: 1.7, hp: 120, tone: 3600 },
+      hard808:     { ring: 1.5, glide: 0.03, drive: 45,  grit: 0.95, mode: "hard", click: 0.4,  sweep: 1.9, hp: 140, tone: 5200 },
+      glide808:    { ring: 2.2, glide: 0.16, drive: 26,  grit: 0.85,  mode: "soft", click: 0.10, sweep: 1.35, hp: 120, tone: 3800 },
+      punch808:    { ring: 1.1, glide: 0.02, drive: 40,  grit: 1.05,  mode: "hard", click: 0.45, sweep: 2.1, hp: 150, tone: 5000 },
+      long808:     { ring: 3.2, glide: 0.05, drive: 10,  grit: 0.42, mode: "soft", click: 0.16, sweep: 1.5, hp: 115, tone: 3400 },
+      // Deliberately the clean one. Every lineup needs a contrast, and a
+      // pure sub 808 under a busy mix is a real choice.
+      clean808:    { ring: 1.8, glide: 0.03, drive: 0,   grit: 0,    mode: "soft", click: 0.12, sweep: 1.4, hp: 120, tone: 3000 },
+      dirty808:    { ring: 1.6, glide: 0.04, drive: 60,  grit: 1.15, mode: "fuzz", click: 0.3,  sweep: 1.8, hp: 130, tone: 5600 },
+      knock808:    { ring: 0.85, glide: 0.01, drive: 44, grit: 1.05, mode: "hard", click: 0.6, sweep: 2.6, hp: 170, tone: 5400 },
+      rumble808:   { ring: 4.0, glide: 0.09, drive: 8,   grit: 0.3,  mode: "soft", click: 0.06, sweep: 1.25, hp: 105, tone: 2600 },
+      detuned808:  { ring: 2.0, glide: 0.06, drive: 30,  grit: 0.9, mode: "soft", click: 0.18, sweep: 1.45, hp: 125, tone: 4000, detune: 12 },
+
+      // --- the distortion the complaint was actually about ------------------
+      // Named for the technique rather than for a producer, so it is obvious
+      // from the kit list which one is which.
+      // A straight clipper, hit hard. Odd harmonics all the way up: this is
+      // the sound of an 808 pushed into a limiter until it buzzes.
+      distort808:  { ring: 1.7, glide: 0.05, drive: 90,  grit: 1.3,  mode: "hard", click: 0.35, sweep: 1.85, hp: 135, tone: 6000 },
+      // Asymmetric, so the octave comes up with the odd harmonics and the
+      // note reads as growling rather than merely loud.
+      fuzz808:     { ring: 1.6, glide: 0.05, drive: 70,  grit: 1.25, mode: "fuzz", click: 0.3, sweep: 1.8, hp: 140, tone: 6500 },
+      // Tube-style: driven hard but rounded, with the top rolled off. Warm
+      // and thick instead of sharp.
+      overdrive808:{ ring: 2.0, glide: 0.07, drive: 34,  grit: 0.9,  mode: "soft", click: 0.2, sweep: 1.7, hp: 110, tone: 2800 },
+      // Everything at once. The dirtiest kit in the list on purpose.
+      grimy808:    { ring: 1.5, glide: 0.04, drive: 110, grit: 1.45, mode: "fold", click: 0.4, sweep: 1.9, hp: 150, tone: 7000 },
+      // The wavefolder, which keeps changing timbre as the note decays -
+      // the closest thing here to the rage/plugg 808.
+      rage808:     { ring: 1.3, glide: 0.03, drive: 130, grit: 1.5,  mode: "fold", click: 0.5, sweep: 2.2, hp: 160, tone: 7500 },
+      // Long, deep, heavily slid, moderate grit: the cinematic trap 808 that
+      // sits under a whole bar.
+      deep808:     { ring: 3.6, glide: 0.14, drive: 20,  grit: 0.6,  mode: "soft", click: 0.12, sweep: 1.3, hp: 108, tone: 3000 },
+      // Memphis/phonk: short, cheap, thoroughly cooked.
+      memphis808:  { ring: 1.0, glide: 0.02, drive: 75,  grit: 1.2,  mode: "fuzz", click: 0.45, sweep: 2.0, hp: 165, tone: 6200 },
+      // Short and hard-hitting with almost no tail - the 808 as a drum.
+      stab808:     { ring: 0.6, glide: 0.01, drive: 52,  grit: 1.0, mode: "hard", click: 0.55, sweep: 2.4, hp: 180, tone: 5800 },
+      // Two detuned copies plus grit, which spreads it wide without losing
+      // the mono centre the sub path keeps.
+      wide808:     { ring: 2.4, glide: 0.08, drive: 36,  grit: 0.95,  mode: "soft", click: 0.2, sweep: 1.5, hp: 125, tone: 4400, detune: 22 },
+      // Drill: the long downward slide is the whole identity, so the glide
+      // is far longer than anything else here.
+      slide808:    { ring: 2.6, glide: 0.3,  drive: 34,  grit: 0.9, mode: "soft", click: 0.14, sweep: 1.4, hp: 118, tone: 3600 },
+      // Bright and cutting - drives the harmonics well up so it survives a
+      // phone speaker with no low end at all.
+      bright808:   { ring: 1.8, glide: 0.05, drive: 55,  grit: 1.1,  mode: "hard", click: 0.4, sweep: 1.8, hp: 200, tone: 8000 },
     };
     if (EIGHT08[flavor]) {
       const p = EIGHT08[flavor];
@@ -2206,32 +2500,53 @@ class BeatEngine {
       const prev = this._last808[flavor];
       this._last808[flavor] = { freq, time };
 
+      // One amplitude envelope, shared by both paths so they decay together.
       const body = ctx.createGain();
       body.gain.setValueAtTime(0.0001, time);
-      body.gain.linearRampToValueAtTime(vel * 0.85, time + 0.006);
+      body.gain.linearRampToValueAtTime(vel * 0.9, time + 0.006);
       body.gain.exponentialRampToValueAtTime(0.001, time + ring);
 
-      // Saturation, in parallel with the clean sine so the fundamental
-      // survives - clipping the sine itself would eat the very thing that
-      // makes it an 808.
-      let tail = body;
-      if (p.drive > 0) {
+      // SUB PATH. Lowpassed so it contributes weight and nothing else, which
+      // leaves the region above it entirely to the grit path instead of the
+      // two fighting over the same octave.
+      const subLp = ctx.createBiquadFilter();
+      subLp.type = "lowpass";
+      subLp.frequency.value = 90;
+      // Web Audio takes lowpass/highpass Q in decibels, not as a linear Q.
+      // 0dB here is a plain Butterworth; asking for 0.707 would ask for
+      // resonance at the corner and put a hump right where the kick lives.
+      subLp.Q.value = 0;
+      const subGain = ctx.createGain();
+      subGain.gain.value = 1;
+      body.connect(subLp).connect(subGain).connect(dest808);
+
+      // GRIT PATH. The high-pass AFTER the shaper is the part that matters:
+      // it throws away the fundamental the shaper just regenerated, so what
+      // reaches the mix is harmonics only.
+      if (p.grit > 0 && p.drive > 0) {
+        const pre = ctx.createGain();
+        pre.gain.value = p.drive;
         const shaper = ctx.createWaveShaper();
-        const n = 1024, curve = new Float32Array(n);
-        for (let i = 0; i < n; i++) {
-          const x = (i / (n - 1)) * 2 - 1;
-          curve[i] = Math.tanh(x * (1 + p.drive * 2.5));
-        }
-        shaper.curve = curve;
-        const wet = ctx.createGain();
-        wet.gain.value = Math.min(0.6, p.drive * 0.16);
-        const dry = ctx.createGain();
-        dry.gain.value = 1;
-        body.connect(dry).connect(dest808);
-        body.connect(shaper).connect(wet).connect(dest808);
-        tail = null;
-      } else {
-        body.connect(dest808);
+        shaper.curve = this.make808Curve(p.mode, 1);
+        shaper.oversample = "4x";
+        const hp = ctx.createBiquadFilter();
+        hp.type = "highpass";
+        hp.frequency.value = p.hp;
+        hp.Q.value = 0;
+        const hp2 = ctx.createBiquadFilter();
+        hp2.type = "highpass";
+        hp2.frequency.value = p.hp;
+        hp2.Q.value = 0;
+        // Rolling the top off keeps hard clipping from turning into fizz.
+        // Every guide on this says the same thing and it is audibly true.
+        const tone = ctx.createBiquadFilter();
+        tone.type = "lowpass";
+        tone.frequency.value = p.tone;
+        tone.Q.value = 0;
+        const gritGain = ctx.createGain();
+        gritGain.gain.value = vel * p.grit * 0.5;
+        body.connect(pre).connect(shaper).connect(hp).connect(hp2)
+            .connect(tone).connect(gritGain).connect(dest808);
       }
 
       for (const cents of (p.detune ? [-p.detune, p.detune] : [0])) {
@@ -2276,124 +2591,7 @@ class BeatEngine {
       return;
     }
 
-    if (flavor === "true808") {
-      // The modern-rap 808 (Travis Scott/Lil Baby/Gunna-era production).
-      // Three researched pieces beyond the basic "808" flavor below:
-      // 1. THE SLIDE. The single most identifiable modern 808 technique -
-      //    the bass glides smoothly from the previous note's pitch into
-      //    the new one instead of re-attacking (producers do it with
-      //    portamento/glide on the 808 channel). The engine schedules
-      //    notes in time order, so tracking the last 808 note lets a note
-      //    that follows closely glide in from the previous pitch.
-      // 2. Warm constant saturation on the sine body (not the parallel-
-      //    distortion "hard808" - this one is round and warm, the melodic
-      //    808 sound rather than the aggressive one).
-      // 3. A soft knock attack and a long ring that outlives short trigger
-      //    notes, because a real 808 decays on its own terms.
-      const ringTime = Math.max(durationSeconds, 1.5);
-      const prev = this.lastTrue808;
-      this.lastTrue808 = { freq, time };
-      osc.type = "sine";
-      if (prev && time - prev.time > 0 && time - prev.time < 0.5 && Math.abs(prev.freq - freq) > 0.5) {
-        osc.frequency.setValueAtTime(prev.freq, time);
-        osc.frequency.exponentialRampToValueAtTime(freq, time + 0.09);
-      } else {
-        osc.frequency.setValueAtTime(freq * 1.7, time);
-        osc.frequency.exponentialRampToValueAtTime(freq, time + 0.08);
-      }
-      gain.gain.setValueAtTime(vel, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + ringTime);
-      const shaper = ctx.createWaveShaper();
-      shaper.curve = this.makeDistortionCurve(10);
-      osc.connect(shaper).connect(gain).connect(this.dest("bass"));
-      osc.start(time);
-      osc.stop(time + ringTime + 0.05);
-
-      const knock = ctx.createBufferSource();
-      knock.buffer = this.makeNoiseBuffer(0.018);
-      const knockFilter = ctx.createBiquadFilter();
-      knockFilter.type = "highpass";
-      knockFilter.frequency.value = 1800;
-      const knockGain = ctx.createGain();
-      knockGain.gain.setValueAtTime(vel * 0.3, time);
-      knockGain.gain.exponentialRampToValueAtTime(0.001, time + 0.018);
-      knock.connect(knockFilter).connect(knockGain).connect(this.dest("bass"));
-      knock.start(time);
-      knock.stop(time + 0.022);
-      return;
-    }
-
-    if (flavor === "808") {
-      // A real 808 rings out on its own decay, independent of how short the
-      // trigger note is - that long, boomy, semi-percussive sustain is what
-      // makes an 808 an 808 rather than just a filtered sine bass. A short
-      // saturation stage and a soft knock transient round it out.
-      const ringTime = Math.max(durationSeconds, 1.4);
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(freq * 1.8, time);
-      osc.frequency.exponentialRampToValueAtTime(freq, time + 0.09);
-      gain.gain.setValueAtTime(vel, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + ringTime);
-      const shaper = ctx.createWaveShaper();
-      shaper.curve = this.makeDistortionCurve(6);
-      osc.connect(shaper).connect(gain).connect(this.dest("bass"));
-      osc.start(time);
-      osc.stop(time + ringTime + 0.05);
-
-      const knock = ctx.createBufferSource();
-      knock.buffer = this.makeNoiseBuffer(0.015);
-      const knockFilter = ctx.createBiquadFilter();
-      knockFilter.type = "highpass";
-      knockFilter.frequency.value = 2000;
-      const knockGain = ctx.createGain();
-      knockGain.gain.setValueAtTime(vel * 0.25, time);
-      knockGain.gain.exponentialRampToValueAtTime(0.001, time + 0.015);
-      knock.connect(knockFilter).connect(knockGain).connect(this.dest("bass"));
-      knock.start(time);
-      knock.stop(time + 0.02);
-      return;
-    } else if (flavor === "hard808") {
-      // Modern hard-trap 808s use parallel distortion: a clean sub layer
-      // keeps the low end powerful and undistorted (distorting the whole
-      // signal loses low-frequency punch), while a second, heavily
-      // saturated copy is blended in on top purely for harmonic "bite" -
-      // the aggression that actually reads on phone/laptop speakers.
-      const ringTime = Math.max(durationSeconds, 1.3);
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(freq * 1.8, time);
-      osc.frequency.exponentialRampToValueAtTime(freq, time + 0.07);
-      gain.gain.setValueAtTime(vel, time);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + ringTime);
-      osc.connect(gain).connect(this.dest("bass"));
-      osc.start(time);
-      osc.stop(time + ringTime + 0.05);
-
-      const grit = ctx.createOscillator();
-      grit.type = "sine";
-      grit.frequency.setValueAtTime(freq * 1.8, time);
-      grit.frequency.exponentialRampToValueAtTime(freq, time + 0.07);
-      const gritShaper = ctx.createWaveShaper();
-      gritShaper.curve = this.makeDistortionCurve(35);
-      const gritGain = ctx.createGain();
-      gritGain.gain.setValueAtTime(vel * 0.45, time);
-      gritGain.gain.exponentialRampToValueAtTime(0.001, time + Math.min(ringTime, 0.9));
-      grit.connect(gritShaper).connect(gritGain).connect(this.dest("bass"));
-      grit.start(time);
-      grit.stop(time + ringTime + 0.05);
-
-      const knock = ctx.createBufferSource();
-      knock.buffer = this.makeNoiseBuffer(0.02);
-      const knockFilter = ctx.createBiquadFilter();
-      knockFilter.type = "highpass";
-      knockFilter.frequency.value = 1600;
-      const knockGain = ctx.createGain();
-      knockGain.gain.setValueAtTime(vel * 0.4, time);
-      knockGain.gain.exponentialRampToValueAtTime(0.001, time + 0.02);
-      knock.connect(knockFilter).connect(knockGain).connect(this.dest("bass"));
-      knock.start(time);
-      knock.stop(time + 0.025);
-      return;
-    } else if (flavor === "synth") {
+    if (flavor === "synth") {
       osc.type = "sawtooth";
       osc.frequency.setValueAtTime(freq, time);
       const filter = ctx.createBiquadFilter();
@@ -2626,6 +2824,54 @@ class BeatEngine {
       osc.start(time);
       osc.stop(time + durationSeconds + 0.05);
     }
+  }
+
+  // Transfer curves for the 808 grit stage, one per family of distortion,
+  // because they do audibly different things and rap records use all of them.
+  //
+  //   soft  tanh. Symmetric and gentle at the knee, so it rounds the peaks
+  //         and builds mostly ODD harmonics that fall away quickly. This is
+  //         "warm", the melodic-808 sound.
+  //   hard  a straight clip at +/-1. The corner is a discontinuity, so the
+  //         odd harmonic series falls away slowly and stays audible a long
+  //         way up. This is the aggressive one - the sound of an 808 slammed
+  //         into a clipper, which is most of modern rap.
+  //   fuzz  asymmetric: the negative half is squashed harder than the
+  //         positive one. Asymmetry is what generates EVEN harmonics
+  //         (notably the octave), which reads as buzzy and vocal rather than
+  //         simply loud.
+  //   fold  a wavefolder. Past full scale the curve turns back on itself
+  //         instead of flattening, so the harmonic content keeps changing as
+  //         the note decays. The most extreme option here, and the closest
+  //         thing to the "rage"/plugg 808 sound.
+  make808Curve(mode, k) {
+    const n = 2048;
+    const curve = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const x = (i / (n - 1)) * 2 - 1;
+      const d = x * k;
+      let y;
+      if (mode === "hard") {
+        y = Math.max(-1, Math.min(1, d));
+      } else if (mode === "fuzz") {
+        y = d >= 0 ? Math.tanh(d) : Math.tanh(d * 1.9) * 0.72;
+      } else if (mode === "fold") {
+        // Fold back at the rails rather than clipping. sin() is the
+        // classic cheap folder and stays continuous, which keeps it musical
+        // instead of merely noisy.
+        y = Math.sin(d * 1.4) * (1 - Math.exp(-Math.abs(d) * 2));
+      } else {
+        y = Math.tanh(d);
+      }
+      curve[i] = y;
+    }
+    // Normalise so the "drive" knob changes CHARACTER and not level. Without
+    // this every kit with a higher drive is also simply louder, and the two
+    // are impossible to tell apart by ear.
+    let peak = 0;
+    for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(curve[i]));
+    if (peak > 0) for (let i = 0; i < n; i++) curve[i] /= peak;
+    return curve;
   }
 
   makeDistortionCurve(amount) {
@@ -4057,6 +4303,22 @@ class BeatEngine {
       flute8:     [0, 0, 8, 0, 0, 0, 0, 0, 0],   // a single pure flute stop
       reedy:      [8, 0, 8, 0, 8, 0, 6, 0, 4],   // odd bars only, hollow and nasal
       bright16:   [8, 6, 8, 6, 4, 4, 2, 2, 6],   // bright, upper-work heavy
+      // 888800000 - the rock registration: the Jimmy Smith setting with the
+      // fourth bar added, which is what fills it out under a band.
+      rockorgan:  [8, 8, 8, 8, 0, 0, 0, 0, 0],
+      // 800808000 - the "percussion" sound: fundamental plus two spaced
+      // upper bars and nothing between them, so it reads as bell-like.
+      perc3:      [8, 0, 0, 8, 0, 8, 0, 0, 0],
+      // 006876540 - a tapered registration, warm through the middle.
+      mellowbars: [0, 0, 6, 8, 7, 6, 5, 4, 0],
+      // 888000008 - the classic "gospel wail": the bottom three plus the
+      // very top bar, which screams without being bright all the way down.
+      wail:       [8, 8, 8, 0, 0, 0, 0, 0, 8],
+      // 088000000 - no fundamental at all, so the pitch is implied by the
+      // quint and the octave. Thin and nasal on purpose.
+      quintonly:  [0, 8, 8, 0, 0, 0, 0, 0, 0],
+      // 858528600 - a theatre-organ style tapered set with a dip in it.
+      theatre:    [8, 5, 8, 5, 2, 8, 6, 0, 0],
     };
     if (DRAWBARS[flavor]) {
       // Own duration - this branch sits above the function's own `const dur`,
@@ -4307,10 +4569,24 @@ class BeatEngine {
     // genuinely changes the word being sung rather than just the tone.
     const VOWELS = {
       eee: [270, 2290, 3010],
-      ohh: [570, 840, 2410],
+      ohh: [500, 700, 2400],
       mmm: [280, 1150, 2300],
+      // Was an exact copy of "ohh" - same three formants, so the two kits
+      // were literally the same sound. /o/ as in "boat" is a closer, rounder
+      // vowel than /aw/ as in "thought"; these are the measured values for
+      // each, which is what makes them different words rather than two names.
       aww: [570, 840, 2410],
       yeah: [660, 1720, 2410],
+      // More of the vowel space, measured values throughout. Each of these is
+      // a different word being sung, not a different filter setting.
+      ih:   [400, 1920, 2560],   // "bit"
+      uh:   [640, 1190, 2390],   // "but"
+      er:   [490, 1350, 1690],   // "bird" - the low third formant is the r
+      oo:   [300, 870, 2240],    // "boot"
+      aa:   [730, 1090, 2440],   // "father"
+      // "bait". This one gives the long-standing "ay" kit a real vowel;
+      // it had no entry here at all and was falling through to the default.
+      ay:   [530, 1840, 2480],
     };
     if (VOWELS[flavor]) {
       const dur = Math.min(durationSeconds, 1.6);
@@ -4471,6 +4747,27 @@ class BeatEngine {
         strike: { freq: 1500, len: 0.016, level: 0.3 } },
       musicboxhi: { gain: 0.34, partials: [[1, 1, 0.9], [4.2, 0.25, 0.4], [9.1, 0.09, 0.16]],
         strike: { freq: 5200, len: 0.007, level: 0.2, type: "highpass" } },
+      // A sansula: a kalimba mounted on a drum head, so the shell resonates
+      // under every note and gives it a soft bloom the bare tines lack.
+      sansula:    { gain: 0.55, partials: [[1, 1, 2.0], [2, 0.3, 1.2], [3.9, 0.16, 0.5], [8.6, 0.05, 0.2]],
+        strike: { freq: 1200, len: 0.018, level: 0.16 } },
+      // A karimba - the small, high, bright board lamellophone.
+      karimba:    { gain: 0.42, partials: [[1, 1, 0.9], [4.1, 0.34, 0.35], [9.3, 0.12, 0.14]],
+        strike: { freq: 3400, len: 0.009, level: 0.3 } },
+      // A likembe, whose buzzing bottlecaps are the point: a noisy rattle
+      // rides on top of every note.
+      likembe:    { gain: 0.5, partials: [[1, 1, 1.3], [3.8, 0.28, 0.45], [7.2, 0.14, 0.25]],
+        strike: { freq: 2000, len: 0.05, level: 0.34, q: 0.6 } },
+      // A celeste: felt hammers on steel bars over resonators. Softer than a
+      // glockenspiel and much rounder than a music box.
+      celestetine:{ gain: 0.34, partials: [[1, 1, 1.6], [4.02, 0.28, 0.8], [8.1, 0.09, 0.3]],
+        strike: { freq: 2600, len: 0.01, level: 0.12 } },
+      // A toy piano: short, hard, slightly out of tune with itself.
+      toybox:     { gain: 0.4, partials: [[1, 1, 0.7], [3.6, 0.4, 0.28], [7.1, 0.2, 0.12]],
+        strike: { freq: 4200, len: 0.008, level: 0.36, type: "highpass" } },
+      // A small tuned bell, for a bright counter-line over a dark beat.
+      tinebell:   { gain: 0.32, partials: [[1, 1, 2.2], [2.76, 0.5, 1.3], [5.4, 0.22, 0.6], [8.9, 0.08, 0.28]],
+        strike: { freq: 6000, len: 0.008, level: 0.26, type: "highpass" } },
     };
     if (TINES[flavor]) { this.playStruckVoice(time, freq, vel, dest, TINES[flavor]); return; }
 
@@ -4626,38 +4923,105 @@ class BeatEngine {
     const dur = Math.min(durationSeconds, 0.55);
 
     // Different vowel shapes. Auto-tuned singing reads as a vowel plus a
-    // pitch, and the vowel is entirely in where the formants sit.
-    const FORMANTS = {
-      moody: [420, 1000, 2350],     // an "oh", dark and closed
-      bright: [720, 1720, 3100],    // an "ah", open and forward
-      wide: [500, 1350, 2700],      // between the two, doubled below
-      gritty: [600, 1450, 2800],    // "ah" with the drive turned up
+    // pitch, and the vowel is entirely in where the formants sit - so the
+    // kits here are a table of real vowel formant frequencies rather than a
+    // set of filter tweaks. F1/F2/F3 values follow the standard measured
+    // positions for each vowel; the rest of each row is how the voice is
+    // driven, which is what separates a soft croon from a full-throated wail.
+    //
+    //   q       formant sharpness. Higher reads as more nasal and synthetic.
+    //   det     chorus width in cents between the two saw layers.
+    //   snap    how fast the pitch locks onto the note. This is the Auto-Tune
+    //           artefact itself: at 0 the pitch simply arrives, and the
+    //           shorter the ramp the harder the correction sounds.
+    //   drive   saturation on the way out.
+    //   sub     level of an octave-below sine, which thickens a low hook.
+    //   air     level of a breath layer over the top.
+    const AUTOLEAD = {
+      moody:   { f: [420, 1000, 2350], lv: [1, 0.5, 0.28], q: 9,  det: 7,  snap: 0.03,  drive: 0,   sub: 0,    air: 0 },
+      bright:  { f: [720, 1720, 3100], lv: [1, 0.62, 0.4], q: 14, det: 7,  snap: 0.02,  drive: 0,   sub: 0,    air: 0.05 },
+      wide:    { f: [500, 1350, 2700], lv: [1, 0.5, 0.28], q: 14, det: 22, snap: 0.03,  drive: 0,   sub: 0.18, air: 0.04 },
+      gritty:  { f: [600, 1450, 2800], lv: [1, 0.5, 0.28], q: 14, det: 9,  snap: 0.015, drive: 12,  sub: 0.1,  air: 0 },
+      hard:    { f: [660, 1580, 2900], lv: [1, 0.58, 0.34], q: 16, det: 5, snap: 0.008, drive: 20,  sub: 0.14, air: 0 },
+      // "oo" - the closed, dark croon that sits under a busy trap mix.
+      soft:    { f: [330, 800, 2200],  lv: [1, 0.4, 0.18], q: 8,  det: 12, snap: 0.05,  drive: 0,   sub: 0.22, air: 0.08 },
+      // "ee" - forward and nasal, the sound of a hook pushed up in register.
+      nasal:   { f: [280, 2250, 2900], lv: [1, 0.7, 0.45], q: 18, det: 6,  snap: 0.012, drive: 6,   sub: 0,    air: 0.03 },
+      // "aa" fully open, wide and long: the big melodic hook.
+      wail:    { f: [800, 1200, 2600], lv: [1, 0.66, 0.36], q: 11, det: 26, snap: 0.04, drive: 4,   sub: 0.12, air: 0.1 },
+      // Almost no ramp at all, high formant Q: the deliberately robotic
+      // setting, where the correction IS the effect.
+      robotic: { f: [540, 1700, 2600], lv: [1, 0.75, 0.5], q: 24, det: 0,  snap: 0.001, drive: 10,  sub: 0,    air: 0 },
+      // Breath over tone, barely driven - the whispered ad-lib.
+      airy:    { f: [480, 1150, 2500], lv: [1, 0.42, 0.3],  q: 7,  det: 16, snap: 0.06, drive: 0,   sub: 0,    air: 0.3 },
+      // Low and thick, for a hook doubled down an octave.
+      deep:    { f: [360, 900, 2100],  lv: [1, 0.45, 0.2],  q: 10, det: 10, snap: 0.03, drive: 5,   sub: 0.34, air: 0 },
+      // The full modern preset: hard snap, wide chorus, saturated.
+      modern:  { f: [620, 1500, 2850], lv: [1, 0.6, 0.38],  q: 15, det: 18, snap: 0.006, drive: 15, sub: 0.2,  air: 0.06 },
     };
-    const formants = FORMANTS[flavor] || FORMANTS.moody;
-    const levels = flavor === "bright" ? [1, 0.62, 0.4] : [1, 0.5, 0.28];
+    const p = AUTOLEAD[flavor] || AUTOLEAD.moody;
 
     const envelope = ctx.createGain();
     envelope.gain.setValueAtTime(0.0001, time);
     envelope.gain.linearRampToValueAtTime(vel, time + 0.008);
     envelope.gain.setValueAtTime(vel, time + Math.max(0.008, dur - 0.09));
     envelope.gain.exponentialRampToValueAtTime(0.001, time + dur);
-    envelope.connect(dest);
 
-    for (const detune of [-0.007, 0.007]) {
+    let out = envelope;
+    if (p.drive > 0) {
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = this.makeDistortionCurve(p.drive);
+      shaper.oversample = "2x";
+      envelope.connect(shaper).connect(dest);
+    } else {
+      envelope.connect(dest);
+    }
+
+    // The pitch snap. A real Auto-Tune at maximum retune speed still takes a
+    // few milliseconds to pull a note into place, and starting slightly flat
+    // is what makes that audible instead of merely correct.
+    const startF = freq * (p.snap > 0.002 ? 0.985 : 0.97);
+    for (const cents of (p.det ? [-p.det, p.det] : [0])) {
       const osc = ctx.createOscillator();
       osc.type = "sawtooth";
-      osc.frequency.setValueAtTime(freq * (1 + detune), time);
-      formants.forEach((freqCenter, i) => {
+      const f = freq * Math.pow(2, cents / 1200);
+      osc.frequency.setValueAtTime(startF * Math.pow(2, cents / 1200), time);
+      osc.frequency.exponentialRampToValueAtTime(f, time + Math.max(0.001, p.snap));
+      p.f.forEach((freqCenter, i) => {
         const bp = ctx.createBiquadFilter();
         bp.type = "bandpass";
         bp.frequency.value = freqCenter;
-        bp.Q.value = flavor === "moody" ? 9 : 14;
+        bp.Q.value = p.q;
         const g = ctx.createGain();
-        g.gain.value = (levels[i] / 2) * (flavor === "moody" ? 0.85 : 1);
+        g.gain.value = (p.lv[i] / (p.det ? 2 : 1)) * 0.9;
         osc.connect(bp).connect(g).connect(envelope);
       });
       osc.start(time);
       osc.stop(time + dur + 0.05);
+    }
+
+    if (p.sub > 0) {
+      const s = ctx.createOscillator();
+      s.type = "sine";
+      s.frequency.setValueAtTime(freq / 2, time);
+      const g = ctx.createGain();
+      g.gain.value = p.sub;
+      s.connect(g).connect(envelope);
+      s.start(time);
+      s.stop(time + dur + 0.05);
+    }
+    if (p.air > 0) {
+      const n = ctx.createBufferSource();
+      n.buffer = this.makeNoiseBuffer(dur + 0.05);
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = p.f[1] * 1.6;
+      bp.Q.value = 1.2;
+      const g = ctx.createGain();
+      g.gain.value = p.air;
+      n.connect(bp).connect(g).connect(envelope);
+      n.start(time);
+      n.stop(time + dur + 0.05);
     }
   }
 
@@ -4684,6 +5048,22 @@ class BeatEngine {
       soprano: { oct: 2, bright: 0.85, breath: 0.22, vib: 5.6 },
       basssax: { oct: 0.25, bright: 0.35, breath: 0.42, vib: 4.0 },
       subtone: { oct: 0.5, bright: 0.28, breath: 0.55, vib: 3.6 },
+      // Overblown to the point of buzzing: the growl a player gets by
+      // humming through the horn while playing it. Far more upper harmonics
+      // and far more air than a clean tone.
+      growl:   { oct: 0.5, bright: 0.95, breath: 0.62, vib: 6.2 },
+      // The altissimo register - above the horn's normal range, thin and
+      // piercing, which is what a solo climbs to at its peak.
+      altissimo:{ oct: 2, bright: 0.92, breath: 0.3, vib: 6.6 },
+      // Played very softly and close: almost no harmonics, mostly breath.
+      // The late-night ballad sound.
+      smoky:   { oct: 0.5, bright: 0.2, breath: 0.7, vib: 3.2 },
+      // A bright, forward, pushed alto - the pop-record sax hook.
+      cutting: { oct: 1, bright: 0.88, breath: 0.24, vib: 5.8 },
+      // Wide slow vibrato and a mid-heavy body: the vintage swing tone.
+      vintage: { oct: 0.5, bright: 0.5, breath: 0.34, vib: 3.0 },
+      // A C-melody sax, between alto and tenor, mellow and centred.
+      cmelody: { oct: 0.75, bright: 0.45, breath: 0.3, vib: 4.4 },
     };
     if (HORNS[flavor]) {
       const h = HORNS[flavor];
@@ -4821,6 +5201,42 @@ class BeatEngine {
       // reed for its bore, which is why it is so breathy, so dark, and
       // has almost no upper harmonics at all despite being a double reed.
       duduk:       { bore: "con",  oct: 0.5, formant: 800,  breath: 0.4,  vib: 4.0, attack: 0.07,  bright: 0.32 },
+
+      // --- more of the flute family ----------------------------------------
+      // Worth having a lot of: the hard genres are restricted to flutes and
+      // dark end-blown winds, so this family is the only woodwind variety
+      // trap, drill, rap and phonk can ever draw on. One flute for four
+      // genres is how a signature sound becomes a rut.
+      // A piccolo is a flute an octave up with almost no body resonance,
+      // which is why it cuts through anything.
+      piccolo:     { bore: "edge", oct: 2,   formant: 3200, breath: 0.34, vib: 5.4, attack: 0.035, bright: 0.4 },
+      // Stopped pipes with no fingerholes: very pure, very breathy, and the
+      // note has to be re-attacked every time.
+      panflute:    { bore: "edge", oct: 1,   formant: 1750, breath: 0.62, vib: 3.4, attack: 0.045, bright: 0.2 },
+      // A vessel flute. Almost no overtones at all - close to a sine with
+      // breath on it, which is exactly why it sounds so soft.
+      ocarina:     { bore: "edge", oct: 1,   formant: 1250, breath: 0.36, vib: 4.2, attack: 0.05, bright: 0.12 },
+      // A tin whistle: bright, hard-edged and pushed.
+      tinwhistle:  { bore: "edge", oct: 2,   formant: 2800, breath: 0.28, vib: 4.8, attack: 0.025, bright: 0.42 },
+      // The dizi's buzzing membrane over a side hole is its whole identity,
+      // so it carries far more breath noise than its brightness suggests.
+      dizi:        { bore: "edge", oct: 1,   formant: 2100, breath: 0.72, vib: 5.2, attack: 0.04, bright: 0.38 },
+      // A Middle Eastern end-blown reed flute, played at an angle: the
+      // breathiest instrument in this table by a distance.
+      ney:         { bore: "edge", oct: 0.5, formant: 1150, breath: 0.95, vib: 4.4, attack: 0.1, bright: 0.28 },
+      // A bass flute: low, wide and slow to speak.
+      bassflute:   { bore: "edge", oct: 0.25, formant: 750, breath: 0.66, vib: 4.0, attack: 0.11, bright: 0.18 },
+      // Overblown flute - pushed hard enough that the harmonics dominate.
+      // The aggressive flute sound, for when the genre is not a pretty one.
+      overblown:   { bore: "edge", oct: 1,   formant: 2300, breath: 0.8,  vib: 6.2, attack: 0.03, bright: 0.6 },
+      // A wooden transverse flute: darker and woodier than the silver one.
+      woodflute:   { bore: "edge", oct: 1,   formant: 1350, breath: 0.5,  vib: 4.4, attack: 0.065, bright: 0.2 },
+
+      // --- two more reeds, for the genres that can take them ----------------
+      // An alto flute's reed-instrument counterpart in register and mood.
+      basset:      { bore: "cyl",  oct: 0.5, formant: 1150, breath: 0.16, vib: 3.6, attack: 0.05, bright: 0.45 },
+      // A contrabassoon: the floor of the woodwind section.
+      contrabassoon:{ bore: "con", oct: 0.125, formant: 320, breath: 0.18, vib: 3.8, attack: 0.07, bright: 0.6 },
     };
     const p = P[flavor] || P.flute;
     const f0 = freq * p.oct;
@@ -4931,6 +5347,76 @@ class BeatEngine {
       const cab = this.makeGuitarCab(dest, { bright: 1.05, body: 1, presence: 2.5 });
       this.addPickNoise(time, vel, cab, 1);
       this.pluckString(time, freq, dur, vel, cab, { damp: 0.3, feedback: 0.99, pluckNoise: 0.01, brightness: 1, sustain: 1.4 });
+      return;
+    }
+
+    // Amp and pickup character as a table. A lead guitar tone is a string
+    // into a gain stage into a speaker, and what separates most of them is
+    // just how much gain, how bright the cabinet is, and how long the string
+    // is allowed to ring - so those are parameters rather than branches.
+    //
+    //   gain      waveshaper drive; 0 means a clean amp
+    //   bright    cabinet top end
+    //   damp      how fast the string dies (low = long sustain)
+    //   fb        string feedback coefficient; near 1 sings, lower plucks
+    //   trem/dep  amplitude tremolo rate in Hz and its depth
+    const LEADS = {
+      // A cranked but not saturated amp: the classic rock rhythm-lead tone.
+      crunch:    { gain: 20, bright: 1.0,  damp: 0.2,  fb: 0.993, sus: 1.8, presence: 4 },
+      // High gain, tight low end, scooped mids.
+      metal:     { gain: 46, bright: 0.85, damp: 0.16, fb: 0.995, sus: 2.2, presence: 6 },
+      // A clean amp with its tremolo circuit on - the surf/spaghetti sound.
+      tremolo:   { gain: 0,  bright: 1.1,  damp: 0.26, fb: 0.991, sus: 1.6, presence: 3, trem: 5.5, dep: 0.55 },
+      // Slow tremolo and a lot of top: the reverb-drenched surf lead.
+      surf:      { gain: 6,  bright: 1.25, damp: 0.3,  fb: 0.99,  sus: 1.4, presence: 5, trem: 4.2, dep: 0.4 },
+      // A hollow-body through a clean amp, rolled off: the jazz box.
+      jazzlead:  { gain: 0,  bright: 0.55, damp: 0.34, fb: 0.988, sus: 1.2, presence: 1.2 },
+      // Just breaking up, mid-forward, long sustain: the blues lead.
+      blues:     { gain: 14, bright: 0.95, damp: 0.18, fb: 0.9945, sus: 2.4, presence: 3.5 },
+      // Chorus on a clean amp - two slightly detuned copies.
+      chorus:    { gain: 0,  bright: 1.15, damp: 0.28, fb: 0.99,  sus: 1.5, presence: 3, detune: 9 },
+      // An EBow: infinite sustain, no pick attack at all, so it swells.
+      ebow:      { gain: 8,  bright: 0.9,  damp: 0.06, fb: 0.9995, sus: 5, presence: 3, swell: 0.35 },
+      // A thin, bright single-coil played hard: the funk/disco lead line.
+      twang:     { gain: 4,  bright: 1.3,  damp: 0.4,  fb: 0.985, sus: 0.9, presence: 6 },
+    };
+    if (LEADS[flavor]) {
+      const p = LEADS[flavor];
+      const cab = this.makeGuitarCab(dest, { bright: p.bright, body: 1, presence: p.presence });
+      let node = cab;
+      if (p.trem) {
+        // The tremolo circuit: the amp's output level swings, so it is an
+        // amplitude modulation on the whole signal rather than on one string.
+        const t = ctx.createGain();
+        t.gain.value = 1 - p.dep / 2;
+        const lfo = ctx.createOscillator();
+        lfo.type = "sine";
+        lfo.frequency.value = p.trem;
+        const amt = ctx.createGain();
+        amt.gain.value = p.dep / 2;
+        lfo.connect(amt).connect(t.gain);
+        lfo.start(time);
+        lfo.stop(time + dur + 0.1);
+        t.connect(cab);
+        node = t;
+      }
+      if (p.gain > 0) {
+        const sh = ctx.createWaveShaper();
+        sh.curve = this.makeDistortionCurve(p.gain);
+        sh.oversample = "4x";
+        const post = ctx.createGain();
+        post.gain.value = 0.5;
+        sh.connect(post).connect(node);
+        node = sh;
+      }
+      if (!p.swell) this.addPickNoise(time, vel, node, p.bright);
+      const strings = p.detune ? [-p.detune, p.detune] : [0];
+      for (const cents of strings) {
+        this.pluckString(time, freq * Math.pow(2, cents / 1200), dur,
+          vel / strings.length, node,
+          { damp: p.damp, feedback: p.fb, pluckNoise: p.swell ? 0.001 : 0.008,
+            brightness: p.bright, sustain: p.sus });
+      }
       return;
     }
 
@@ -5054,6 +5540,18 @@ class BeatEngine {
       robot:  [[400, 1300], [420, 1350], [400, 1300]],
       // "ah" -> "ee" up high, cutting
       bright: [[700, 1200], [400, 2400], [300, 2600]],
+      // "oo" throughout, barely moving: dark and closed, sits under a mix.
+      deep:   [[350, 800], [330, 760], [300, 700]],
+      // "ee" held, the most nasal and most obviously synthetic vowel.
+      nasal:  [[280, 2250], [300, 2400], [280, 2250]],
+      // "oh" -> "ah" -> "oo", a full round phrase rather than a single word.
+      drawl:  [[450, 900], [700, 1150], [400, 850]],
+      // The 70s vocoder shape: mid vowels, wide sweep, ends open.
+      vintage:[[520, 1100], [600, 1550], [700, 1900]],
+      // "ah" -> "oh" fast and back, which reads as a short spoken word.
+      chatter:[[720, 1250], [420, 950], [700, 1220]],
+      // A long rise into "ee" - the talkbox lick that climbs.
+      rise:   [[400, 850], [500, 1500], [300, 2450]],
     };
     const path = VOWELS[flavor] || VOWELS.roger;
 
@@ -5144,6 +5642,32 @@ class BeatEngine {
         strike: { freq: 900, len: 0.015, level: 0.16 } },
       celestebar:  { gain: 0.36, partials: [[1, 1, 1.3], [4.05, 0.3, 0.7], [8.1, 0.1, 0.35], [12, 0.04, 0.2]],
         strike: { freq: 3000, len: 0.009, level: 0.14 } },
+      // A steel pan: a hammered dish whose note areas are tuned to the
+      // octave and twelfth, which is why it sounds bright but still pitched.
+      steelpan:    { gain: 0.5, partials: [[1, 1, 1.4], [2, 0.6, 1.0], [3, 0.34, 0.6], [4.9, 0.12, 0.3]],
+        strike: { freq: 2400, len: 0.012, level: 0.28 } },
+      // Bowed vibraphone: no strike at all, so it swells instead of being
+      // hit, and the partials last far longer.
+      bowedvibes:  { gain: 0.4, partials: [[1, 1, 3.4], [4, 0.3, 2.2], [10.7, 0.08, 1.1]] },
+      // A tuned bell plate, deliberately inharmonic and metallic.
+      bellplate:   { gain: 0.38, partials: [[1, 1, 2.6], [2.34, 0.6, 1.8], [3.91, 0.32, 1.1], [6.2, 0.15, 0.6]],
+        strike: { freq: 5200, len: 0.01, level: 0.3, type: "highpass" } },
+      // Almglocken - tuned cowbells. Short, hard and very inharmonic.
+      almglocken:  { gain: 0.44, partials: [[1, 1, 0.9], [1.52, 0.5, 0.6], [2.61, 0.28, 0.35], [3.8, 0.12, 0.2]],
+        strike: { freq: 3600, len: 0.008, level: 0.34 } },
+      // A wooden slit drum: the fundamental plus one weak, low overtone.
+      slitdrum:    { gain: 0.58, partials: [[1, 1, 0.8], [1.9, 0.18, 0.4]],
+        strike: { freq: 700, len: 0.014, level: 0.24 } },
+      // Marimba struck with hard rubber rather than yarn: the same bar with
+      // far more attack and a shorter body.
+      hardmallet:  { gain: 0.55, partials: [[1, 1, 0.75], [4, 0.34, 0.3], [9.2, 0.14, 0.14]],
+        strike: { freq: 2800, len: 0.01, level: 0.4 } },
+      // Very soft yarn mallets on a low marimba - almost no attack at all.
+      softmallet:  { gain: 0.6, partials: [[1, 1, 1.9], [4, 0.1, 0.6]],
+        strike: { freq: 500, len: 0.03, level: 0.06 } },
+      // Glockenspiel: small steel bars, extremely bright, long ring.
+      glockbar:    { gain: 0.3, partials: [[1, 1, 1.8], [3, 0.5, 1.0], [6.1, 0.2, 0.5], [10.4, 0.07, 0.25]],
+        strike: { freq: 7000, len: 0.007, level: 0.3, type: "highpass" } },
     };
     if (BARS[flavor]) { this.playStruckVoice(time, freq, vel, dest, BARS[flavor]); return; }
 
@@ -5285,6 +5809,58 @@ class BeatEngine {
     const ctx = this.ctx;
     const dest = this.dest("arp");
     const dur = Math.min(durationSeconds, 0.16);
+
+    // Most arpeggiator sounds are the same three decisions - waveform, how
+    // far the filter sweeps, how long the tail is - so they are a table
+    // rather than a branch each. The hand-written ones below are the ones
+    // that need something a table cannot express.
+    //
+    //   uni/det  unison voices and their spread in cents
+    //   cut      filter sweep, as multiples of the note's own frequency, so
+    //            the brightness tracks the pitch instead of every high note
+    //            turning to glass
+    //   tail     decay as a multiple of the step length
+    const ARPS = {
+      saw:     { wave: "sawtooth", uni: 1, det: 0,  q: 3,  cut: [14, 2.5], tail: 1.2, gain: 0.6 },
+      square:  { wave: "square",   uni: 1, det: 0,  q: 4,  cut: [10, 2],   tail: 1.1, gain: 0.5 },
+      wide:    { wave: "sawtooth", uni: 5, det: 20, q: 5,  cut: [12, 3],   tail: 1.8, gain: 0.42 },
+      dark:    { wave: "triangle", uni: 3, det: 8,  q: 2,  cut: [5, 1.6],  tail: 1.5, gain: 0.62 },
+      glass:   { wave: "sine",     uni: 3, det: 5,  q: 1,  cut: [24, 10],  tail: 2.4, gain: 0.5 },
+      // A pure sub-octave arp, for when the arpeggio is the bassline.
+      subarp:  { wave: "triangle", uni: 1, det: 0,  q: 1,  cut: [4, 1.2],  tail: 1.3, gain: 0.7, oct: -1 },
+      // Very short and very bright: the "plucked" arp that sits on top of a
+      // busy mix without competing with anything.
+      needle:  { wave: "sawtooth", uni: 2, det: 4,  q: 9,  cut: [30, 6],   tail: 0.7, gain: 0.45 },
+      // Filter opening upward instead of closing, so each note swells.
+      swellarp:{ wave: "sawtooth", uni: 3, det: 12, q: 6,  cut: [2, 16],   tail: 2.6, gain: 0.4 },
+    };
+    if (ARPS[flavor]) {
+      const p = ARPS[flavor];
+      const f0 = freq * (p.oct ? Math.pow(2, p.oct) : 1);
+      const tail = dur * p.tail;
+      const filter = ctx.createBiquadFilter();
+      filter.type = "lowpass";
+      filter.Q.value = p.q;
+      filter.frequency.setValueAtTime(Math.min(16000, Math.max(120, f0 * p.cut[0])), time);
+      filter.frequency.exponentialRampToValueAtTime(
+        Math.min(16000, Math.max(120, f0 * p.cut[1])), time + tail);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, time);
+      gain.gain.linearRampToValueAtTime(vel * p.gain, time + 0.004);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + tail);
+      filter.connect(gain).connect(dest);
+      if (p.uni > 1) {
+        this.addUnisonVoices(f0, p.uni, p.det, p.wave, filter, time, time + tail + 0.03);
+      } else {
+        const o = ctx.createOscillator();
+        o.type = p.wave;
+        o.frequency.setValueAtTime(f0, time);
+        o.connect(filter);
+        o.start(time);
+        o.stop(time + tail + 0.03);
+      }
+      return;
+    }
 
     if (flavor === "trance") {
       // The supersaw arp of late-90s trance: several detuned saws, a filter
@@ -5804,6 +6380,92 @@ class BeatEngine {
     hammer.start(time);
     hammer.stop(time + 0.015);
 
+    if (flavor === "rhodes" || flavor === "electric") {
+      // Both of these had no branch at all: they fell through to the generic
+      // sine-plus-triangle below and were byte-for-byte the same sound. That
+      // matters more than most duplicates would, because the Rhodes is the
+      // single most-used keyboard in four of this program's genres - neo-soul,
+      // R&B, lo-fi and boom-bap all lean on it - and it was a plain sine.
+      //
+      // A Rhodes is a struck TINE: a steel rod hit by a hammer, with a
+      // pickup next to it. Three things make the sound, and none of them is
+      // a filter:
+      //  1. the strike, which is a short burst of very high inharmonic
+      //     partials - the "bark" - and it dies away in under 200ms;
+      //  2. a nearly pure sine body underneath it, because a tine vibrating
+      //     in free air has almost no overtones of its own;
+      //  3. the pickup, which is nonlinear and adds a little asymmetric
+      //     grit that grows with how hard the note is played.
+      // The bark is what says "electric piano" instead of "sine", and it is
+      // velocity-dependent, which is why a Rhodes goes from mellow to
+      // aggressive with nothing but the player's hands.
+      const tine = flavor === "rhodes";
+      const body = ctx.createGain();
+      body.gain.setValueAtTime(0.0001, time);
+      body.gain.linearRampToValueAtTime(vel * 0.85, time + 0.004);
+      body.gain.exponentialRampToValueAtTime(0.001, time + dur);
+
+      // The pickup nonlinearity, harder on the Rhodes than on the generic
+      // amped electric.
+      const pickup = ctx.createWaveShaper();
+      pickup.curve = this.makeDistortionCurve(tine ? 3 + vel * 6 : 2);
+      pickup.oversample = "2x";
+      const post = ctx.createGain();
+      post.gain.value = 0.85;
+      body.connect(pickup).connect(post).connect(dest);
+
+      const fundamental = ctx.createOscillator();
+      fundamental.type = "sine";
+      fundamental.frequency.setValueAtTime(freq, time);
+      fundamental.connect(body);
+      fundamental.start(time);
+      fundamental.stop(time + dur + 0.1);
+
+      // A second, very slightly detuned voice: the Rhodes has two tines per
+      // note over most of its range and they are never perfectly in tune.
+      const pair = ctx.createOscillator();
+      pair.type = "sine";
+      pair.frequency.setValueAtTime(freq * (tine ? 1.0015 : 1.004), time);
+      const pg = ctx.createGain();
+      pg.gain.value = 0.5;
+      pair.connect(pg).connect(body);
+      pair.start(time);
+      pair.stop(time + dur + 0.1);
+
+      // The bark: high inharmonic partials that decay far faster than the
+      // body, scaled by velocity.
+      const barkPartials = tine ? [[4.1, 0.5], [6.9, 0.34], [10.2, 0.16]]
+                                : [[3.0, 0.28], [5.1, 0.12]];
+      for (const [ratio, lvl] of barkPartials) {
+        if (freq * ratio > 14000) continue;
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.setValueAtTime(freq * ratio, time);
+        const g = ctx.createGain();
+        const decay = tine ? 0.18 : 0.3;
+        g.gain.setValueAtTime(lvl * vel * vel, time);
+        g.gain.exponentialRampToValueAtTime(0.0001, time + decay);
+        o.connect(g).connect(body);
+        o.start(time);
+        o.stop(time + decay + 0.05);
+      }
+
+      // The hammer hitting the tine.
+      const knock = ctx.createBufferSource();
+      knock.buffer = this.makeNoiseBuffer(0.012);
+      const kf = ctx.createBiquadFilter();
+      kf.type = "bandpass";
+      kf.frequency.value = tine ? 2600 : 1800;
+      kf.Q.value = 0.9;
+      const kg = ctx.createGain();
+      kg.gain.setValueAtTime(vel * (tine ? 0.2 : 0.12), time);
+      kg.gain.exponentialRampToValueAtTime(0.0001, time + 0.012);
+      knock.connect(kf).connect(kg).connect(dest);
+      knock.start(time);
+      knock.stop(time + 0.016);
+      return;
+    }
+
     const osc1 = ctx.createOscillator();
     osc1.type = "sine";
     osc1.frequency.setValueAtTime(freq, time);
@@ -5835,10 +6497,13 @@ class BeatEngine {
     osc2.stop(time + dur + 0.1);
   }
 
-  playLeadVoice(time, freq, durationSeconds, vel, flavor) {
-    if (this.playSampleFlavor("lead", flavor, time, vel, freq, durationSeconds)) return;
+  // destOverride lets another track borrow a lead timbre - the stab voice is
+  // built almost entirely out of "a lead sound through a short envelope", and
+  // it needs the result on the stab bus rather than the lead one.
+  playLeadVoice(time, freq, durationSeconds, vel, flavor, destOverride) {
+    if (!destOverride && this.playSampleFlavor("lead", flavor, time, vel, freq, durationSeconds)) return;
     const ctx = this.ctx;
-    const dest = this.dest("lead");
+    const dest = destOverride || this.dest("lead");
     const dur = Math.min(durationSeconds, 1);
 
     if (flavor === "hoover") {
@@ -6492,6 +7157,19 @@ class BeatEngine {
       crystal: { voices: 3, detune: 4, type: "sine", cutoff: 9000, attack: 0.25, q: 0.8 },
       analogwarm: { voices: 4, detune: 9, type: "sawtooth", cutoff: 1500, attack: 0.35, q: 1.4 },
       sweep: { voices: 6, detune: 13, type: "sawtooth", cutoff: 600, attack: 0.2, q: 6, open: 5200 },
+      // A very wide, very slow string wash - the biggest pad here.
+      wash: { voices: 9, detune: 24, type: "sawtooth", cutoff: 2600, attack: 1.2, q: 0.5 },
+      // Low and dark, sitting under everything rather than over it.
+      lowpad: { voices: 4, detune: 6, type: "triangle", cutoff: 900, attack: 0.6, q: 1.1 },
+      // Bright, thin and glassy, an octave-ish above where a pad usually sits.
+      shimmer: { voices: 5, detune: 9, type: "sine", cutoff: 12000, attack: 0.4, q: 0.6 },
+      // Square waves detuned wide: the hollow, slightly cold 80s pad.
+      hollow: { voices: 5, detune: 18, type: "square", cutoff: 2200, attack: 0.5, q: 1.6 },
+      // Opens slowly across the whole note, so it evolves rather than sits.
+      evolving: { voices: 6, detune: 14, type: "sawtooth", cutoff: 400, attack: 0.9, q: 3.5, open: 6500 },
+      // Almost no detune and a fast attack: closer to an organ than a pad,
+      // which is what a lot of house records actually use.
+      tight: { voices: 2, detune: 3, type: "sawtooth", cutoff: 3400, attack: 0.06, q: 1 },
     };
     if (PAD_SHAPES[flavor]) {
       const p = PAD_SHAPES[flavor];
@@ -6819,6 +7497,12 @@ class BeatEngine {
     const STAB_AS_LEAD = {
       "saw-chord": "saw", "supersaw-chord": "supersaw", "fm-chord": "fm",
       "sine-chord": "sine", "pluck-stab": "pluck", "hoover-chord": "hoover",
+      // These became possible only once playLeadVoiceTo stopped ignoring the
+      // flavor it was handed - before that every entry in this table produced
+      // one identical bell, so adding more would have added more of nothing.
+      "ms20-chord": "ms20", "d50-chord": "d50", "prophet-chord": "prophet",
+      "obxa-chord": "obxa", "chip-chord": "chip", "phase-chord": "phasedist",
+      "square-lead-chord": "square", "brass-lead-chord": "brasslead",
     };
     if (STAB_AS_LEAD[flavor]) {
       this.playLeadVoiceTo(time, freq, dur, vel, STAB_AS_LEAD[flavor], dest);
@@ -6942,6 +7626,23 @@ class BeatEngine {
       }
       return;
     }
+    if (flavor === "pluck-chord") {
+      // A genuinely plucked chord stab, rather than what this was: the name
+      // had no branch at all, so it fell through to the sawtooth default
+      // below and was the same sound as saw-chord. Measured at a third the
+      // distance of any other pair on this track, which is what gave it away.
+      //
+      // A plucked string is a physical model, not a filtered oscillator, so
+      // this uses the same Karplus-Strong routine the guitars do - short
+      // decay, bright pick, no sustain.
+      const body = ctx.createBiquadFilter();
+      body.type = "lowpass";
+      body.frequency.value = 4200;
+      body.connect(dest);
+      this.pluckString(time, freq, dur, vel * 0.9, body,
+        { damp: 0.42, feedback: 0.975, pluckNoise: 0.012, brightness: 1.1, sustain: 0.5 });
+      return;
+    }
     const osc = ctx.createOscillator();
     osc.type = flavor === "square-chord" ? "square" : "sawtooth";
     osc.frequency.setValueAtTime(freq, time);
@@ -6957,26 +7658,21 @@ class BeatEngine {
     osc.stop(time + dur + 0.05);
   }
 
+  // Play a lead timbre onto some other track's bus.
+  //
+  // This used to take a `flavor` argument and ignore it completely, synthesising
+  // one fixed two-operator bell no matter what was asked for. Six of the stab
+  // kits route through here - saw-chord, supersaw-chord, fm-chord, sine-chord,
+  // pluck-stab and hoover-chord - so all six were the same sound with six
+  // names on it, which is the exact failure the kit tests exist to catch and
+  // which they missed: rendered twice, two of these differ by about as much as
+  // either differs from a genuinely different kit, so a threshold generous
+  // enough to tolerate the per-render randomness waved them through.
+  //
+  // Caught by comparing them against organ-chord, which has its own real
+  // implementation and sits at twice the distance from all of them.
   playLeadVoiceTo(time, freq, dur, vel, flavor, dest) {
-    const ctx = this.ctx;
-    const osc1 = ctx.createOscillator();
-    osc1.type = "sine";
-    osc1.frequency.setValueAtTime(freq, time);
-    const osc2 = ctx.createOscillator();
-    osc2.type = "sine";
-    osc2.frequency.setValueAtTime(freq * 2.76, time);
-    const gain1 = ctx.createGain();
-    gain1.gain.setValueAtTime(vel, time);
-    gain1.gain.exponentialRampToValueAtTime(0.001, time + dur);
-    const gain2 = ctx.createGain();
-    gain2.gain.setValueAtTime(vel * 0.3, time);
-    gain2.gain.exponentialRampToValueAtTime(0.001, time + dur * 0.4);
-    osc1.connect(gain1).connect(dest);
-    osc2.connect(gain2).connect(dest);
-    osc1.start(time);
-    osc2.start(time);
-    osc1.stop(time + dur + 0.1);
-    osc2.stop(time + dur + 0.1);
+    this.playLeadVoice(time, freq, dur, vel, flavor, dest);
   }
 
   startAmbience(kind) {

@@ -45,6 +45,21 @@ const ONLY = process.argv.slice(2);
   const results = await page.evaluate(async ({ ONLY_TRACKS, RENDER_SEC }) => {
     const SR_TEST = 22050;   // half rate: this compares sounds, it does not master them
     const out = [];
+
+    // A small deterministic PRNG standing in for Math.random during renders,
+    // so that "play this kit" is a pure function of the flavor name. mulberry32
+    // - 32-bit state, one multiply and a few shifts, good enough for this and
+    // short enough to read.
+    const seedRandom = (seed) => {
+      let a = seed >>> 0;
+      Math.random = () => {
+        a = (a + 0x6D2B79F5) >>> 0;
+        let t = a;
+        t = Math.imul(t ^ (t >>> 15), 1 | t);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    };
     const VOICES = {
       tom: (e, t, v, f) => e.playTom(t, v, f),
       arp: (e, t, v, f) => e.playArpVoice(t, 440, 0.4, v, f),
@@ -84,6 +99,20 @@ const ONLY = process.argv.slice(2);
         const takes = [];
         let err = null;
         for (let take = 0; take < 2; take++) {
+          // Both takes are rendered with the SAME seeded random sequence.
+          //
+          // Almost every voice randomises something per hit - a tom's
+          // fundamental, a snare's noise, a guitar's pick position - which is
+          // right for music and ruinous for a comparison: it put the distance
+          // between two renders of one kit on the same scale as the distance
+          // between two different kits, and no threshold can separate those
+          // once they overlap. Six stab kits that shared a code path and were
+          // literally one sound sat comfortably inside that noise and passed.
+          //
+          // With the randomness pinned, a second render of a kit is
+          // bit-identical to the first, so self-distance is zero and any pair
+          // that still measures zero apart is genuinely one sound.
+          seedRandom(12345);
           const off = new OfflineAudioContext(2, SR_TEST * RENDER_SEC, SR_TEST);
           const clone = new BeatEngine();
           clone.ensureContext(off);
@@ -177,18 +206,32 @@ const ONLY = process.argv.slice(2);
     separations.push([track, medCross / Math.max(medSelf, 1e-6), crosses[0]]);
     // What counts as a duplicate, and what does not.
     //
-    // The thing worth catching is a flavor with no synthesis branch at all,
-    // which falls through to the default and is byte-for-byte another kit.
-    // That measures essentially zero apart. What is NOT worth failing on is
-    // two kits that merely sound similar: the 21 hi-hats are all one recipe -
-    // filtered noise - with different corner frequencies and decays, so some
-    // pairs are inevitably close, and chasing them flagged a different pair
-    // on every run purely from per-hit randomness. The closest pairs are
-    // printed below either way, so the crowding is visible rather than
-    // asserted away.
-    const threshold = 0.005;
+    // The thing worth catching is a flavor with no synthesis branch, which
+    // falls through to the default and is another kit under a second name.
+    // What is NOT worth failing on is two kits that merely sound similar: the
+    // 31 hi-hats are all one recipe - filtered noise - with different corner
+    // frequencies and decays, so some pairs are inevitably close, and failing
+    // on those says nothing useful.
+    //
+    // Because renders are now seeded, a shared code path produces a distance
+    // of exactly zero rather than "somewhere in the noise", so the two cases
+    // genuinely separate and the threshold can sit very low without either
+    // missing clones or flagging cousins. medSelf below should be 0 for the
+    // same reason, and is checked rather than assumed - if a voice reaches
+    // for entropy some other way, that assumption is silently wrong and the
+    // clone check goes back to being unreliable.
+    // Three scales, cleanly separated, which is why this number is not
+    // fiddly: a true clone measures exactly 0; a kit re-rendered against
+    // itself measures ~1e-6 (floating-point, not randomness - the renders are
+    // seeded); and the closest genuinely-different pair on any track measures
+    // ~0.03. Anything in between is a clone.
+    const threshold = 1e-3;
     for (const [d, a, b] of crosses) {
-      if (d < threshold) clones.push(`${track}: ${a} == ${b} (${d.toFixed(4)} < ${threshold.toFixed(4)})`);
+      if (d < threshold) clones.push(`${track}: ${a} == ${b} (${d.toExponential(2)})`);
+    }
+    if (medSelf > threshold) {
+      clones.push(`${track}: renders are not reproducible (a kit differs from ` +
+                  `itself by ${medSelf.toExponential(2)}), so the clone check cannot be trusted`);
     }
   }
   check("no two kits on a track are the same sound", clones.length === 0,

@@ -7,44 +7,44 @@ const FLAVOR_POOLS = {
   snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn", "707", "dmx", "sp1200", "rimclick", "gatedverb", "lm1", "rz1", "hr16", "r8", "drumulator", "drumtraks", "rx5", "cr8000", "kr55", "dr110", "mpc60", "piccolo", "deepsnare", "crack", "roomsnare", "snap", "thicksnare", "brushswirl", "sidestick", "drillsnare", "housesnare", "dnbsnare", "lofisnare"],
   hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909", "707", "606", "ride", "lm1", "rz1", "r8", "drumulator", "rx5", "cr8000", "kr55", "dr110", "mpc60", "trapclosed", "washy", "foot", "tick", "halfopen", "brushhat", "glassy", "dirty", "clave606", "shimmer"],
   perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78", "talkingdrum", "woodblock", "tabla", "cabasa", "guiro", "agogo", "vibraslap", "cajon", "djembe", "timbale", "shekere", "ganza", "caxixi", "udu", "pandeiro", "tamborim", "repinique", "surdo", "bata", "cuica"],
-  tom: ["acoustic", "simmons", "roto", "taiko", "808tom", "floor", "gatedtom"],
-  bass: ["warm", "synth", "808", "true808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog", "303", "slap", "sh101", "fretless", "m1organbass", "glide808", "punch808", "long808", "clean808", "dirty808", "knock808", "rumble808", "detuned808"],
+  tom: ["acoustic", "simmons", "roto", "taiko", "808tom", "floor", "gatedtom", "linn", "909tom", "electro", "deeptom", "concert", "damped", "hybridtom"],
+  bass: ["warm", "synth", "808", "true808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog", "303", "slap", "sh101", "fretless", "m1organbass", "glide808", "punch808", "long808", "clean808", "dirty808", "knock808", "rumble808", "detuned808", "distort808", "fuzz808", "overdrive808", "grimy808", "rage808", "deep808", "memphis808", "stab808", "wide808", "slide808", "bright808"],
   piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord", "dx7ep", "clav", "m1piano", "cp70", "honkytonk", "felt", "tack", "jazzgrand"],
   lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm", "whistle", "theremin", "panflute", "harmonica", "ocarina", "hoover", "ms20", "d50", "prophet", "obxa", "phasedist"],
-  pad: ["warm", "ensemble", "airy", "glass", "choir", "dark", "juno", "solina", "cs80", "voxhumana", "jupiter8", "polysix", "ppgwave", "strings2", "brassy", "breath", "crystal", "analogwarm", "sweep"],
-  stab: ["pluck-chord", "square-chord", "bell-chord", "brass-chord", "organ-chord", "string-chord", "orchhit", "saw-chord", "supersaw-chord", "fm-chord", "sine-chord", "pluck-stab", "hoover-chord", "vox-chord", "piano-chord"],
+  pad: ["warm", "ensemble", "airy", "glass", "choir", "dark", "juno", "solina", "cs80", "voxhumana", "jupiter8", "polysix", "ppgwave", "strings2", "brassy", "breath", "crystal", "analogwarm", "sweep", "wash", "lowpad", "shimmer", "hollow", "evolving", "tight"],
+  stab: ["pluck-chord", "square-chord", "bell-chord", "brass-chord", "organ-chord", "string-chord", "orchhit", "saw-chord", "supersaw-chord", "fm-chord", "sine-chord", "pluck-stab", "hoover-chord", "vox-chord", "piano-chord", "ms20-chord", "d50-chord", "prophet-chord", "obxa-chord", "chip-chord", "phase-chord", "square-lead-chord", "brass-lead-chord"],
   guitar: ["clean", "power", "muted", "nylon", "acoustic", "jazz", "funk", "twelvestring", "sitar", "banjo", "mandolin", "ukulele", "slide", "openchord", "resonator", "baritone"],
   strings: ["soul", "orchestral", "staccato", "synth", "pizzicato", "tremolo", "mellotron", "solina", "cello", "spiccato", "harp", "solocello", "chamber", "cinematic", "marcato", "sulponte"],
   horn: ["brass", "soft", "muted", "sax", "trumpetstab", "section", "clarinet", "frenchhorn", "oboe", "trombone", "tuba", "flugelhorn", "piccolo", "hornsection", "solotrumpet", "mellow", "stabbrass", "lowbrass"],
-  organ: ["drawbar", "gospel", "church", "combo", "farfisa", "accordion", "harmonium", "m1organ", "jazzorgan", "fullorgan", "flute8", "reedy", "bright16"],
-  vocal: ["ooh", "ahh", "ay", "oh", "choir", "vocoder", "eee", "ohh", "mmm", "aww", "yeah"],
-  kalimba: ["kalimba", "musicbox", "steeldrum", "glock", "hangdrum", "balafon", "kora", "thumbpiano", "mbira", "handpan", "gamelan", "musicboxhi"],
-  marimba: ["marimba", "vibraphone", "xylophone", "tubularbell", "bassmarimba", "crotales", "glassbar", "tonguedrum", "celestebar"],
-  arp: ["arp", "pulse", "trance", "acid", "harp", "bellarp"],
+  organ: ["drawbar", "gospel", "church", "combo", "farfisa", "accordion", "harmonium", "m1organ", "jazzorgan", "fullorgan", "flute8", "reedy", "bright16", "rockorgan", "perc3", "mellowbars", "wail", "quintonly", "theatre"],
+  vocal: ["ooh", "ahh", "ay", "oh", "choir", "vocoder", "eee", "ohh", "mmm", "aww", "yeah", "ih", "uh", "er", "oo", "aa"],
+  kalimba: ["kalimba", "musicbox", "steeldrum", "glock", "hangdrum", "balafon", "kora", "thumbpiano", "mbira", "handpan", "gamelan", "musicboxhi", "sansula", "karimba", "likembe", "celestetine", "toybox", "tinebell"],
+  marimba: ["marimba", "vibraphone", "xylophone", "tubularbell", "bassmarimba", "crotales", "glassbar", "tonguedrum", "celestebar", "steelpan", "bowedvibes", "bellplate", "almglocken", "slitdrum", "hardmallet", "softmallet", "glockbar"],
+  arp: ["arp", "pulse", "trance", "acid", "harp", "bellarp", "saw", "square", "wide", "dark", "glass", "subarp", "needle", "swellarp"],
   // A real mono hook instrument for the "Auto-Tune hook" modern rap/trap
   // production leans on - distinct from the existing "vocal" chordal
   // vowel-chop instrument (see playAutoLeadVoice for why: no vibrato at
   // all, which is what actually reads as hard-pitch-corrected rather than
   // sung).
-  autolead: ["hard", "moody", "bright", "wide", "gritty"],
+  autolead: ["hard", "moody", "bright", "wide", "gritty", "soft", "nasal", "wail", "robotic", "airy", "deep", "modern"],
   // A real mono solo-line instrument - saxophone melodies are played one
   // note at a time, a different musical role from Horn's chord stabs.
-  sax: ["smooth", "breathy", "alto", "bari", "tenor", "soprano", "basssax", "subtone"],
+  sax: ["smooth", "breathy", "alto", "bari", "tenor", "soprano", "basssax", "subtone", "growl", "altissimo", "smoky", "cutting", "vintage", "cmelody"],
   // The rest of the woodwind family - the sax's siblings. Every one of
   // these is a single-line solo instrument, and the family splits on one
   // acoustic fact (see playWoodwindVoice): a CONICAL bore (sax, oboe,
   // bassoon) produces the complete harmonic series, while a CYLINDRICAL
   // one (clarinet) produces essentially only the ODD harmonics - which
   // is exactly why a clarinet sounds hollow next to an oboe.
-  woodwind: ["flute", "altoflute", "clarinet", "bassclarinet", "oboe", "englishhorn", "bassoon", "sopranosax", "shakuhachi", "bansuri", "duduk", "recorder"],
+  woodwind: ["flute", "altoflute", "clarinet", "bassclarinet", "oboe", "englishhorn", "bassoon", "sopranosax", "shakuhachi", "bansuri", "duduk", "recorder", "piccolo", "panflute", "ocarina", "tinwhistle", "dizi", "ney", "bassflute", "overblown", "woodflute", "basset", "contrabassoon"],
   // A dedicated solo/lead guitar track, separate from the rhythm guitar.
   // Six genres had no solo voice at all; rock in particular had a rhythm
   // guitar and nothing to play over it.
-  leadguitar: ["overdrive", "fuzz", "wah", "sustain", "octave", "cleantone", "harmonics"],
+  leadguitar: ["overdrive", "fuzz", "wah", "sustain", "octave", "cleantone", "harmonics", "crunch", "metal", "tremolo", "surf", "jazzlead", "blues", "chorus", "ebow", "twang"],
   // A talkbox is an INSTRUMENT shaped by a mouth, which is the opposite
   // of a vocoder (a voice shaped by an instrument) - see playTalkboxVoice.
-  talkbox: ["roger", "gfunk", "robot", "bright"],
-  fx: ["riser", "siren", "impact"],
+  talkbox: ["roger", "gfunk", "robot", "bright", "deep", "nasal", "drawl", "vintage", "chatter", "rise"],
+  fx: ["riser", "siren", "impact", "downlifter", "uplifter", "reverse", "wind", "whistle", "sweepdown", "subdrop", "vinylstop", "zap", "airhorn"],
 };
 
 // Which genres each kit actually belongs to.
@@ -62,6 +62,16 @@ const FLAVOR_POOLS = {
 // Any flavor NOT listed here is treated as universal - that covers every
 // generic flavor the program already had ("warm", "bright", "grand"...).
 const FLAVOR_GENRES = {
+  // --- kits whose own character decides where they can go
+  // A brushed or jazz-kit drum is a room, a wire brush and a player. Under a
+  // trap, drill, phonk or techno beat it does not read as a variation, it
+  // reads as the wrong record. These were reachable everywhere because
+  // nothing had ever said otherwise.
+  "kick:acoustic": ["rock", "lofi", "neosoul", "rnb", "hiphop", "afrobeats", "amapiano", "reggaeton", "house"],
+  "kick:jazzkick": ["lofi", "neosoul", "rnb", "hiphop", "house", "dnb"],
+  "snare:brush": ["lofi", "neosoul", "rnb", "hiphop", "afrobeats", "amapiano", "rock"],
+  "snare:brushswirl": ["lofi", "neosoul", "rnb", "hiphop", "afrobeats", "amapiano", "rock"],
+  "snare:acoustic": ["rock", "lofi", "neosoul", "rnb", "hiphop", "afrobeats", "amapiano", "reggaeton", "dnb", "house"],
   // --- round 12 additions, each placed where the sound actually comes from
   "arp:trance": ["synthwave", "techno", "house", "dnb", "dubstep", "ukgarage"],
   "arp:acid": ["techno", "house", "dnb", "synthwave"],
@@ -231,29 +241,70 @@ const FLAVOR_GENRES = {
 //
 // So where a genre has a palette rather than a preference, it is written
 // down here and it wins outright.
+//
+// The woodwind track is really four families - flutes and dark end-blown
+// winds, jazz reeds, orchestral double reeds, and recorders - and which of
+// them a genre may field is a different answer per genre. A clarinet over a
+// boom-bap beat follows the sampled jazz record it came from and is entirely
+// at home; the same clarinet over trap is not. These two lists are the
+// shapes almost every genre wants, named so they are not retyped nineteen
+// times and quietly diverged.
+const WW_FLUTE = ["flute", "altoflute", "bansuri", "shakuhachi", "duduk", "piccolo",
+                  "panflute", "ocarina", "tinwhistle", "dizi", "ney", "bassflute",
+                  "overblown", "woodflute"];
+const WW_FLUTE_JAZZ = [...WW_FLUTE, "clarinet", "bassclarinet", "sopranosax", "basset"];
+
+// The 808 family, in one place. It was written out per genre before, which
+// is how trap ended up listing eight of them TWICE - harmless, but a sign
+// that the list had stopped being read and started being copied. Grouped by
+// how hard each one is driven, because that is the choice a producer is
+// actually making when they pick between them.
+// tools/measure-808.js holds each of these groups to a different amount of
+// measured harmonic distortion, so a kit listed in the wrong one gets caught
+// rather than just sounding off.
+const K808_CLEAN = ["clean808", "sub", "rumble808", "long808", "deep808"];
+const K808_WARM  = ["808", "true808", "glide808", "detuned808", "overdrive808",
+                    "wide808", "slide808"];
+const K808_HARD  = ["hard808", "punch808", "knock808", "stab808", "bright808"];
+const K808_FILTHY = ["dirty808", "distort808", "fuzz808", "grimy808", "rage808",
+                     "memphis808"];
+const K808_ALL = [...K808_CLEAN, ...K808_WARM, ...K808_HARD, ...K808_FILTHY];
+// Synth basses that are not 808s but do the same job in the same genres - a
+// distorted saw, a growling reese, the drill slide. Kept separate from the
+// groups above so "808 family" keeps meaning the 808 family.
+const K_HARD_SYNTH_BASS = ["distorted", "growl", "drillslide"];
 const GENRE_TRACK_KITS = {
   // The 808 genres. The bass is an 808 - that is the entire point - so the
   // list is the 808 family plus the two sub variants that still read as one.
-  trap:       { bass: ["808", "true808", "hard808", "sub", "distorted", "drillslide", "growl", "glide808", "punch808", "long808", "clean808", "dirty808", "knock808", "rumble808", "detuned808", "glide808", "punch808", "long808", "clean808", "dirty808", "knock808", "rumble808", "detuned808"],
-                woodwind: ["flute", "altoflute", "bansuri", "shakuhachi"] },
-  rap:        { bass: ["808", "true808", "hard808", "sub", "distorted", "growl"],
-                woodwind: ["flute", "altoflute", "bansuri"] },
-  drill:      { bass: ["drillslide", "808", "true808", "hard808", "sub", "distorted", "glide808", "punch808", "long808", "clean808", "dirty808", "knock808", "rumble808", "detuned808"],
-                woodwind: ["flute", "altoflute", "bansuri", "shakuhachi", "duduk"] },
-  phonk:      { bass: ["distorted", "808", "hard808", "true808", "sub", "growl", "glide808", "punch808", "long808", "clean808", "dirty808", "knock808", "rumble808", "detuned808"],
-                woodwind: ["flute", "shakuhachi", "duduk"] },
-  jerseyclub: { bass: ["808", "true808", "hard808", "sub", "distorted", "glide808", "punch808", "long808", "clean808", "dirty808", "knock808", "rumble808", "detuned808"],
-                woodwind: ["flute", "altoflute"] },
-  hiphop:     { woodwind: ["flute", "altoflute", "bansuri", "sopranosax", "clarinet"] },
+  trap:       { bass: [...K808_ALL, ...K_HARD_SYNTH_BASS], woodwind: WW_FLUTE },
+  rap:        { bass: [...K808_ALL, ...K_HARD_SYNTH_BASS], woodwind: WW_FLUTE },
+  // Drill leads with the slide, which is the genre's signature 808 move.
+  drill:      { bass: ["slide808", ...K808_ALL, ...K_HARD_SYNTH_BASS],
+                woodwind: WW_FLUTE },
+  // Phonk is the dirty end of the family and has no use for a polite one.
+  phonk:      { bass: [...K808_FILTHY, ...K808_HARD, ...K808_WARM, ...K_HARD_SYNTH_BASS],
+                woodwind: WW_FLUTE },
+  jerseyclub: { bass: [...K808_HARD, ...K808_WARM, ...K808_CLEAN], woodwind: WW_FLUTE },
+  hiphop:     { woodwind: WW_FLUTE_JAZZ },
   // Dance genres: the bass is a synth, never an acoustic one.
-  house:      { bass: ["warm", "synth", "sub", "pluck", "moog", "303", "sh101", "m1organbass", "reese"] },
+  house:      { bass: ["warm", "synth", "sub", "pluck", "moog", "303", "sh101", "m1organbass", "reese"],
+                woodwind: WW_FLUTE_JAZZ },
   techno:     { bass: ["303", "sub", "distorted", "reese", "moog", "sh101", "synth", "pluck"] },
-  dnb:        { bass: ["reese", "sub", "growl", "wobble", "distorted", "synth", "moog", "upright"] },
+  dnb:        { bass: ["reese", "sub", "growl", "wobble", "distorted", "synth", "moog", "upright"],
+                woodwind: WW_FLUTE },
   dubstep:    { bass: ["wobble", "growl", "reese", "sub", "distorted", "hard808"] },
-  ukgarage:   { bass: ["sub", "warm", "synth", "pluck", "moog", "sh101", "reese", "m1organbass"] },
+  ukgarage:   { bass: ["sub", "warm", "synth", "pluck", "moog", "sh101", "reese", "m1organbass"],
+                woodwind: WW_FLUTE },
   // Live-band genres: the bass is played by a person.
   rock:       { bass: ["warm", "upright", "slap", "fretless", "distorted", "moog"] },
-  neosoul:    { bass: ["upright", "warm", "fretless", "slap", "moog", "sub"] },
+  neosoul:    { bass: ["upright", "warm", "fretless", "slap", "moog", "sub"],
+                woodwind: WW_FLUTE_JAZZ },
+  // The Afro-diasporic and Latin genres take flutes and jazz reeds freely -
+  // a soprano sax over amapiano or a flute over afrobeats is the sound - but
+  // an oboe or a bassoon still belongs to a different record entirely.
+  afrobeats:  { woodwind: WW_FLUTE_JAZZ },
+  amapiano:   { woodwind: WW_FLUTE_JAZZ },
+  reggaeton:  { woodwind: WW_FLUTE_JAZZ },
 };
 
 function flavorFitsGenre(inst, flavor, styleId) {
@@ -2851,21 +2902,38 @@ function pickFillType() {
 // it, and each generation draws one or two. Weights keep the genre's
 // signature voice most likely without making it inevitable.
 const SOLO_POOLS = {
-  hiphop:    [["lead", 3], ["sax", 2], ["woodwind", 2], ["leadguitar", 2], ["kalimba", 1], ["marimba", 1], ["talkbox", 1]],
-  // Rebalanced by what these records actually feature. A flute lead over a
-  // trap beat is real - it is most of the Metro Boomin catalogue - but at
-  // weight 3 it was tying for the most likely voice and turning up in 58% of
-  // trap beats, which is far more often than any real catalogue. The bell and
-  // synth leads that actually define the genre now lead the pool.
-  trap:      [["lead", 4], ["autolead", 3], ["kalimba", 2], ["woodwind", 2], ["marimba", 1]],
+  // Boom-bap samples soul and jazz records, so horns, organ, guitar, sax,
+  // vibes and piano are all in scope. A thumb piano is not: it is an African
+  // and lo-fi sound that arrived here only because nothing said no.
+  hiphop:    [["lead", 3], ["sax", 2], ["woodwind", 2], ["leadguitar", 2], ["piano", 2], ["marimba", 1], ["horn", 1], ["talkbox", 1]],
+  // Rebalanced twice, both times because of what came out rather than what
+  // the table looked like.
+  //
+  // First a flute lead was turning up in 58% of trap beats - real sound, far
+  // too often - so it came down to weight 2. That left the kalimba and the
+  // marimba, which were never questioned and which between them still put a
+  // mallet or a thumb piano on top of a third of all trap beats. Neither
+  // belongs anywhere near the genre; they read as lo-fi and afrobeats
+  // instantly, and they are exactly what a listener means by an instrument
+  // that throws off the flow.
+  //
+  // What replaces them is what trap records actually put on top: bell and
+  // synth leads, an autotuned hook, a dark piano figure, and cinematic
+  // strings. The flute stays, because it earns its place.
+  trap:      [["lead", 5], ["autolead", 3], ["woodwind", 2], ["piano", 2], ["strings", 1]],
   house:     [["lead", 3], ["sax", 2], ["woodwind", 2], ["arp", 2], ["marimba", 1], ["talkbox", 1]],
-  rock:      [["leadguitar", 4], ["lead", 1], ["woodwind", 1]],
+  // Rock is guitars, a Hammond and a piano. A flute solo was arriving in 42%
+  // of rock beats, which is a prog-rock joke rather than a genre.
+  rock:      [["leadguitar", 5], ["lead", 1], ["organ", 1], ["piano", 1]],
   reggaeton: [["lead", 3], ["woodwind", 2], ["marimba", 2], ["leadguitar", 1]],
   lofi:      [["lead", 2], ["sax", 2], ["woodwind", 3], ["marimba", 2], ["kalimba", 2], ["leadguitar", 2]],
-  // Drill: the cold bell/synth motif is the sound, with a dark wind second.
-  drill:     [["lead", 4], ["woodwind", 2], ["autolead", 2], ["kalimba", 1]],
+  // Drill: the cold bell/synth motif is the sound, with a dark wind second
+  // and the sliding minor piano figure that half the genre is built on.
+  drill:     [["lead", 4], ["woodwind", 2], ["autolead", 2], ["piano", 2], ["strings", 1]],
   afrobeats: [["woodwind", 3], ["marimba", 2], ["kalimba", 2], ["sax", 2], ["leadguitar", 2], ["lead", 1]],
-  dubstep:   [["lead", 4], ["arp", 2], ["woodwind", 1]],
+  // Dubstep is a synthesis genre: the interest is in the bass design, not in
+  // an acoustic solo voice sitting over it.
+  dubstep:   [["lead", 5], ["arp", 2]],
   // The genre this was reported on. A saxophone is one of R&B's voices,
   // not its only one - vibraphone, flute, clean lead guitar and talkbox
   // all carry top lines on real records.
@@ -2874,8 +2942,9 @@ const SOLO_POOLS = {
   jerseyclub:[["lead", 3], ["arp", 2], ["autolead", 2]],
   dnb:       [["arp", 3], ["lead", 3], ["woodwind", 1]],
   synthwave: [["lead", 3], ["arp", 3], ["leadguitar", 2]],
-  // Rap: an Auto-Tune hook or a synth lead, not a woodwind recital.
-  rap:       [["autolead", 4], ["lead", 3], ["woodwind", 1], ["sax", 1], ["talkbox", 1]],
+  // Rap: an Auto-Tune hook or a synth lead, not a woodwind recital. The piano
+  // is here because soul-sampling rap is built on one.
+  rap:       [["autolead", 4], ["lead", 3], ["piano", 2], ["woodwind", 1], ["sax", 1], ["talkbox", 1]],
   amapiano:  [["woodwind", 3], ["sax", 3], ["lead", 2], ["marimba", 2], ["kalimba", 1], ["leadguitar", 2]],
   ukgarage:  [["lead", 3], ["arp", 2], ["sax", 2], ["woodwind", 2]],
   techno:    [["arp", 3], ["lead", 3]],

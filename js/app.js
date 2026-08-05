@@ -266,6 +266,7 @@ function selectStyle(id) {
   // without it, picking a genre after making a type beat would quietly keep
   // building beats in the previous producer's shape.
   if (typeof setArtistKnobs === "function") setArtistKnobs(null);
+  if (typeof setArtistAvoid === "function") setArtistAvoid(null);
   selectedStyleId = id;
   baseStyle = STYLES[id];
   activeStyle = Object.assign({}, baseStyle, { key: baseStyle.key });
@@ -2505,6 +2506,15 @@ function applyArtistProfile(name) {
   // structurally indistinguishable - measurably so.
   if (typeof setArtistKnobs === "function") setArtistKnobs(artistKnobs(p));
 
+  // What this producer's records actually have on them. `only` replaces the
+  // genre's solo pool; `avoid` removes instruments from consideration
+  // entirely, including the chordal ones a solo pool never reached.
+  if (typeof artistInstruments === "function") {
+    const pal = artistInstruments(found.key, p);
+    if (pal.only && pal.only.length) activeStyle.soloOverride = pal.only.slice();
+    if (typeof setArtistAvoid === "function") setArtistAvoid(pal.avoid);
+  }
+
   generatePattern();
   renderStepGrid();
   lastArtist = found;
@@ -3104,199 +3114,6 @@ function expandLauncher() {
 if (launcherExpand) launcherExpand.addEventListener("click", expandLauncher);
 
 // ---------------------------------------------------------------------------
-// The sample bank
-// ---------------------------------------------------------------------------
-// Load audio, slice it, and make it available as a kit on any track. A sample
-// is offered through the same flavor mechanism as every synthesized kit, so
-// nothing else in the program needs to know it exists.
-const sampleFilesInput = document.getElementById("sample-files");
-const sampleListEl = document.getElementById("sample-list");
-const sampleStatus = document.getElementById("sample-status");
-const sampleClearBtn = document.getElementById("sample-clear");
-
-const SAMPLE_ASSIGNABLE = ["kick", "snare", "hihat", "openhat", "tom", "perc",
-  "bass", "piano", "lead", "pad", "stab", "vocal", "kalimba", "marimba", "arp"];
-
-// Draw the waveform so a slice count means something visually rather than
-// being a number the user has to trust.
-function drawSampleWave(canvas, item) {
-  const ctx2d = canvas.getContext("2d");
-  const w = canvas.width, h = canvas.height;
-  ctx2d.clearRect(0, 0, w, h);
-  const d = item.buffer.getChannelData(0);
-  const step = Math.max(1, Math.floor(d.length / w));
-  ctx2d.fillStyle = "rgba(255,255,255,0.45)";
-  for (let x = 0; x < w; x++) {
-    let peak = 0;
-    for (let i = x * step; i < (x + 1) * step && i < d.length; i++) {
-      const v = Math.abs(d[i]);
-      if (v > peak) peak = v;
-    }
-    const bar = Math.max(1, peak * h);
-    ctx2d.fillRect(x, (h - bar) / 2, 1, bar);
-  }
-  if (item.mode === "sliced" && item.slices.length > 1) {
-    ctx2d.fillStyle = "rgba(110,231,255,0.9)";
-    for (const s of item.slices) {
-      const x = Math.floor((s.start / item.duration) * w);
-      ctx2d.fillRect(x, 0, 1, h);
-    }
-  }
-}
-
-function renderSampleList() {
-  if (!sampleListEl) return;
-  sampleListEl.innerHTML = "";
-  const items = SampleBank.list();
-  if (!items.length) {
-    sampleStatus.textContent = "";
-    return;
-  }
-  for (const item of items) {
-    const li = document.createElement("li");
-    li.className = "sample-item";
-
-    const canvas = document.createElement("canvas");
-    canvas.width = 160; canvas.height = 34;
-    li.appendChild(canvas);
-
-    const name = document.createElement("span");
-    name.className = "sample-name";
-    name.textContent = item.name;
-    li.appendChild(name);
-
-    const meta = document.createElement("span");
-    meta.className = "sample-meta";
-    const setMeta = () => {
-      meta.textContent = `${item.duration.toFixed(2)}s`
-        + (item.mode === "sliced" ? ` · ${item.slices.length} slices` : ` · ${item.mode}`);
-    };
-    setMeta();
-    li.appendChild(meta);
-
-    const mode = document.createElement("select");
-    for (const m of ["oneshot", "sliced", "pitched"]) {
-      const o = document.createElement("option");
-      o.value = m; o.textContent = m;
-      if (item.mode === m) o.selected = true;
-      mode.appendChild(o);
-    }
-    mode.addEventListener("change", () => {
-      item.mode = mode.value;
-      // Slices are only computed when they are wanted - transient detection
-      // over a long file is not free.
-      if (item.mode === "sliced" && item.slices.length < 2) {
-        item.slices = sliceOnTransients(item.buffer);
-      }
-      setMeta();
-      drawSampleWave(canvas, item);
-    });
-    li.appendChild(mode);
-
-    const assign = document.createElement("select");
-    assign.className = "sample-assign";
-    const none = document.createElement("option");
-    none.value = ""; none.textContent = "not assigned";
-    assign.appendChild(none);
-    for (const t of SAMPLE_ASSIGNABLE) {
-      const o = document.createElement("option");
-      o.value = t; o.textContent = t;
-      if (currentFlavors[t] === item.flavor) o.selected = true;
-      assign.appendChild(o);
-    }
-    assign.addEventListener("change", () => {
-      // Clear this sample off any track it was previously on, so moving it
-      // does not leave it playing in two places.
-      for (const t of SAMPLE_ASSIGNABLE) {
-        if (currentFlavors[t] === item.flavor) {
-          currentFlavors[t] = (baseStyle && baseStyle.defaultFlavors && baseStyle.defaultFlavors[t]) || undefined;
-        }
-      }
-      if (assign.value) currentFlavors[assign.value] = item.flavor;
-      renderStepGrid();
-      sampleStatus.textContent = assign.value
-        ? `"${item.name}" now plays on ${assign.value}.`
-        : `"${item.name}" unassigned.`;
-    });
-    li.appendChild(assign);
-
-    const audition = document.createElement("button");
-    audition.className = "transport-btn";
-    audition.textContent = "▶";
-    audition.title = "Hear it";
-    audition.addEventListener("click", () => {
-      engine.ensureContext();
-      engine.playSampleFlavor("perc", item.flavor, engine.ctx.currentTime + 0.02, 0.9, 440, 1.5, 0);
-    });
-    li.appendChild(audition);
-
-    const del = document.createElement("button");
-    del.className = "transport-btn";
-    del.textContent = "✕";
-    del.title = "Remove";
-    del.addEventListener("click", () => {
-      for (const t of SAMPLE_ASSIGNABLE) {
-        if (currentFlavors[t] === item.flavor) {
-          currentFlavors[t] = (baseStyle && baseStyle.defaultFlavors && baseStyle.defaultFlavors[t]) || undefined;
-        }
-      }
-      SampleBank.remove(item.id);
-      renderSampleList();
-      renderStepGrid();
-    });
-    li.appendChild(del);
-
-    sampleListEl.appendChild(li);
-    drawSampleWave(canvas, item);
-  }
-}
-
-if (sampleFilesInput) {
-  sampleFilesInput.addEventListener("change", async () => {
-    const files = Array.from(sampleFilesInput.files || []);
-    if (!files.length) return;
-    engine.ensureContext();
-    let loaded = 0;
-    for (const f of files) {
-      sampleStatus.textContent = `Decoding ${f.name}…`;
-      try {
-        const bytes = await f.arrayBuffer();
-        const buffer = await engine.ctx.decodeAudioData(bytes);
-        // Level-match on load, so a quiet recording and a loud one sit
-        // together without hand-adjusting every track gain.
-        normaliseBuffer(buffer);
-        const slices = buffer.duration >= 1.2 ? sliceOnTransients(buffer) : [{ start: 0, end: buffer.duration }];
-        SampleBank.add(f.name, buffer, { slices, mode: guessMode(buffer, slices.length) });
-        loaded++;
-      } catch (err) {
-        sampleStatus.textContent = `Could not decode ${f.name}: ${String(err.message || err).slice(0, 80)}`;
-      }
-    }
-    renderSampleList();
-    if (loaded) {
-      sampleStatus.textContent = `${loaded} sample${loaded === 1 ? "" : "s"} loaded — pick a track to put one on.`;
-    }
-    sampleFilesInput.value = "";
-  });
-}
-
-if (sampleClearBtn) {
-  sampleClearBtn.addEventListener("click", () => {
-    for (const item of SampleBank.list()) {
-      for (const t of SAMPLE_ASSIGNABLE) {
-        if (currentFlavors[t] === item.flavor) {
-          currentFlavors[t] = (baseStyle && baseStyle.defaultFlavors && baseStyle.defaultFlavors[t]) || undefined;
-        }
-      }
-    }
-    SampleBank.clear();
-    renderSampleList();
-    renderStepGrid();
-    sampleStatus.textContent = "All samples removed.";
-  });
-}
-
-// ---------------------------------------------------------------------------
 // The measured-best kit combination
 // ---------------------------------------------------------------------------
 // tools/research-kits.js renders thousands of random kit combinations and
@@ -3351,5 +3168,408 @@ if (bestKitsBtn) {
     const meta = KIT_PRESET_META;
     bestKitsStatus.textContent = `${applied} kits loaded — scored ${KIT_PRESETS[selectedStyleId].score}`
       + (meta.samplesPerGenre ? ` out of ${meta.samplesPerGenre} combinations tried.` : ".");
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The sample editor
+// ---------------------------------------------------------------------------
+// Load audio, LISTEN to it, drag across the waveform to pick exactly the part
+// you want, and send that part to a track. The first version had none of the
+// middle: it loaded a file, auto-sliced it, and offered a dropdown. That is
+// fine for a one-shot and useless for a song - nobody knows which of 32
+// numbered slices is the bit they wanted without hearing it.
+const sampleFilesInput = document.getElementById("sample-files");
+const sampleListEl = document.getElementById("sample-list");
+const sampleStatus = document.getElementById("sample-status");
+const sampleClearBtn = document.getElementById("sample-clear");
+const sampleEditor = document.getElementById("sample-editor");
+const samplePick = document.getElementById("sample-pick");
+const samplePlayBtn = document.getElementById("sample-play");
+const sampleStopBtn = document.getElementById("sample-stop");
+const samplePlaySelBtn = document.getElementById("sample-play-sel");
+const sampleSnapBtn = document.getElementById("sample-snap");
+const sampleSelAllBtn = document.getElementById("sample-sel-all");
+const sampleWave = document.getElementById("sample-wave");
+const samplePlayheadEl = document.getElementById("sample-playhead");
+const sampleTimeEl = document.getElementById("sample-time");
+const sampleSelEl = document.getElementById("sample-sel");
+const sampleModeSel = document.getElementById("sample-mode");
+const sampleRootField = document.getElementById("sample-root-field");
+const sampleRootSel = document.getElementById("sample-root");
+const sampleTrackSel = document.getElementById("sample-track");
+const sampleApplyBtn = document.getElementById("sample-apply");
+const sampleApplyStatus = document.getElementById("sample-apply-status");
+
+const SAMPLE_ASSIGNABLE = ["kick", "snare", "hihat", "openhat", "tom", "perc",
+  "bass", "piano", "lead", "pad", "stab", "vocal", "kalimba", "marimba", "arp", "guitar"];
+
+// The file currently open in the editor, its detected transients, and the
+// selection. Selection is in SECONDS, never pixels - the canvas resizes with
+// the window and a pixel selection would silently mean something different
+// after a resize.
+let editing = null;             // { id, name, buffer, duration, onsets: [sec] }
+let selStart = 0, selEnd = 0;   // seconds; equal means "whole file"
+let previewSource = null, previewStartedAt = 0, previewOffset = 0, previewRaf = 0;
+
+function fmtTime(t) {
+  if (!isFinite(t)) return "0:00";
+  const m = Math.floor(t / 60), sec = Math.floor(t % 60);
+  return `${m}:${String(sec).padStart(2, "0")}`;
+}
+
+function hasSelection() { return editing && selEnd - selStart > 0.005; }
+function selRange() {
+  return hasSelection() ? { start: selStart, end: selEnd } : { start: 0, end: editing.duration };
+}
+
+function drawWave() {
+  if (!editing || !sampleWave) return;
+  // Match the backing store to the CSS size so the drawing is not stretched.
+  const rect = sampleWave.getBoundingClientRect();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  const w = Math.max(200, Math.round(rect.width * dpr));
+  const h = Math.round(150 * dpr);
+  if (sampleWave.width !== w || sampleWave.height !== h) { sampleWave.width = w; sampleWave.height = h; }
+  const g = sampleWave.getContext("2d");
+  g.clearRect(0, 0, w, h);
+
+  const d = editing.buffer.getChannelData(0);
+  const step = Math.max(1, Math.floor(d.length / w));
+  const mid = h / 2;
+
+  // The selected region gets a lit background, the rest is dimmed - which is
+  // the whole point of the view.
+  const { start, end } = selRange();
+  const x0 = (start / editing.duration) * w;
+  const x1 = (end / editing.duration) * w;
+  if (hasSelection()) {
+    g.fillStyle = "rgba(110,231,255,0.13)";
+    g.fillRect(x0, 0, x1 - x0, h);
+  }
+
+  for (let x = 0; x < w; x++) {
+    let peak = 0;
+    for (let i = x * step; i < (x + 1) * step && i < d.length; i++) {
+      const v = Math.abs(d[i]);
+      if (v > peak) peak = v;
+    }
+    const inSel = !hasSelection() || (x >= x0 && x <= x1);
+    g.fillStyle = inSel ? "rgba(255,255,255,0.72)" : "rgba(255,255,255,0.2)";
+    const bar = Math.max(1, peak * (h - 8));
+    g.fillRect(x, mid - bar / 2, 1, bar);
+  }
+
+  // Transients: the natural chop points, so a selection can be made to line
+  // up with the music rather than with wherever the mouse happened to stop.
+  g.strokeStyle = "rgba(255,190,90,0.5)";
+  g.setLineDash([3 * dpr, 4 * dpr]);
+  g.lineWidth = dpr;
+  for (const t of editing.onsets) {
+    const x = (t / editing.duration) * w;
+    g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke();
+  }
+  g.setLineDash([]);
+
+  if (hasSelection()) {
+    g.strokeStyle = "rgba(110,231,255,0.95)";
+    g.lineWidth = 2 * dpr;
+    for (const x of [x0, x1]) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+  }
+
+  sampleSelEl.textContent = hasSelection()
+    ? `${fmtTime(start)}–${fmtTime(end)}  (${(end - start).toFixed(2)}s)`
+    : "whole file";
+}
+
+function stopPreview() {
+  if (previewSource) {
+    try { previewSource.stop(); } catch (e) { /* already stopped */ }
+    previewSource = null;
+  }
+  cancelAnimationFrame(previewRaf);
+  samplePlayheadEl.hidden = true;
+}
+
+function playPreview(from, to) {
+  if (!editing) return;
+  stopPreview();
+  engine.ensureContext();
+  const ctx = engine.ctx;
+  const src = ctx.createBufferSource();
+  src.buffer = editing.buffer;
+  const g = ctx.createGain();
+  g.gain.value = 0.9;
+  src.connect(g).connect(ctx.destination);
+  const dur = Math.max(0.02, to - from);
+  src.start(ctx.currentTime, from, dur);
+  previewSource = src;
+  previewStartedAt = ctx.currentTime;
+  previewOffset = from;
+  src.onended = () => { if (previewSource === src) stopPreview(); };
+
+  const tick = () => {
+    if (!previewSource || !editing) return;
+    const t = previewOffset + (engine.ctx.currentTime - previewStartedAt);
+    samplePlayheadEl.hidden = false;
+    const rect = sampleWave.getBoundingClientRect();
+    samplePlayheadEl.style.left = `${(t / editing.duration) * rect.width}px`;
+    sampleTimeEl.textContent = `${fmtTime(t)} / ${fmtTime(editing.duration)}`;
+    previewRaf = requestAnimationFrame(tick);
+  };
+  tick();
+}
+
+function openInEditor(id) {
+  const item = SampleBank.get(id);
+  if (!item) return;
+  stopPreview();
+  editing = {
+    id: item.id,
+    name: item.name,
+    buffer: item.buffer,
+    duration: item.duration,
+    // Transients are computed once per file and reused for both the display
+    // and the snap button.
+    onsets: sliceOnTransients(item.buffer, { maxSlices: 64 }).map((s) => s.start),
+  };
+  selStart = selEnd = 0;
+  sampleEditor.hidden = false;
+  samplePick.value = id;
+  sampleTimeEl.textContent = `0:00 / ${fmtTime(editing.duration)}`;
+  sampleApplyStatus.textContent = "";
+  drawWave();
+}
+
+function refreshSampleList() {
+  const items = SampleBank.list();
+  samplePick.innerHTML = "";
+  for (const it of items) {
+    const o = document.createElement("option");
+    o.value = it.id;
+    o.textContent = `${it.name}  (${it.duration.toFixed(1)}s)`;
+    samplePick.appendChild(o);
+  }
+  // What is currently assigned where, so the state is visible.
+  sampleListEl.innerHTML = "";
+  for (const it of items) {
+    const on = SAMPLE_ASSIGNABLE.filter((t) => currentFlavors[t] === it.flavor);
+    if (!on.length) continue;
+    const li = document.createElement("li");
+    li.className = "sample-item";
+    const name = document.createElement("span");
+    name.className = "sample-name";
+    name.textContent = `${it.name} → ${on.join(", ")}`;
+    const meta = document.createElement("span");
+    meta.className = "sample-meta";
+    meta.textContent = it.mode === "sliced" ? `${it.slices.length} slices` : it.mode;
+    const off = document.createElement("button");
+    off.className = "transport-btn";
+    off.textContent = "Remove from track";
+    off.addEventListener("click", () => {
+      for (const t of on) {
+        currentFlavors[t] = (baseStyle && baseStyle.defaultFlavors && baseStyle.defaultFlavors[t]) || undefined;
+      }
+      refreshSampleList();
+      renderStepGrid();
+    });
+    li.append(name, meta, off);
+    sampleListEl.appendChild(li);
+  }
+  if (!items.length) { sampleEditor.hidden = true; editing = null; }
+  else if (!editing) openInEditor(items[0].id);
+}
+
+// ---- Selection by dragging -------------------------------------------------
+if (sampleWave) {
+  let dragging = false, dragFrom = 0;
+  const xToTime = (clientX) => {
+    const rect = sampleWave.getBoundingClientRect();
+    const frac = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    return frac * editing.duration;
+  };
+  sampleWave.addEventListener("pointerdown", (e) => {
+    if (!editing) return;
+    sampleWave.setPointerCapture(e.pointerId);
+    dragging = true;
+    dragFrom = xToTime(e.clientX);
+    selStart = selEnd = dragFrom;
+    drawWave();
+  });
+  sampleWave.addEventListener("pointermove", (e) => {
+    if (!dragging || !editing) return;
+    const t = xToTime(e.clientX);
+    selStart = Math.min(dragFrom, t);
+    selEnd = Math.max(dragFrom, t);
+    drawWave();
+  });
+  const endDrag = () => {
+    if (!dragging) return;
+    dragging = false;
+    // A click rather than a drag clears the selection instead of leaving a
+    // zero-width one, which would read as "whole file" anyway but looks broken.
+    if (selEnd - selStart < 0.01) { selStart = selEnd = 0; }
+    drawWave();
+  };
+  sampleWave.addEventListener("pointerup", endDrag);
+  sampleWave.addEventListener("pointercancel", endDrag);
+  window.addEventListener("resize", () => { if (editing) drawWave(); });
+}
+
+if (samplePick) samplePick.addEventListener("change", () => openInEditor(samplePick.value));
+if (samplePlayBtn) samplePlayBtn.addEventListener("click", () => {
+  if (editing) playPreview(0, editing.duration);
+});
+if (sampleStopBtn) sampleStopBtn.addEventListener("click", stopPreview);
+if (samplePlaySelBtn) samplePlaySelBtn.addEventListener("click", () => {
+  const r = selRange();
+  playPreview(r.start, r.end);
+});
+if (sampleSelAllBtn) sampleSelAllBtn.addEventListener("click", () => {
+  if (!editing) return;
+  selStart = selEnd = 0;
+  drawWave();
+});
+if (sampleSnapBtn) sampleSnapBtn.addEventListener("click", () => {
+  if (!editing || !editing.onsets.length) return;
+  const r = selRange();
+  const nearest = (t) => editing.onsets.reduce((best, o) =>
+    Math.abs(o - t) < Math.abs(best - t) ? o : best, editing.onsets[0]);
+  const a = nearest(r.start);
+  // The end snaps to the next transient AFTER the start, so snapping never
+  // collapses the selection to nothing.
+  const after = editing.onsets.filter((o) => o > a + 0.02);
+  const b = after.length ? nearest(r.end) > a ? nearest(r.end) : after[0] : editing.duration;
+  selStart = a;
+  selEnd = Math.max(b, a + 0.02);
+  drawWave();
+  sampleApplyStatus.textContent = "Snapped to the nearest detected transients.";
+});
+
+if (sampleModeSel) {
+  sampleModeSel.addEventListener("change", () => {
+    sampleRootField.hidden = sampleModeSel.value !== "pitched";
+  });
+}
+
+// ---- Sending the selection to a track --------------------------------------
+function buildSelectionBuffer() {
+  const r = selRange();
+  const src = editing.buffer;
+  const sr = src.sampleRate;
+  const from = Math.floor(r.start * sr);
+  const len = Math.max(1, Math.floor((r.end - r.start) * sr));
+  engine.ensureContext();
+  const out = engine.ctx.createBuffer(src.numberOfChannels, len, sr);
+  for (let c = 0; c < src.numberOfChannels; c++) {
+    const s = src.getChannelData(c), o = out.getChannelData(c);
+    for (let i = 0; i < len; i++) o[i] = s[from + i] || 0;
+    // Short fades at both ends. Cutting a waveform mid-cycle is a click, and
+    // a chopped sample that clicks on every trigger is unusable.
+    const fade = Math.min(Math.floor(sr * 0.004), Math.floor(len / 8));
+    for (let i = 0; i < fade; i++) {
+      o[i] *= i / fade;
+      o[len - 1 - i] *= i / fade;
+    }
+  }
+  return out;
+}
+
+if (sampleApplyBtn) {
+  sampleApplyBtn.addEventListener("click", () => {
+    if (!editing) return;
+    const track = sampleTrackSel.value;
+    if (!track) { sampleApplyStatus.textContent = "Pick a track to send it to."; return; }
+    const mode = sampleModeSel.value;
+    const buffer = buildSelectionBuffer();
+    normaliseBuffer(buffer);
+    const r = selRange();
+    const slices = mode === "sliced"
+      ? sliceOnTransients(buffer)
+      : [{ start: 0, end: buffer.duration }];
+    const label = hasSelection()
+      ? `${editing.name} ${fmtTime(r.start)}-${fmtTime(r.end)}`
+      : editing.name;
+    const item = SampleBank.add(label, buffer, {
+      slices, mode,
+      rootMidi: Number(sampleRootSel.value) || 60,
+    });
+    currentFlavors[track] = item.flavor;
+    generatePattern();
+    renderStepGrid();
+    refreshSampleList();
+    sampleApplyStatus.textContent =
+      `"${item.name}" (${buffer.duration.toFixed(2)}s) is now the ${track} sound`
+      + (mode === "sliced" ? `, chopped into ${slices.length} slices.` : `, as a ${mode}.`);
+  });
+}
+
+// Track and root-note dropdowns, built once.
+if (sampleTrackSel) {
+  for (const t of SAMPLE_ASSIGNABLE) {
+    const o = document.createElement("option");
+    o.value = t; o.textContent = t;
+    sampleTrackSel.appendChild(o);
+  }
+}
+if (sampleRootSel) {
+  const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  for (let m = 24; m <= 84; m++) {
+    const o = document.createElement("option");
+    o.value = String(m);
+    o.textContent = NAMES[m % 12] + (Math.floor(m / 12) - 1);
+    if (m === 60) o.selected = true;
+    sampleRootSel.appendChild(o);
+  }
+}
+
+if (sampleFilesInput) {
+  sampleFilesInput.addEventListener("change", async () => {
+    const files = Array.from(sampleFilesInput.files || []);
+    if (!files.length) return;
+    engine.ensureContext();
+    let first = null, loaded = 0;
+    for (const f of files) {
+      sampleStatus.textContent = `Decoding ${f.name}…`;
+      try {
+        const bytes = await f.arrayBuffer();
+        const buffer = await engine.ctx.decodeAudioData(bytes);
+        normaliseBuffer(buffer);
+        // Loaded files are NOT auto-sliced any more. A song is thirty
+        // thousand samples long and chopping it into 32 numbered pieces
+        // before anyone has heard it is not a useful default - the editor
+        // exists so the part gets chosen deliberately.
+        const item = SampleBank.add(f.name, buffer, { mode: "oneshot" });
+        if (!first) first = item.id;
+        loaded++;
+      } catch (err) {
+        sampleStatus.textContent = `Could not decode ${f.name}: ${String(err.message || err).slice(0, 80)}`;
+      }
+    }
+    refreshSampleList();
+    if (first) openInEditor(first);
+    if (loaded) {
+      sampleStatus.textContent = `${loaded} file${loaded === 1 ? "" : "s"} loaded — play it, drag to choose a part, then send it to a track.`;
+    }
+    sampleFilesInput.value = "";
+  });
+}
+
+if (sampleClearBtn) {
+  sampleClearBtn.addEventListener("click", () => {
+    stopPreview();
+    for (const item of SampleBank.list()) {
+      for (const t of SAMPLE_ASSIGNABLE) {
+        if (currentFlavors[t] === item.flavor) {
+          currentFlavors[t] = (baseStyle && baseStyle.defaultFlavors && baseStyle.defaultFlavors[t]) || undefined;
+        }
+      }
+    }
+    SampleBank.clear();
+    editing = null;
+    sampleEditor.hidden = true;
+    refreshSampleList();
+    renderStepGrid();
+    sampleStatus.textContent = "All samples removed.";
   });
 }

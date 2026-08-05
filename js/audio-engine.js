@@ -2175,6 +2175,107 @@ class BeatEngine {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
 
+    // ---- more 808s ------------------------------------------------------
+    // The whole family, because in trap and rap the 808 is not the bass
+    // instrument - it IS the low end, the bassline and half the drum kit at
+    // once, and producers pick between them the way a rock band picks an amp.
+    //
+    // Every one is a sine fundamental (that is what an 808 is) plus three
+    // choices: how far it glides in, how long it rings, and how much
+    // saturation sits on top. Saturation is what makes an 808 audible on a
+    // phone speaker that cannot reproduce 40Hz at all - the harmonics it adds
+    // are heard and the ear infers the missing fundamental.
+    const EIGHT08 = {
+      glide808:   { ring: 2.2, glide: 0.16, drive: 1.4, click: 0.10, sweep: 1.35 },
+      punch808:   { ring: 1.1, glide: 0.02, drive: 2.2, click: 0.45, sweep: 2.1 },
+      long808:    { ring: 3.2, glide: 0.05, drive: 1.1, click: 0.16, sweep: 1.5 },
+      clean808:   { ring: 1.8, glide: 0.03, drive: 0,   click: 0.12, sweep: 1.4 },
+      dirty808:   { ring: 1.6, glide: 0.04, drive: 4.5, click: 0.3,  sweep: 1.8 },
+      knock808:   { ring: 0.85, glide: 0.01, drive: 3.0, click: 0.6, sweep: 2.6 },
+      rumble808:  { ring: 4.0, glide: 0.09, drive: 0.8, click: 0.06, sweep: 1.25 },
+      detuned808: { ring: 2.0, glide: 0.06, drive: 1.6, click: 0.18, sweep: 1.45, detune: 12 },
+    };
+    if (EIGHT08[flavor]) {
+      const p = EIGHT08[flavor];
+      const dest808 = this.dest("bass");
+      const ring = Math.max(durationSeconds, p.ring);
+
+      // Glide from the previous note, the defining modern-808 move. Tracked
+      // per flavor so two 808 kits never fight over one "last note".
+      this._last808 = this._last808 || {};
+      const prev = this._last808[flavor];
+      this._last808[flavor] = { freq, time };
+
+      const body = ctx.createGain();
+      body.gain.setValueAtTime(0.0001, time);
+      body.gain.linearRampToValueAtTime(vel * 0.85, time + 0.006);
+      body.gain.exponentialRampToValueAtTime(0.001, time + ring);
+
+      // Saturation, in parallel with the clean sine so the fundamental
+      // survives - clipping the sine itself would eat the very thing that
+      // makes it an 808.
+      let tail = body;
+      if (p.drive > 0) {
+        const shaper = ctx.createWaveShaper();
+        const n = 1024, curve = new Float32Array(n);
+        for (let i = 0; i < n; i++) {
+          const x = (i / (n - 1)) * 2 - 1;
+          curve[i] = Math.tanh(x * (1 + p.drive * 2.5));
+        }
+        shaper.curve = curve;
+        const wet = ctx.createGain();
+        wet.gain.value = Math.min(0.6, p.drive * 0.16);
+        const dry = ctx.createGain();
+        dry.gain.value = 1;
+        body.connect(dry).connect(dest808);
+        body.connect(shaper).connect(wet).connect(dest808);
+        tail = null;
+      } else {
+        body.connect(dest808);
+      }
+
+      for (const cents of (p.detune ? [-p.detune, p.detune] : [0])) {
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        const f = freq * Math.pow(2, cents / 1200);
+        const canGlide = prev && time - prev.time > 0 && time - prev.time < 0.55
+          && Math.abs(prev.freq - freq) > 0.5;
+        if (canGlide) {
+          o.frequency.setValueAtTime(prev.freq, time);
+          o.frequency.exponentialRampToValueAtTime(f, time + p.glide + 0.03);
+        } else {
+          // No previous note: the pitch still sweeps down into the note,
+          // which is the 808's own attack rather than a slide.
+          o.frequency.setValueAtTime(f * p.sweep, time);
+          o.frequency.exponentialRampToValueAtTime(f, time + 0.045 + p.glide);
+        }
+        const og = ctx.createGain();
+        og.gain.value = p.detune ? 0.6 : 1;
+        o.connect(og).connect(body);
+        o.start(time);
+        o.stop(time + ring + 0.05);
+      }
+
+      // The click. An 808 with no attack transient vanishes on small
+      // speakers even with saturation, because there is nothing above 200Hz
+      // for them to reproduce at all.
+      if (p.click > 0) {
+        const cl = ctx.createBufferSource();
+        cl.buffer = this.makeNoiseBuffer(0.014);
+        const bp = ctx.createBiquadFilter();
+        bp.type = "bandpass";
+        bp.frequency.value = 1400;
+        bp.Q.value = 0.8;
+        const cg = ctx.createGain();
+        cg.gain.setValueAtTime(vel * p.click * 0.5, time);
+        cg.gain.exponentialRampToValueAtTime(0.0001, time + 0.014);
+        cl.connect(bp).connect(cg).connect(dest808);
+        cl.start(time);
+        cl.stop(time + 0.02);
+      }
+      return;
+    }
+
     if (flavor === "true808") {
       // The modern-rap 808 (Travis Scott/Lil Baby/Gunna-era production).
       // Three researched pieces beyond the basic "808" flavor below:

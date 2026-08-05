@@ -8,7 +8,7 @@ const FLAVOR_POOLS = {
   hihat: ["bright", "dark", "vinyl", "metallic", "analog", "tape", "sizzle", "lofi808", "909", "707", "606", "ride", "lm1", "rz1", "r8", "drumulator", "rx5", "cr8000", "kr55", "dr110", "mpc60", "trapclosed", "washy", "foot", "tick", "halfopen", "brushhat", "glassy", "dirty", "clave606", "shimmer"],
   perc: ["shaker", "conga", "cowbell", "clave", "tambourine", "bongo", "triangle", "timpani", "cr78", "talkingdrum", "woodblock", "tabla", "cabasa", "guiro", "agogo", "vibraslap", "cajon", "djembe", "timbale", "shekere", "ganza", "caxixi", "udu", "pandeiro", "tamborim", "repinique", "surdo", "bata", "cuica"],
   tom: ["acoustic", "simmons", "roto", "taiko", "808tom", "floor", "gatedtom"],
-  bass: ["warm", "synth", "808", "true808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog", "303", "slap", "sh101", "fretless", "m1organbass"],
+  bass: ["warm", "synth", "808", "true808", "hard808", "sub", "pluck", "logdrum", "wobble", "drillslide", "distorted", "reese", "growl", "upright", "moog", "303", "slap", "sh101", "fretless", "m1organbass", "glide808", "punch808", "long808", "clean808", "dirty808", "knock808", "rumble808", "detuned808"],
   piano: ["electric", "pluck", "grand", "rhodes", "wurlitzer", "upright", "celesta", "toy", "harpsichord", "dx7ep", "clav", "m1piano", "cp70", "honkytonk", "felt", "tack", "jazzgrand"],
   lead: ["square", "saw", "bell", "flute", "supersaw", "pluck", "sine", "chip", "brasslead", "fm", "whistle", "theremin", "panflute", "harmonica", "ocarina", "hoover", "ms20", "d50", "prophet", "obxa", "phasedist"],
   pad: ["warm", "ensemble", "airy", "glass", "choir", "dark", "juno", "solina", "cs80", "voxhumana", "jupiter8", "polysix", "ppgwave", "strings2", "brassy", "breath", "crystal", "analogwarm", "sweep"],
@@ -211,9 +211,58 @@ const FLAVOR_GENRES = {
 // most common hat sounds there is - unavailable in fifteen of nineteen
 // genres. Keys may now be written "track:flavor" to disambiguate, and an
 // instrument-specific entry always wins over the bare name.
+// ---------------------------------------------------------------------------
+// Genres with a STRICT palette on a track
+// ---------------------------------------------------------------------------
+// FLAVOR_GENRES is opt-out: a kit is allowed everywhere unless it is
+// individually restricted. That is the right default for 380 kits - listing
+// every genre for every kit would be unmaintainable and would drift - but it
+// is the wrong default for the handful of tracks where a genre's identity IS
+// the sound choice.
+//
+// Measured before this existed: trap, rap, drill and phonk all allowed an
+// upright double bass, a slap bass, a Moog, a 303 and a Reese on the bass
+// track. Any shuffle could therefore put a jazz double bass under a trap
+// beat, which is not a variation on trap - it is a different genre, and it
+// is why the 808 kept disappearing from beats that are supposed to be built
+// on one. Woodwind was worse: trap fielded a woodwind lead in 58% of beats
+// and drill in 68%, and the allowed kits included clarinet, oboe, bassoon
+// and duduk. A FLUTE over a trap beat is real and common; a bassoon is not.
+//
+// So where a genre has a palette rather than a preference, it is written
+// down here and it wins outright.
+const GENRE_TRACK_KITS = {
+  // The 808 genres. The bass is an 808 - that is the entire point - so the
+  // list is the 808 family plus the two sub variants that still read as one.
+  trap:       { bass: ["808", "true808", "hard808", "sub", "distorted", "drillslide", "growl", "glide808", "punch808", "long808", "clean808", "dirty808", "knock808", "rumble808", "detuned808", "glide808", "punch808", "long808", "clean808", "dirty808", "knock808", "rumble808", "detuned808"],
+                woodwind: ["flute", "altoflute", "bansuri", "shakuhachi"] },
+  rap:        { bass: ["808", "true808", "hard808", "sub", "distorted", "growl"],
+                woodwind: ["flute", "altoflute", "bansuri"] },
+  drill:      { bass: ["drillslide", "808", "true808", "hard808", "sub", "distorted", "glide808", "punch808", "long808", "clean808", "dirty808", "knock808", "rumble808", "detuned808"],
+                woodwind: ["flute", "altoflute", "bansuri", "shakuhachi", "duduk"] },
+  phonk:      { bass: ["distorted", "808", "hard808", "true808", "sub", "growl", "glide808", "punch808", "long808", "clean808", "dirty808", "knock808", "rumble808", "detuned808"],
+                woodwind: ["flute", "shakuhachi", "duduk"] },
+  jerseyclub: { bass: ["808", "true808", "hard808", "sub", "distorted", "glide808", "punch808", "long808", "clean808", "dirty808", "knock808", "rumble808", "detuned808"],
+                woodwind: ["flute", "altoflute"] },
+  hiphop:     { woodwind: ["flute", "altoflute", "bansuri", "sopranosax", "clarinet"] },
+  // Dance genres: the bass is a synth, never an acoustic one.
+  house:      { bass: ["warm", "synth", "sub", "pluck", "moog", "303", "sh101", "m1organbass", "reese"] },
+  techno:     { bass: ["303", "sub", "distorted", "reese", "moog", "sh101", "synth", "pluck"] },
+  dnb:        { bass: ["reese", "sub", "growl", "wobble", "distorted", "synth", "moog", "upright"] },
+  dubstep:    { bass: ["wobble", "growl", "reese", "sub", "distorted", "hard808"] },
+  ukgarage:   { bass: ["sub", "warm", "synth", "pluck", "moog", "sh101", "reese", "m1organbass"] },
+  // Live-band genres: the bass is played by a person.
+  rock:       { bass: ["warm", "upright", "slap", "fretless", "distorted", "moog"] },
+  neosoul:    { bass: ["upright", "warm", "fretless", "slap", "moog", "sub"] },
+};
+
 function flavorFitsGenre(inst, flavor, styleId) {
   // Called as (flavor, styleId) in older code paths; detect and shift.
   if (arguments.length === 2) { styleId = flavor; flavor = inst; inst = null; }
+  // A strict palette wins over everything else, including a kit that carries
+  // no restriction of its own.
+  const strict = inst && GENRE_TRACK_KITS[styleId] && GENRE_TRACK_KITS[styleId][inst];
+  if (strict) return strict.includes(flavor);
   const allowed = (inst && FLAVOR_GENRES[inst + ":" + flavor]) || FLAVOR_GENRES[flavor];
   return !allowed || allowed.includes(styleId);
 }
@@ -2803,23 +2852,30 @@ function pickFillType() {
 // signature voice most likely without making it inevitable.
 const SOLO_POOLS = {
   hiphop:    [["lead", 3], ["sax", 2], ["woodwind", 2], ["leadguitar", 2], ["kalimba", 1], ["marimba", 1], ["talkbox", 1]],
-  trap:      [["lead", 3], ["woodwind", 3], ["kalimba", 2], ["autolead", 2], ["marimba", 1]],
+  // Rebalanced by what these records actually feature. A flute lead over a
+  // trap beat is real - it is most of the Metro Boomin catalogue - but at
+  // weight 3 it was tying for the most likely voice and turning up in 58% of
+  // trap beats, which is far more often than any real catalogue. The bell and
+  // synth leads that actually define the genre now lead the pool.
+  trap:      [["lead", 4], ["autolead", 3], ["kalimba", 2], ["woodwind", 2], ["marimba", 1]],
   house:     [["lead", 3], ["sax", 2], ["woodwind", 2], ["arp", 2], ["marimba", 1], ["talkbox", 1]],
   rock:      [["leadguitar", 4], ["lead", 1], ["woodwind", 1]],
   reggaeton: [["lead", 3], ["woodwind", 2], ["marimba", 2], ["leadguitar", 1]],
   lofi:      [["lead", 2], ["sax", 2], ["woodwind", 3], ["marimba", 2], ["kalimba", 2], ["leadguitar", 2]],
-  drill:     [["woodwind", 3], ["lead", 2], ["autolead", 1]],
+  // Drill: the cold bell/synth motif is the sound, with a dark wind second.
+  drill:     [["lead", 4], ["woodwind", 2], ["autolead", 2], ["kalimba", 1]],
   afrobeats: [["woodwind", 3], ["marimba", 2], ["kalimba", 2], ["sax", 2], ["leadguitar", 2], ["lead", 1]],
   dubstep:   [["lead", 4], ["arp", 2], ["woodwind", 1]],
   // The genre this was reported on. A saxophone is one of R&B's voices,
   // not its only one - vibraphone, flute, clean lead guitar and talkbox
   // all carry top lines on real records.
   rnb:       [["sax", 3], ["woodwind", 3], ["leadguitar", 2], ["marimba", 2], ["lead", 2], ["talkbox", 2]],
-  phonk:     [["lead", 3], ["leadguitar", 2], ["woodwind", 2], ["autolead", 2]],
+  phonk:     [["lead", 4], ["autolead", 2], ["leadguitar", 2], ["woodwind", 1]],
   jerseyclub:[["lead", 3], ["arp", 2], ["autolead", 2]],
   dnb:       [["arp", 3], ["lead", 3], ["woodwind", 1]],
   synthwave: [["lead", 3], ["arp", 3], ["leadguitar", 2]],
-  rap:       [["autolead", 3], ["lead", 2], ["sax", 2], ["woodwind", 2], ["talkbox", 1]],
+  // Rap: an Auto-Tune hook or a synth lead, not a woodwind recital.
+  rap:       [["autolead", 4], ["lead", 3], ["woodwind", 1], ["sax", 1], ["talkbox", 1]],
   amapiano:  [["woodwind", 3], ["sax", 3], ["lead", 2], ["marimba", 2], ["kalimba", 1], ["leadguitar", 2]],
   ukgarage:  [["lead", 3], ["arp", 2], ["sax", 2], ["woodwind", 2]],
   techno:    [["arp", 3], ["lead", 3]],
@@ -2883,6 +2939,10 @@ function pickSoloInstruments(style) {
     ? style.soloOverride.map((i) => [i, 1])
     : (SOLO_POOLS[style.id] || []);
   const pool = source.filter(([inst]) => {
+    // A named producer's records simply do not have certain instruments on
+    // them. Without this a Metro Boomin type beat could arrive with a
+    // saxophone, because the genre pool offered one and nothing said no.
+    if (artistAvoids(inst)) return false;
     // A genre can only field an instrument it has a melodic profile for,
     // either its own or the shared default.
     return (style.melody && style.melody[inst]) || DEFAULT_MELODY[inst];
@@ -2911,7 +2971,12 @@ function pickSoloInstruments(style) {
 // every time. The first two are kept (they carry the harmony) and the
 // rest are each rolled for, so the supporting cast changes shape.
 function pickChordInstruments(style) {
-  const all = style.melodic.chordInstruments || [];
+  // The chordal parts were never filtered by the artist's palette - only the
+  // solo pool was - so a producer who never uses an organ could still get one
+  // comping underneath. Two are always kept so the beat cannot end up with no
+  // harmony at all, even if the artist avoids most of what this genre offers.
+  let all = (style.melodic.chordInstruments || []).filter((i) => !artistAvoids(i));
+  if (!all.length) all = (style.melodic.chordInstruments || []).slice(0, 1);
   if (all.length <= 2) return all.slice();
   const cx = complexityProfile();
   const kept = all.slice(0, 2);
@@ -2927,6 +2992,16 @@ function pickChordInstruments(style) {
 // let the scorer choose the line-up - and because the scorer rewards
 // interplay it simply always picked the busiest option, which quietly
 // undid most of the variety this is here to create.
+// Instruments the named artist never uses. Set alongside the artist knobs and
+// cleared whenever the beat is made any other way.
+let CURRENT_ARTIST_AVOID = null;
+function setArtistAvoid(list) {
+  CURRENT_ARTIST_AVOID = (list && list.length) ? new Set(list) : null;
+}
+function artistAvoids(inst) {
+  return !!(CURRENT_ARTIST_AVOID && CURRENT_ARTIST_AVOID.has(inst));
+}
+
 function planInstrumentation(style) {
   // How each part is physically played is chosen per generation too - a
   // strummed guitar and a fingerpicked one are different performances of

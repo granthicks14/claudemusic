@@ -24,10 +24,12 @@ vm.createContext(sandbox);
 // (it needs Web Audio), so take just that one line from it.
 const engineSrc = fs.readFileSync(path.join(root, "js", "audio-engine.js"), "utf8");
 const allTracksLine = engineSrc.match(/^const ALL_TRACKS = \[[^\]]*\];/m)[0];
-const { ARTIST_PROFILES, STYLES, FLAVOR_POOLS, ALL_TRACKS, noteNameToMidi, findArtistProfile, DEFAULT_MELODY }
+const { ARTIST_PROFILES, STYLES, FLAVOR_POOLS, ALL_TRACKS, noteNameToMidi, findArtistProfile, DEFAULT_MELODY, generateVariation,
+        setBeatComplexity, setArtistAvoid }
   = vm.runInContext(src + "\n;" + allTracksLine
       + `\n;({ ARTIST_PROFILES, STYLES, FLAVOR_POOLS, ALL_TRACKS,
-      noteNameToMidi, findArtistProfile, DEFAULT_MELODY })`, sandbox, { filename: "bundle.js" });
+      noteNameToMidi, findArtistProfile, DEFAULT_MELODY, generateVariation,
+        setBeatComplexity, setArtistAvoid })`, sandbox, { filename: "bundle.js" });
 
 let failures = 0;
 const problems = [];
@@ -131,6 +133,43 @@ if (thin.length) {
   failures++;
 } else {
   console.log("\n  PASS  every genre has at least 4 profiles");
+}
+
+// ---------------------------------------------------------------------------
+// Artist instrument palettes
+// ---------------------------------------------------------------------------
+// `avoid` is only meaningful if it is actually enforced. Generating beats and
+// counting what turns up is the only way to know - the filter lives in two
+// separate places (the solo pool and the chordal picker) and missing either
+// one lets the instrument straight back in.
+console.log("\nChecking artist instrument palettes");
+{
+  const { ARTIST_INSTRUMENTS, artistInstruments } = require("../js/artists.js");
+  const names = Object.keys(ARTIST_INSTRUMENTS);
+  let leaks = 0;
+  for (const name of names) {
+    const p = ARTIST_PROFILES[name];
+    if (!p || !STYLES[p.genre]) { note(name, "instrument palette for an unknown profile"); continue; }
+    const pal = artistInstruments(name, p);
+    const counts = {};
+    for (let i = 0; i < 24; i++) {
+      sandbox.setBeatComplexity(p.complexity);
+      sandbox.setArtistAvoid(pal.avoid);
+      const st = Object.assign({}, STYLES[p.genre], { soloOverride: pal.only });
+      let v;
+      try { v = sandbox.generateVariation(st, 4); } catch (e) { continue; }
+      for (const k of Object.keys(v.instruments || {})) {
+        if (Array.isArray(v.instruments[k]) && v.instruments[k].some(Boolean)) counts[k] = (counts[k] || 0) + 1;
+      }
+    }
+    sandbox.setArtistAvoid(null);
+    const leaked = (pal.avoid || []).filter((x) => counts[x]);
+    if (leaked.length) {
+      leaks++;
+      note(name, `avoids ${leaked.join(", ")} but still plays them`);
+    }
+  }
+  if (!leaks) console.log(`  PASS  all ${names.length} palettes are enforced — nothing on an avoid list is played`);
 }
 
 // ---------------------------------------------------------------------------

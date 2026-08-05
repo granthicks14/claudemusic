@@ -1082,3 +1082,43 @@ A sample participates as a **kit**, not a new track type: the flavor string `sam
 **The choice of kits matters, and by how much is now a number**: across all 19 genres the gap between the best and worst combination found averaged **17.8 points out of 100** — near a fifth of the whole scale, and trap alone spanned 31.6 points in a longer run. So this is not noise.
 
 **What it is evidence of, and what it is not.** The reward is the rating equation, and that measures *balance* — loudness on target, no band swamping another, real dynamics, a findable pulse. It does not measure taste. A combination in the table is one that sits together cleanly, not one that is beautiful, and those are not the same thing. The search is also random rather than exhaustive: a genre with nine tracks and twenty candidate kits each has more combinations than there are seconds in the age of the universe. These are good regions, not global optima, and the tool says so in its own header.
+
+## Trap and rap were fielding clarinets and double basses
+
+Three complaints, all of which turned out to be exactly right, and all of which were invisible from reading the tables. `tools/audit-genre-fit.js` generates many beats per genre and counts what actually turns up:
+
+- **A woodwind lead appeared in 58% of trap beats and 68% of drill beats** — and the kits available to it included clarinet, oboe, bassoon and duduk. A *flute* over a trap beat is real and common (it is most of the Metro Boomin catalogue). A bassoon is not.
+- **Trap, rap, drill and phonk all allowed an upright double bass, a slap bass, a Moog, a 303 and a Reese on the bass track.** Any shuffle could put a jazz double bass under a trap beat. **This is why the 808 kept disappearing** — it was there, it just kept getting shuffled away.
+- Reading `FLAVOR_GENRES`, `SOLO_POOLS` and the style tables separately made none of this obvious. Counting the output did.
+
+**The fix is a strict palette.** `FLAVOR_GENRES` is opt-out — a kit is allowed everywhere unless individually restricted — which is the right default for 388 kits but the wrong one for the handful of tracks where a genre's identity *is* the sound choice. `GENRE_TRACK_KITS` is an allow-list that wins outright: trap's bass is the 808 family, its woodwind is flute-family only, house and techno get synth basses, rock and neo-soul get played ones. The solo pools were rebalanced too — lead and Auto-Tune now lead the hard genres, and woodwind fell to 24% in trap and 34% in drill.
+
+## Eight more 808s
+
+The 808 is not the bass instrument in trap and rap — it is the low end, the bassline and half the drum kit at once, and producers choose between them the way a rock band chooses an amp. `glide808`, `punch808`, `long808`, `clean808`, `dirty808`, `knock808`, `rumble808` and `detuned808`, each a sine fundamental (that is what an 808 is) plus three choices: how far it glides in, how long it rings, how much saturation sits on top.
+
+Saturation is applied **in parallel** with the clean sine rather than to it, because clipping the sine would eat the very thing that makes it an 808. It matters because it is what makes an 808 audible on a phone speaker that cannot reproduce 40 Hz at all — the harmonics get heard and the ear infers the missing fundamental. Every one also carries a click, for the same reason.
+
+## What each producer actually plays
+
+A profile named the genre, tempo, key, swing, complexity, kits and solo voices — but the solo voices were only a *bias*, and the genre's pool still supplied everything else. So a Metro Boomin type beat could arrive with a saxophone on it, because the genre fields one and nothing said otherwise.
+
+`ARTIST_INSTRUMENTS` covers the 44 producers whose sound is most defined by a specific instrument, with two fields: `only` replaces the genre's solo pool outright, and `avoid` removes instruments from consideration entirely — **including the chordal ones the solo pool never touched**, which was a real hole (a producer who never uses an organ could still get one comping underneath). DJ Premier gets saxophone and vocal chops and never an Auto-Tune lead; Rick Rubin gets guitars and nothing else; Kordhell gets one synth lead and no orchestra. `tools/test-content.js` generates beats for all 44 and fails if anything on an avoid list is played.
+
+## The sampler: load it, hear it, pick the part
+
+The first version loaded a file, auto-sliced it, and offered a dropdown of numbered slices. That is fine for a one-shot and useless for a song — nobody knows which of 32 numbered slices is the bit they wanted without hearing it.
+
+Now: **load → play → drag across the waveform to select exactly the part you want → send that part to a track.** The waveform shows detected transients as dotted lines (the natural chop points), **Snap to transients** moves the selection edges to them, **Play selection** auditions just that region, and the extracted audio gets short fades at both ends because cutting a waveform mid-cycle is a click. Files are no longer auto-sliced on load — a song is thirty thousand samples long and chopping it into 32 pieces before anyone has heard it is not a useful default.
+
+The test drives the whole path: it builds four bursts at four known pitches, selects the third, and checks that what comes out is 0.25 s long and measures 440 Hz — the part that was selected, not the whole file.
+
+## On connecting an external source
+
+Worth answering directly, since it was asked. **No external source would have prevented any of these bugs.** The clarinets-in-trap problem was not missing data — the program already knew what a clarinet was and which genres could use one. The problem was that *nothing checked what came out*. A remote instrument database would have had exactly the same bug, plus a network dependency and a CORS problem.
+
+What actually prevents recurrence is the audit: `tools/audit-genre-fit.js` states, in writing, which instruments do not belong in which genre, then generates beats and fails if they turn up. It caught all three complaints in one run and now runs alongside the other suites. That is cheaper, faster and more honest than a service.
+
+### And a fourth time the measuring tool was behind the code
+
+The audit's list of "kits that count as an 808" was hardcoded, so the moment eight new 808 kits were added it reported every one of them as a violation. It now derives the set from the name. That is the fourth time in this project a measurement has been wrong before the thing it measured was — the onset detector's band split, the kit-duplicate detector, the sampler's frequency estimator, and now this — which is the entire argument for checking the tool before believing its verdict.

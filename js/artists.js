@@ -1250,9 +1250,100 @@ function artistKnobs(profile) {
   return clampKnobs(acc);
 }
 
+// ---------------------------------------------------------------------------
+// What each producer actually plays
+// ---------------------------------------------------------------------------
+// A profile named the genre, tempo, key, swing, complexity, drum kits and
+// solo voices - but the solo voices were only a bias, and the genre's own
+// pool still supplied everything else. So a Metro Boomin type beat could
+// arrive with a saxophone on it, because R&B-adjacent genres field one and
+// nothing said otherwise.
+//
+// This is the missing half: what a producer's records DO and DO NOT have on
+// them. `only` replaces the genre's solo pool outright; `avoid` removes
+// instruments from consideration entirely, including the chordal ones the
+// solo pool never touched.
+//
+// The entries below cover the producers whose sound is most defined by a
+// specific instrument. Anything not listed keeps the genre's own behaviour,
+// which is the right default - most producers are not defined by refusing to
+// use a piano.
+const ARTIST_INSTRUMENTS = {
+  // ---- trap / rap: the 808 is the instrument, the melody is bells or synth
+  "metro boomin":  { only: ["lead", "woodwind", "kalimba"], avoid: ["sax", "leadguitar", "organ", "guitar", "strings", "talkbox"] },
+  "southside":     { only: ["lead", "autolead"], avoid: ["sax", "woodwind", "leadguitar", "organ", "guitar", "strings", "piano"] },
+  "wheezy":        { only: ["lead", "kalimba", "woodwind"], avoid: ["sax", "leadguitar", "organ", "guitar", "strings"] },
+  "tay keith":     { only: ["lead", "autolead"], avoid: ["sax", "woodwind", "leadguitar", "organ", "guitar", "strings", "marimba"] },
+  "pierre bourne": { only: ["lead", "marimba", "kalimba"], avoid: ["sax", "woodwind", "leadguitar", "organ", "guitar", "strings"] },
+  "cashmoneyap":   { only: ["lead", "kalimba"], avoid: ["sax", "woodwind", "leadguitar", "organ", "strings"] },
+  "taz taylor":    { only: ["guitar", "lead"], avoid: ["sax", "woodwind", "organ", "strings", "talkbox"] },
+  "hit-boy":       { only: ["lead", "woodwind"], avoid: ["sax", "leadguitar", "organ", "guitar"] },
+  "swizz beatz":   { only: ["organ", "lead"], avoid: ["sax", "woodwind", "leadguitar", "strings", "marimba", "kalimba"] },
+  "just blaze":    { only: ["horn", "organ"], avoid: ["woodwind", "leadguitar", "kalimba", "marimba", "autolead"] },
+  "dr dre":        { only: ["lead", "strings"], avoid: ["woodwind", "kalimba", "marimba", "autolead", "talkbox"] },
+  "eminem":        { only: ["strings", "lead"], avoid: ["woodwind", "sax", "kalimba", "marimba", "talkbox"] },
+  "kanye west":    { only: ["vocal", "strings"], avoid: ["woodwind", "kalimba", "marimba", "autolead"] },
+  "havoc":         { only: ["lead", "piano"], avoid: ["woodwind", "sax", "kalimba", "marimba", "leadguitar", "talkbox"] },
+
+  // ---- drill: a cold bell or dark wind, and nothing warm
+  "pop smoke":     { only: ["lead", "woodwind"], avoid: ["sax", "leadguitar", "organ", "guitar", "strings", "marimba"] },
+  "central cee":   { only: ["lead", "woodwind", "piano"], avoid: ["sax", "leadguitar", "organ", "guitar", "strings"] },
+  "ab":            { only: ["lead"], avoid: ["sax", "woodwind", "leadguitar", "organ", "guitar", "strings", "marimba", "kalimba"] },
+  "ghostface800":  { only: ["lead", "piano", "woodwind"], avoid: ["sax", "leadguitar", "organ", "guitar", "strings"] },
+
+  // ---- phonk: cowbell lead and saturation, no orchestra
+  "kordhell":      { only: ["lead"], avoid: ["sax", "woodwind", "organ", "strings", "marimba", "kalimba", "guitar"] },
+  "dj smokey":     { only: ["lead", "vocal"], avoid: ["sax", "woodwind", "organ", "strings", "marimba"] },
+  "soudiere":      { only: ["lead"], avoid: ["sax", "woodwind", "organ", "strings", "marimba", "kalimba", "guitar", "piano"] },
+
+  // ---- boom bap and soul: horns, keys, and no synth leads
+  "j dilla":       { only: ["sax", "vocal", "leadguitar"], avoid: ["autolead", "lead", "arp", "talkbox"] },
+  "dj premier":    { only: ["sax", "vocal"], avoid: ["autolead", "lead", "arp", "kalimba", "marimba", "talkbox"] },
+  "the alchemist": { only: ["sax", "woodwind", "vocal"], avoid: ["autolead", "lead", "arp", "talkbox"] },
+  "madlib":        { only: ["sax", "woodwind", "vocal"], avoid: ["autolead", "arp", "talkbox"] },
+  "9th wonder":    { only: ["sax", "vocal"], avoid: ["autolead", "lead", "arp", "kalimba", "talkbox"] },
+  "large professor": { only: ["sax", "vocal"], avoid: ["autolead", "lead", "arp", "talkbox"] },
+  "diamond d":     { only: ["horn", "sax"], avoid: ["autolead", "lead", "arp", "talkbox", "kalimba"] },
+  "nujabes":       { only: ["sax", "woodwind", "piano"], avoid: ["autolead", "arp", "talkbox"] },
+  "knxwledge":     { only: ["vocal", "sax"], avoid: ["autolead", "lead", "arp", "talkbox"] },
+
+  // ---- neo-soul: real players
+  "robert glasper": { only: ["piano", "sax"], avoid: ["autolead", "lead", "arp", "talkbox", "kalimba"] },
+  "d'angelo":      { only: ["leadguitar", "sax", "organ"], avoid: ["autolead", "lead", "arp", "kalimba", "marimba"] },
+  "erykah badu":   { only: ["sax", "woodwind", "organ"], avoid: ["autolead", "lead", "arp", "kalimba"] },
+  "hiatus kaiyote": { only: ["guitar", "sax"], avoid: ["autolead", "arp", "talkbox"] },
+  "steve lacy":    { only: ["guitar", "leadguitar"], avoid: ["autolead", "arp", "sax", "woodwind", "talkbox", "kalimba"] },
+
+  // ---- dance: synths only
+  "daft punk":     { only: ["lead", "talkbox", "arp"], avoid: ["sax", "woodwind", "leadguitar", "marimba", "kalimba"] },
+  "carl cox":      { only: ["lead", "arp"], avoid: ["sax", "woodwind", "leadguitar", "guitar", "marimba", "kalimba", "piano"] },
+  "richie hawtin": { only: ["lead", "arp"], avoid: ["sax", "woodwind", "leadguitar", "guitar", "marimba", "kalimba", "piano", "strings"] },
+  "charlotte de witte": { only: ["lead"], avoid: ["sax", "woodwind", "leadguitar", "guitar", "marimba", "kalimba", "piano", "strings"] },
+  "perturbator":   { only: ["lead", "arp"], avoid: ["sax", "woodwind", "guitar", "marimba", "kalimba", "piano"] },
+  "kerri chandler": { only: ["organ", "piano"], avoid: ["autolead", "arp", "talkbox", "kalimba", "marimba"] },
+
+  // ---- rock: guitars
+  "rick rubin":    { only: ["leadguitar", "guitar"], avoid: ["lead", "autolead", "arp", "sax", "woodwind", "talkbox", "kalimba", "marimba"] },
+  "steve albini":  { only: ["leadguitar"], avoid: ["lead", "autolead", "arp", "sax", "woodwind", "talkbox", "kalimba", "marimba", "strings"] },
+  "butch vig":     { only: ["leadguitar"], avoid: ["lead", "autolead", "arp", "sax", "woodwind", "talkbox", "kalimba", "marimba"] },
+};
+
+// The solo voices a profile should be allowed to field, and the instruments
+// it should never field. Returns nulls when a profile has no opinion, which
+// is most of them.
+function artistInstruments(artistKey, profile) {
+  const spec = ARTIST_INSTRUMENTS[artistKey];
+  if (!spec) return { only: (profile && profile.solos) ? profile.solos.slice() : null, avoid: null };
+  return {
+    only: spec.only ? spec.only.slice() : ((profile && profile.solos) ? profile.solos.slice() : null),
+    avoid: spec.avoid ? spec.avoid.slice() : null,
+  };
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     ARTIST_PROFILES, findArtistProfile, artistFallbackGenre, artistProfileNames,
     creditLine, uploadText, artistKnobs, ARTIST_KNOB_RANGE, ARTIST_KEYWORD_KNOBS,
+    ARTIST_INSTRUMENTS, artistInstruments,
   };
 }

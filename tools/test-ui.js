@@ -159,34 +159,71 @@ const path = require("path");
   check("space does not play while typing in a field",
     (await page.evaluate(() => engine.isPlaying)) === false);
 
-  console.log("\n6. The samples tab");
+  console.log("\n6. The sample editor");
   await page.click('.tools-tab[data-tool="samples"]');
-  const hasInput = await page.isVisible("#sample-files");
-  check("the sample loader is present", hasInput);
-  // Load a generated sample straight into the bank and assign it, which is
-  // the whole path the UI drives.
-  const sampleWired = await page.evaluate(async () => {
+  const ed = await page.evaluate(async () => {
     const SR = 44100;
-    const c = new OfflineAudioContext(1, SR, SR);
-    const b = c.createBuffer(1, Math.floor(SR * 0.4), SR);
+    const c = new OfflineAudioContext(1, SR * 2, SR);
+    const b = c.createBuffer(1, SR * 2, SR);
     const d = b.getChannelData(0);
-    for (let i = 0; i < d.length; i++) {
-      d[i] = Math.exp(-(i / SR) * 9) * Math.sin(2 * Math.PI * 180 * (i / SR)) * 0.7;
+    // Four bursts at four pitches, so a selection that grabs the third one
+    // can be checked against a known answer.
+    [0.1, 0.6, 1.1, 1.6].forEach((t0, i) => {
+      const f = [220, 330, 440, 550][i];
+      const st = Math.floor(t0 * SR);
+      for (let k = 0; k < SR * 0.25; k++) {
+        d[st + k] = Math.exp(-(k / SR) * 12) * Math.sin(2 * Math.PI * f * (k / SR)) * 0.8;
+      }
+    });
+    const item = SampleBank.add("editor-test.wav", b, { mode: "oneshot" });
+    refreshSampleList();
+    openInEditor(item.id);
+    const opened = !document.getElementById("sample-editor").hidden;
+    const onsets = editing ? editing.onsets.length : 0;
+
+    // Select the third burst (1.1s-1.35s) and send it to the kick.
+    selStart = 1.1; selEnd = 1.35;
+    drawWave();
+    const selText = document.getElementById("sample-sel").textContent;
+    document.getElementById("sample-track").value = "kick";
+    document.getElementById("sample-mode").value = "oneshot";
+    document.getElementById("sample-apply").click();
+
+    const kickFlavor = currentFlavors.kick;
+    const made = SampleBank.resolve(kickFlavor);
+    // The extracted region must be the LENGTH that was selected, and must
+    // contain the pitch that was in that region - not the whole file.
+    let hz = 0;
+    if (made) {
+      const s2 = made.buffer.getChannelData(0);
+      let peak = 0;
+      for (let i = 0; i < s2.length; i++) peak = Math.max(peak, Math.abs(s2[i]));
+      let lo = -1, hi = -1;
+      for (let i = 0; i < s2.length; i++) if (Math.abs(s2[i]) > peak * 0.15) { if (lo < 0) lo = i; hi = i; }
+      let zc = 0;
+      for (let i = lo + 1; i <= hi; i++) if ((s2[i] >= 0) !== (s2[i - 1] >= 0)) zc++;
+      hz = hi > lo ? zc / 2 / ((hi - lo) / SR) : 0;
     }
-    const item = SampleBank.add("ui-test.wav", b, {});
-    renderSampleList();
-    const rows = document.querySelectorAll("#sample-list .sample-item").length;
-    currentFlavors.kick = item.flavor;
-    // And it must survive into a real render.
-    engine.ensureContext();
-    const before = currentFlavors.kick;
+    const out = {
+      opened, onsets, selText,
+      madeLen: made ? +made.buffer.duration.toFixed(3) : 0,
+      hz: Math.round(hz),
+      isSample: !!made,
+    };
     SampleBank.clear();
-    renderSampleList();
-    return { rows, assigned: before === item.flavor, clearedRows: document.querySelectorAll("#sample-list .sample-item").length };
+    editing = null;
+    document.getElementById("sample-editor").hidden = true;
+    refreshSampleList();
+    return out;
   });
-  check("a loaded sample appears in the list", sampleWired.rows === 1, `${sampleWired.rows} rows`);
-  check("it can be assigned to a track", sampleWired.assigned);
-  check("clearing empties the list", sampleWired.clearedRows === 0, `${sampleWired.clearedRows} rows`);
+  check("the editor opens on a loaded file", ed.opened);
+  check("transients are detected for the waveform", ed.onsets >= 4, `${ed.onsets} onsets`);
+  check("the selection is reported in seconds", /0:01/.test(ed.selText), ed.selText);
+  check("only the selected region is extracted", Math.abs(ed.madeLen - 0.25) < 0.02,
+    `${ed.madeLen}s selected 0.25s`);
+  check("the extracted audio is the part that was selected", Math.abs(ed.hz - 440) < 60,
+    `${ed.hz}Hz, the third burst was built at 440Hz`);
+  check("it becomes the track's sound", ed.isSample);
 
   console.log("\n7. No page errors");
   check("no uncaught errors", errors.length === 0, errors.slice(0, 3).join(" | "));

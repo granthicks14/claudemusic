@@ -220,9 +220,50 @@
               <button id="sample-clear" class="transport-btn">Remove all</button>
               <span id="sample-status" class="taste-status"></span>
             </div>
-            <p class="tools-hint">Drop in your own audio — one-shots, loops, vocal chops, anything. A short file becomes a one-shot; a longer one is cut at its transients into numbered slices you can re-sequence across the grid, which is what a sampler is for. Assign a sample to any track and it plays there instead of the synth. <strong>Everything is decoded in your browser and never uploaded.</strong></p>
-            <p class="tools-hint"><strong>No sample pack ships with the program</strong>, and that is deliberate: a drum sample is a recording, and recordings are owned. Bundling a pack would mean shipping either something I have no right to distribute or something so restrictively licensed that the beats made with it could not be used. Bring your own, or a CC0 set.</p>
+            <p class="tools-hint">Load your own audio — a full song, a loop, a one-shot, anything. Play it, drag across the waveform to choose <strong>exactly the part you want</strong>, then send that selection to a track. Everything is decoded in your browser and never uploaded.</p>
+
+            <div id="sample-editor" class="sample-editor" hidden>
+              <div class="sample-editor-head">
+                <select id="sample-pick" class="sample-pick"></select>
+                <button id="sample-play" class="transport-btn play">▶ Play</button>
+                <button id="sample-stop" class="transport-btn">■ Stop</button>
+                <span id="sample-time" class="sample-meta">0:00 / 0:00</span>
+              </div>
+
+              <div class="sample-wave-wrap">
+                <canvas id="sample-wave" class="sample-wave" width="1200" height="150"></canvas>
+                <div id="sample-playhead" class="sample-playhead" hidden></div>
+              </div>
+              <p class="tools-hint sample-drag-hint">Drag across the waveform to select. Click once to clear the selection. The dotted lines are detected transients — the natural chop points.</p>
+
+              <div class="tools-row sample-controls">
+                <span class="sample-meta">Selection: <b id="sample-sel">whole file</b></span>
+                <button id="sample-play-sel" class="transport-btn">▶ Play selection</button>
+                <button id="sample-snap" class="transport-btn" title="Move the selection edges to the nearest detected transients">Snap to transients</button>
+                <button id="sample-sel-all" class="transport-btn">Select all</button>
+              </div>
+
+              <div class="tools-row sample-controls">
+                <label class="sample-field">Use as
+                  <select id="sample-mode">
+                    <option value="oneshot">one-shot</option>
+                    <option value="sliced">chopped across the grid</option>
+                    <option value="pitched">played at pitch</option>
+                  </select>
+                </label>
+                <label class="sample-field" id="sample-root-field" hidden>Recorded note
+                  <select id="sample-root"></select>
+                </label>
+                <label class="sample-field">Send to
+                  <select id="sample-track"></select>
+                </label>
+                <button id="sample-apply" class="transport-btn play">Use this part</button>
+              </div>
+              <p id="sample-apply-status" class="tools-hint"></p>
+            </div>
+
             <ul id="sample-list" class="sample-list"></ul>
+            <p class="tools-hint"><strong>No sample pack ships with the program</strong>, and that is deliberate: a drum sample is a recording, and recordings are owned. Bundling a pack would mean shipping either something I have no right to distribute or something so restrictively licensed that the beats made with it could not be used. Bring your own, or a CC0 set.</p>
           </div>
           <div class="tools-panel" role="tabpanel" data-tool-panel="export" hidden>
             <div class="tools-row">

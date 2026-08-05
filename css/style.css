@@ -1034,6 +1034,85 @@ a.transport-btn { text-decoration: none; display: inline-flex; align-items: cent
 }
 .example-chip:hover { background: rgba(255, 255, 255, 0.11); border-color: var(--accent, #6ee7ff); }
 
+/* ---------------------------------------------------------------------------
+   "Your style" - the build-it-yourself panel
+   ---------------------------------------------------------------------------
+   Far more controls than any other launcher panel, so it needs a layout of
+   its own rather than the single column the others use. Auto-fit columns mean
+   it collapses to one column on a narrow screen without a media query. */
+.mystyle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.mystyle-wide { grid-column: 1 / -1; }
+.mystyle-block {
+  border: 1px solid var(--line, #2a2f3a);
+  border-radius: 10px;
+  padding: 12px 13px 14px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.mystyle-h { margin: 0 0 4px; font-size: 0.95em; }
+.mystyle-note { margin: 0 0 10px; opacity: 0.6; font-size: 0.82em; line-height: 1.4; }
+.mystyle-select {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 7px;
+  border: 1px solid var(--line, #2a2f3a);
+  background: rgba(255, 255, 255, 0.05);
+  color: inherit;
+  font: inherit;
+  font-size: 0.88em;
+}
+.mystyle-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Selected state has to survive on its own, not only as a hover: this is a
+   multi-select and the whole point is seeing what is already chosen. */
+.ms-chip[aria-pressed="true"] {
+  background: var(--accent, #6ee7ff);
+  border-color: var(--accent, #6ee7ff);
+  color: #0b0e14;
+  font-weight: 600;
+}
+/* A chip for an instrument the genre would not normally field. Not disabled -
+   choosing it on purpose is allowed - just marked, so the choice is informed. */
+.ms-chip[data-offgenre="1"]::after {
+  content: " ◦";
+  opacity: 0.75;
+}
+.mystyle-kits {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px 12px;
+}
+.mystyle-kit-row { display: flex; flex-direction: column; gap: 3px; font-size: 0.82em; }
+.mystyle-kit-row span { opacity: 0.62; }
+.mystyle-rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px 18px;
+}
+.mystyle-row {
+  display: grid;
+  grid-template-columns: 84px 1fr 62px;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85em;
+}
+.mystyle-row > span { opacity: 0.68; }
+.mystyle-row output { opacity: 0.8; text-align: right; font-variant-numeric: tabular-nums; }
+.mystyle-row input[type="range"] { width: 100%; }
+.mystyle-fit {
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 196, 84, 0.35);
+  background: rgba(255, 196, 84, 0.08);
+  font-size: 0.85em;
+  line-height: 1.45;
+}
+.mystyle-actions { margin-top: 4px; }
+
 /* ===========================================================================
    Transport bar + tabbed tools
    ===========================================================================

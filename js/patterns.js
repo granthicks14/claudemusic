@@ -381,6 +381,15 @@ function C(degreeOffset, size, len) {
   return { type: "chord", degreeOffset, size, len };
 }
 
+// The chord part an instrument gets when its genre never wrote one for it.
+// Genres only configure the instruments they normally field, so any line-up
+// assembled by hand can name one they did not - see buildChordBar.
+const DEFAULT_CHORD_PART = {
+  core:     [C(0, 3, 8), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  optional: [0, 0, 0, 0, 0, 0, 0, 0, C(0, 3, 4), 0, 0, 0, 0, 0, 0, 0],
+  optionalProbability: 0.3,
+};
+
 // ---- Motif-based melody generation ----
 // Grounded in real songwriting practice: a short motif is stated, then
 // repeated with small variations (transposition, inversion, truncation) so
@@ -2650,7 +2659,17 @@ function buildChordBar(style, variant, barRootDegree, chordVariety, prevLowest =
       continue;
     }
     const v = (chordVariety && chordVariety[inst]) || {};
-    bar[inst] = resolveChordBarTrack(inst, style.chords[inst], barRootDegree, { ...v, prevLowest: prevLowest[inst] });
+    // A genre only writes a chord part for the instruments it normally uses,
+    // so asking any other instrument to comp - which "Your style" lets you do
+    // deliberately, and which an edited arrangement can do by accident - found
+    // no config here and threw on reading `.core` of undefined.
+    //
+    // The fallback is a plain one: the chord on the downbeat, held, plus an
+    // occasional answer on the second half of the bar. That is what a player
+    // handed an unfamiliar chart does, and it lets any instrument hold
+    // harmony in any genre instead of the request being an error.
+    const cfg = (style.chords && style.chords[inst]) || DEFAULT_CHORD_PART;
+    bar[inst] = resolveChordBarTrack(inst, cfg, barRootDegree, { ...v, prevLowest: prevLowest[inst] });
     for (let i = bar[inst].length - 1; i >= 0; i--) {
       if (bar[inst][i]) { prevLowest[inst] = bar[inst][i].degrees[0]; break; }
     }
@@ -3000,7 +3019,35 @@ const DEFAULT_MELODY = {
 // Draw this generation's solo voices. One most of the time, two often
 // enough that beats have a call-and-response pair - but never so many
 // that the top of the mix turns into a crowd.
+// ---------------------------------------------------------------------------
+// A style the user built themselves
+// ---------------------------------------------------------------------------
+// Every other entry point picks instruments FOR the user - a genre draws from
+// its pool, an artist profile narrows that pool, a text prompt guesses at one.
+// This is the case where they have already decided, and the only correct
+// behaviour is to play exactly what was asked for.
+//
+// So this deliberately does not weight, sample or filter. If someone asks for
+// a kalimba over a trap beat - which the genre audit would call a mistake, and
+// which it is, as a default - they get a kalimba over a trap beat. The audit
+// exists to stop the program making that choice on its own, not to stop a
+// person making it on purpose.
+let CURRENT_USER_STYLE = null;
+function setUserStyle(spec) {
+  const has = spec && ((spec.solo && spec.solo.length) || (spec.chord && spec.chord.length));
+  CURRENT_USER_STYLE = has ? spec : null;
+}
+function userStyleActive() { return !!CURRENT_USER_STYLE; }
+
 function pickSoloInstruments(style) {
+  // Exactly what was asked for, in the order it was asked for. Still gated on
+  // having a melodic profile, because an instrument with no idea how to phrase
+  // a line cannot carry one - but every genre instrument has one, either its
+  // own or the shared default, so in practice nothing is dropped.
+  if (CURRENT_USER_STYLE && CURRENT_USER_STYLE.solo && CURRENT_USER_STYLE.solo.length) {
+    return CURRENT_USER_STYLE.solo.filter(
+      (i) => (style.melody && style.melody[i]) || DEFAULT_MELODY[i]);
+  }
   // A type-beat profile can name the solo voices that define an artist's
   // sound; when it does, they replace the genre's own pool rather than
   // merely being added to it.
@@ -3040,6 +3087,12 @@ function pickSoloInstruments(style) {
 // every time. The first two are kept (they carry the harmony) and the
 // rest are each rolled for, so the supporting cast changes shape.
 function pickChordInstruments(style) {
+  // As above: a chosen line-up is kept whole rather than being thinned by the
+  // usual per-instrument roll, which would silently drop parts the user
+  // specifically asked for.
+  if (CURRENT_USER_STYLE && CURRENT_USER_STYLE.chord && CURRENT_USER_STYLE.chord.length) {
+    return CURRENT_USER_STYLE.chord.slice();
+  }
   // The chordal parts were never filtered by the artist's palette - only the
   // solo pool was - so a producer who never uses an organ could still get one
   // comping underneath. Two are always kept so the beat cannot end up with no
@@ -3091,7 +3144,18 @@ function planInstrumentation(style) {
   }
   // The rhythm guitar is a chordal/riff role, not a solo one, so it stays
   // wherever the genre put it rather than competing for the solo slot.
-  const keptMono = (style.melodic.monoInstruments || []).filter((i) => i === "bass" || i === "guitar");
+  //
+  // Under a user-built style the guitar is only kept if it was actually
+  // chosen: the genre would otherwise smuggle a rhythm guitar into a line-up
+  // that deliberately did not include one. The bass always stays, because a
+  // beat with no low end is not a line-up decision, it is a broken beat.
+  const keptMono = (style.melodic.monoInstruments || []).filter((i) => {
+    if (i === "bass") return true;
+    if (i !== "guitar") return false;
+    if (!CURRENT_USER_STYLE) return true;
+    return (CURRENT_USER_STYLE.solo || []).includes("guitar")
+        || (CURRENT_USER_STYLE.chord || []).includes("guitar");
+  });
   return {
     melody,
     articulation,

@@ -1093,11 +1093,54 @@ Three complaints, all of which turned out to be exactly right, and all of which 
 
 **The fix is a strict palette.** `FLAVOR_GENRES` is opt-out — a kit is allowed everywhere unless individually restricted — which is the right default for 388 kits but the wrong one for the handful of tracks where a genre's identity *is* the sound choice. `GENRE_TRACK_KITS` is an allow-list that wins outright: trap's bass is the 808 family, its woodwind is flute-family only, house and techno get synth basses, rock and neo-soul get played ones. The solo pools were rebalanced too — lead and Auto-Tune now lead the hard genres, and woodwind fell to 24% in trap and 34% in drill.
 
-## Eight more 808s
+## The 808s, rebuilt around measurement
 
-The 808 is not the bass instrument in trap and rap — it is the low end, the bassline and half the drum kit at once, and producers choose between them the way a rock band chooses an amp. `glide808`, `punch808`, `long808`, `clean808`, `dirty808`, `knock808`, `rumble808` and `detuned808`, each a sine fundamental (that is what an 808 is) plus three choices: how far it glides in, how long it rings, how much saturation sits on top.
+"There are still no 808s" came back a second time, with the specific thing that was missing attached: *the true distortion sound you can find in rap songs*. That is a measurable claim, so `tools/measure-808.js` renders every bass kit and reports what share of its energy sits in harmonics rather than in the fundamental.
 
-Saturation is applied **in parallel** with the clean sine rather than to it, because clipping the sine would eat the very thing that makes it an 808. It matters because it is what makes an 808 audible on a phone speaker that cannot reproduce 40 Hz at all — the harmonics get heard and the ear infers the missing fundamental. Every one also carries a click, for the same reason.
+**Every one of the fifteen 808-family kits failed.** The one named `dirty808` measured 0.11 — 96% pure sine. The default `808` measured 0.15.
+
+**Why the previous attempt did not work**, which is worth writing down because it looks like the textbook answer. It put a waveshaper *in parallel* with the clean sine and mixed it back at 60%. But clipping a sine does not mostly produce harmonics — it mostly produces **more sine**. A square wave is 4/π of fundamental against 1/3, 1/5, 1/7 for its harmonics, so barely a tenth of its energy is the part you hear as distortion, and blending that against a clean copy buries the tenth under two servings of the thing it was meant to add character to.
+
+**What producers actually do** — and what every "distort your 808" guide describes — is a multiband split: keep the sub clean below ~90 Hz, and drive a copy that has been **high-passed so its own fundamental is gone** before it is mixed back. Then the only thing the wet path contributes is harmonics, which is the entire point.
+
+```
+sub path    osc → envelope → lowpass 90Hz ──────────────────────────→ mix
+grit path   osc → envelope → pre-gain → shaper → highpass → tone ──→ mix
+```
+
+Four transfer curves, because they do audibly different things and rap records use all of them: **tanh** (warm, rounded), **hard clip** (odd harmonics that stay audible a long way up — the aggressive one), **asymmetric fuzz** (even harmonics, so it growls rather than merely being loud), and a **wavefolder** (keeps changing timbre as the note decays). The pre-gain matters as much as the curve: without it the grit falls out of clipping as the note decays and the tail goes clean, which is the opposite of how an 808 into a clipper behaves.
+
+`dirty808` now measures **1.31** against 0.11; the default `808` measures **0.61** against 0.15; `rage808` puts 71% of its energy above 100 Hz. Eleven new kits — `distort808`, `fuzz808`, `overdrive808`, `grimy808`, `rage808`, `deep808`, `memphis808`, `stab808`, `wide808`, `slide808`, `bright808` — grouped as clean / warm / hard / filthy, and the measurement tool holds each group to its own standard so `clean808`, whose job is to be the clean one, is not marked down for doing it.
+
+**And the 808 family may now sit below 33 Hz.** Every bass was octave-lifted above that, on the sound reasoning that a note nobody's speakers reproduce is a wasted note. But an 808's grit path deliberately puts its audible energy in the harmonics precisely so the ear can infer a fundamental it never hears — that is the trick — and lifting a low C to C2 threw the trick away. Rap 808s live at C1 and below.
+
+### A fifth time the measuring tool was wrong first
+
+`measure-808.js` asked Web Audio for a Butterworth band split with `Q = 1/√2`. **Web Audio takes lowpass and highpass Q in decibels**, not as the linear Q of the filter-design textbooks, so that asks for a resonant peak instead of a flat response. It reported a band holding 1.97× as much energy as the whole signal it came from — which is impossible, which is how it was caught before its verdict was trusted. A linear Q of 0.7071 is −3.01 dB.
+
+## Every genre has a written-down palette now
+
+The genre audit had expectations for four genres out of nineteen and forbade a kalimba nowhere. So it printed **ok** for trap while trap played a thumb piano in 23% of its beats and a marimba in 12% — which is exactly what a listener means by an instrument that throws off the flow.
+
+An audit with no expectation is not an audit. Every genre now has one:
+
+- **Woodwinds are classified by family** — flutes and dark end-blown winds, jazz reeds, orchestral double reeds, recorders — rather than "flute or not". The old binary had only two settings, so any genre that wanted a soprano sax had to be given an oboe as well. A clarinet over boom-bap follows the sampled jazz record it came from and is at home; the same clarinet over trap is not.
+- **A counterweight check**, because the cheapest way to pass a forbidden-instrument test is to ban everything and ship nineteen genres of drums. Each genre must still field a lead voice in 98% of its beats. It is measured on the voices actually *chosen* to carry the top line, not on what sounded — drill comps on a piano in 100% of its beats, so "did a piano play?" says nothing about whether the beat has a melody.
+- **Trap and drill lost the kalimba and marimba outright** and gained the dark piano figure and cinematic strings those records actually use. Rock and dubstep lost the flute recital that was turning up in 42% and 27% of their beats. Brushed and jazz drum kits can no longer land under trap, drill, phonk or techno.
+
+**27 counted problems to none.** And a woodwind kit added without being classified now fails the audit by itself, rather than being silently allowed everywhere.
+
+## Your style: you specify it, the program builds it
+
+Every other way into this program decides the line-up for you — a genre draws from a weighted pool, a producer profile narrows that pool, a typed description guesses at one. That is right most of the time, because most of the time people want a good beat rather than a specific one.
+
+**Your style** is the other case. Pick the genre, name the exact instruments you want carrying the top line and the exact ones holding the harmony, choose the kit for each track by name, and set tempo, key, mood, complexity, swing and length. Nothing is weighted, sampled or thinned: if you name six instruments, six instruments play.
+
+Instruments the genre would not normally field are **marked, not blocked** — a small ring on the chip, and a note underneath naming them. Asking for a kalimba over a trap beat is a mistake as a *default*, which is what the audit is there to prevent; it is a legitimate choice when a person makes it on purpose. The panel says which one you are doing and then does it.
+
+Two things this needed underneath. `setUserStyle` in `patterns.js` bypasses the pool draw in both `pickSoloInstruments` and `pickChordInstruments`, and is cleared by `selectStyle` so a custom line-up cannot leak into the next genre you pick. And `buildChordBar` gained a fallback voicing: a genre only writes chord parts for the instruments it normally uses, so asking any other one to comp found no config and **threw** — reachable from any hand-edited arrangement, not just this panel.
+
+Verified across all **2,432** genre × lead × chordal combinations: none throws, and the requested instrument plays in every one.
 
 ## What each producer actually plays
 
@@ -1121,4 +1164,20 @@ What actually prevents recurrence is the audit: `tools/audit-genre-fit.js` state
 
 ### And a fourth time the measuring tool was behind the code
 
-The audit's list of "kits that count as an 808" was hardcoded, so the moment eight new 808 kits were added it reported every one of them as a violation. It now derives the set from the name. That is the fourth time in this project a measurement has been wrong before the thing it measured was — the onset detector's band split, the kit-duplicate detector, the sampler's frequency estimator, and now this — which is the entire argument for checking the tool before believing its verdict.
+The audit's list of "kits that count as an 808" was hardcoded, so the moment eight new 808 kits were added it reported every one of them as a violation. It now derives the set from the name. That is the fourth time in this project a measurement has been wrong before the thing it measured was — the onset detector's band split, the kit-duplicate detector, the sampler's frequency estimator, and now this — which is the entire argument for checking the tool before believing its verdict. The fifth was the 808 measurement's band splitter, described above, and it was caught the same way: by noticing the answer was impossible rather than merely surprising.
+
+## 489 kits, and three that were secretly one kit
+
+Kits went from 388 to 489, weighted toward the tracks that had the fewest: `autolead` 5→12 (real vowel formants, plus how hard the pitch snaps — the Auto-Tune artefact itself), `arp` 6→14, `talkbox` 4→10, `tom` 7→14, `fx` 3→13 (risers, downlifters, a sub drop, a vinyl stop, an air horn), `marimba` 9→17, `kalimba` 12→18, `sax` 8→14, `leadguitar` 7→16, `woodwind` 12→23.
+
+The woodwind got the most on purpose: the hard genres are restricted to the flute family, so it is the only woodwind variety trap, drill, rap and phonk can *ever* draw on, and one flute across four genres is how a signature sound becomes a rut. Piccolo, pan flute, ocarina, tin whistle, dizi, ney, bass flute, wooden flute and an overblown setting all belong to it.
+
+**Three duplicate kits surfaced on the way, all of which the kit test had been passing:**
+
+1. **`playLeadVoiceTo` took a `flavor` argument and ignored it completely**, synthesising one fixed bell no matter what was asked for. Six stab kits route through it — `saw-chord`, `supersaw-chord`, `fm-chord`, `sine-chord`, `pluck-stab`, `hoover-chord` — so all six were one sound under six names.
+2. **Piano `rhodes` and `electric` had no branch at all** and fell through to a generic sine-plus-triangle. That one matters more than most: the Rhodes is the most-used keyboard in four of this program's genres.
+3. **Vocal `aww` was an exact copy of `ohh`** — the same three formants, so the same word.
+
+**Why the test missed them.** Almost every voice randomises something per hit, which is right for music and ruinous for a comparison: it put the distance between two renders of *one* kit on the same scale as the distance between two different kits, and no threshold separates those once they overlap. Renders are now driven by a seeded PRNG, so a second render of a kit is identical to the first and a shared code path measures **exactly zero**. Three scales then separate cleanly — a clone at 0, float noise at ~1e-6, the closest genuinely-different pair at ~0.03 — and the test also fails if renders stop being reproducible, because that assumption is what the whole check rests on.
+
+`pluck-chord` was caught the same way and given the physically-modelled plucked stab its name had always promised.

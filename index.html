@@ -35,6 +35,9 @@
         <button class="launcher-tab" role="tab" aria-selected="false" data-tab="track" id="tab-track" aria-controls="panel-track">
           <span class="tab-icon">📂</span><span class="tab-name">From your track</span>
         </button>
+        <button class="launcher-tab" role="tab" aria-selected="false" data-tab="mystyle" id="tab-mystyle" aria-controls="panel-mystyle">
+          <span class="tab-icon">🎚️</span><span class="tab-name">Your style</span>
+        </button>
       </div>
 
       <div class="launcher-body">
@@ -114,6 +117,82 @@
             </div>
             <p class="credit-note">Your file is read in the browser and never uploaded anywhere. Tempo and key are detected and the generated beat is matched to them. <strong>Centre reduction is not source separation</strong> — a centred lead vocal largely cancels, but so does anything else centred (usually kick and bass, which are partly restored), and stereo reverb on the vocal stays. Use it on audio you own or that is licensed for it — <a href="http://ccmixter.org/" target="_blank" rel="noopener">ccMixter</a> exists precisely for this.</p>
           </div>
+        </div>
+
+        <div class="launcher-panel" role="tabpanel" id="panel-mystyle" aria-labelledby="tab-mystyle" data-panel="mystyle" hidden>
+          <p class="panel-lead">Build the beat to your own specification. Choose the genre, name the exact instruments you want on top and underneath, pick the kits, and set the feel. Nothing here is a suggestion &mdash; you get precisely the line-up you ask for.</p>
+
+          <div class="mystyle-grid">
+            <div class="mystyle-block">
+              <h3 class="mystyle-h">Genre</h3>
+              <p class="mystyle-note">Sets the groove, chord vocabulary and drum patterns underneath your choices.</p>
+              <select id="ms-genre" class="mystyle-select"></select>
+            </div>
+
+            <div class="mystyle-block">
+              <h3 class="mystyle-h">Lead &amp; melody</h3>
+              <p class="mystyle-note">What carries the top line. Pick as many as you want &mdash; every one of them plays.</p>
+              <div class="mystyle-chips" id="ms-solo"></div>
+            </div>
+
+            <div class="mystyle-block">
+              <h3 class="mystyle-h">Chords &amp; texture</h3>
+              <p class="mystyle-note">What sits underneath holding the harmony.</p>
+              <div class="mystyle-chips" id="ms-chord"></div>
+            </div>
+
+            <div class="mystyle-block mystyle-wide">
+              <h3 class="mystyle-h">Kits</h3>
+              <p class="mystyle-note">The specific sound each part uses. &ldquo;Genre default&rdquo; lets the style choose.</p>
+              <div class="mystyle-kits" id="ms-kits"></div>
+            </div>
+
+            <div class="mystyle-block mystyle-wide">
+              <h3 class="mystyle-h">Feel</h3>
+              <div class="mystyle-rows">
+                <label class="mystyle-row"><span>Tempo</span>
+                  <input type="range" id="ms-tempo" min="60" max="200" value="140">
+                  <output id="ms-tempo-out">140 BPM</output>
+                </label>
+                <label class="mystyle-row"><span>Key</span>
+                  <select id="ms-key" class="mystyle-select"></select>
+                  <output></output>
+                </label>
+                <label class="mystyle-row"><span>Mood</span>
+                  <select id="ms-mood" class="mystyle-select">
+                    <option value="genre">Genre default</option>
+                    <option value="dark">Dark</option>
+                    <option value="warm">Warm</option>
+                    <option value="bright">Bright</option>
+                  </select>
+                  <output></output>
+                </label>
+                <label class="mystyle-row"><span>Complexity</span>
+                  <input type="range" id="ms-complexity" min="1" max="10" value="5">
+                  <output id="ms-complexity-out">5</output>
+                </label>
+                <label class="mystyle-row"><span>Swing</span>
+                  <input type="range" id="ms-swing" min="0" max="60" value="0">
+                  <output id="ms-swing-out">0%</output>
+                </label>
+                <label class="mystyle-row"><span>Length</span>
+                  <select id="ms-bars" class="mystyle-select">
+                    <option value="4">4 bars</option>
+                    <option value="8">8 bars</option>
+                    <option value="song">Full song</option>
+                  </select>
+                  <output></output>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <p id="ms-fit" class="mystyle-fit" hidden></p>
+          <div class="prompt-row mystyle-actions">
+            <button id="ms-generate" class="transport-btn play">Make my beat</button>
+            <button id="ms-reset" class="transport-btn">Reset to genre defaults</button>
+          </div>
+          <p id="ms-status" class="shuffle-status"></p>
         </div>
       </div>
     </section>

@@ -54,7 +54,7 @@ const path = require("path");
   const styleCards = await page.$$eval("#style-select .style-card, #style-select button", (c) => c.length);
   check("the genre grid is populated", styleCards >= 19, `${styleCards} cards`);
 
-  for (const t of ["describe", "artist", "song", "track", "genre"]) {
+  for (const t of ["describe", "artist", "song", "track", "mystyle", "genre"]) {
     await page.click(`.launcher-tab[data-tab="${t}"]`);
     const shown = await page.$$eval(".launcher-panel", (ps) =>
       ps.filter((p) => !p.hidden).map((p) => p.dataset.panel));
@@ -225,7 +225,68 @@ const path = require("path");
     `${ed.hz}Hz, the third burst was built at 440Hz`);
   check("it becomes the track's sound", ed.isSample);
 
-  console.log("\n7. No page errors");
+  console.log("\n7. Your style");
+  // The promise this panel makes is unusually literal - "you get exactly the
+  // line-up you ask for" - so the test asks for a line-up the genre would
+  // never choose on its own and checks that all of it turns up. Picking
+  // instruments trap does not use is the point: if the genre pools were still
+  // in charge, a kalimba and a saxophone over a trap beat is precisely what
+  // would go missing.
+  await page.click("#launcher-expand");
+  await page.click('.launcher-tab[data-tab="mystyle"]');
+  const msReady = await page.evaluate(() => ({
+    genres: document.querySelectorAll("#ms-genre option").length,
+    solo: document.querySelectorAll("#ms-solo .ms-chip").length,
+    chord: document.querySelectorAll("#ms-chord .ms-chip").length,
+    kits: document.querySelectorAll("#ms-kits select").length,
+  }));
+  check("every genre is offered", msReady.genres >= 19, `${msReady.genres} genres`);
+  check("instruments are offered for both roles",
+    msReady.solo >= 12 && msReady.chord >= 6, `${msReady.solo} lead, ${msReady.chord} chordal`);
+  check("kits can be named per track", msReady.kits >= 6, `${msReady.kits} kit pickers`);
+
+  await page.selectOption("#ms-genre", "trap");
+  await page.evaluate(() => {
+    for (const c of document.querySelectorAll("#ms-solo .ms-chip, #ms-chord .ms-chip")) {
+      c.setAttribute("aria-pressed", "false");
+    }
+  });
+  for (const inst of ["kalimba", "sax", "lead"]) {
+    await page.click(`#ms-solo .ms-chip[data-inst="${inst}"]`);
+  }
+  await page.click('#ms-chord .ms-chip[data-inst="piano"]');
+  const fitNote = await page.textContent("#ms-fit");
+  check("off-genre picks are called out, not blocked",
+    /not things Trap normally uses/.test(fitNote || ""), (fitNote || "").slice(0, 60) + "…");
+
+  await page.selectOption('#ms-kits select[data-track="bass"]', "rage808");
+  await page.selectOption("#ms-key", "F");
+  await page.click("#ms-generate");
+  await page.waitForTimeout(900);
+  const built = await page.evaluate(() => ({
+    key: document.getElementById("key-select").value,
+    bass: currentFlavors.bass,
+    played: Object.keys(currentPattern.instruments)
+      .filter((k) => Array.isArray(currentPattern.instruments[k])
+                  && currentPattern.instruments[k].some(Boolean)),
+  }));
+  for (const inst of ["kalimba", "sax", "lead", "piano"]) {
+    check(`the requested ${inst} actually plays`, built.played.includes(inst),
+      built.played.join(" "));
+  }
+  check("the named bass kit is used", built.bass === "rage808", built.bass);
+  check("the chosen key is used", built.key === "F", built.key);
+
+  // And the line-up must not leak: picking a genre afterwards has to go back
+  // to that genre's own choices rather than silently keeping this one.
+  await page.click("#launcher-expand");
+  await page.click('.launcher-tab[data-tab="genre"]');
+  await page.click("#style-select .style-card, #style-select button");
+  await page.waitForTimeout(600);
+  check("a later genre pick clears the custom line-up",
+    (await page.evaluate(() => userStyleActive())) === false);
+
+  console.log("\n8. No page errors");
   check("no uncaught errors", errors.length === 0, errors.slice(0, 3).join(" | "));
 
   await browser.close();

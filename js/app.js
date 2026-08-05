@@ -267,6 +267,12 @@ function selectStyle(id) {
   // building beats in the previous producer's shape.
   if (typeof setArtistKnobs === "function") setArtistKnobs(null);
   if (typeof setArtistAvoid === "function") setArtistAvoid(null);
+  // Same reasoning for a hand-built line-up: without this, picking a genre
+  // after using "Your style" would keep silently forcing the instruments that
+  // style named, and the genre grid would stop working. buildUserStyleBeat
+  // therefore sets its line-up AFTER calling this, exactly as the artist path
+  // sets its knobs afterwards.
+  if (typeof setUserStyle === "function") setUserStyle(null);
   selectedStyleId = id;
   baseStyle = STYLES[id];
   activeStyle = Object.assign({}, baseStyle, { key: baseStyle.key });
@@ -3089,7 +3095,7 @@ const summaryText = document.getElementById("summary-text");
 const summaryIcon = document.getElementById("summary-icon");
 const launcherExpand = document.getElementById("launcher-expand");
 
-const SOURCE_ICON = { genre: "🎛️", describe: "💬", artist: "🎤", song: "🔍", track: "📂" };
+const SOURCE_ICON = { genre: "🎛️", describe: "💬", artist: "🎤", song: "🔍", track: "📂", mystyle: "🎚️" };
 
 function collapseLauncher(source, headline, detail) {
   if (!launcherEl) return;
@@ -3572,4 +3578,295 @@ if (sampleClearBtn) {
     renderStepGrid();
     sampleStatus.textContent = "All samples removed.";
   });
+}
+
+// ===========================================================================
+// "Your style" - the user specifies the beat, the program builds it
+// ===========================================================================
+// Every other way into this program decides the line-up on the user's behalf:
+// a genre draws from a weighted pool, a producer profile narrows that pool, a
+// typed description guesses at one. All of that exists because most of the
+// time people want a good beat rather than a specific one.
+//
+// This is the other case. Here the choice has already been made, and the only
+// correct behaviour is to build exactly what was asked for - which is why
+// setUserStyle in patterns.js does not weight, sample or thin the list it is
+// given, and why the off-genre marks below are marks and not restrictions.
+
+const msGenre = document.getElementById("ms-genre");
+const msSolo = document.getElementById("ms-solo");
+const msChord = document.getElementById("ms-chord");
+const msKits = document.getElementById("ms-kits");
+const msTempo = document.getElementById("ms-tempo");
+const msTempoOut = document.getElementById("ms-tempo-out");
+const msKey = document.getElementById("ms-key");
+const msMood = document.getElementById("ms-mood");
+const msComplexity = document.getElementById("ms-complexity");
+const msComplexityOut = document.getElementById("ms-complexity-out");
+const msSwing = document.getElementById("ms-swing");
+const msSwingOut = document.getElementById("ms-swing-out");
+const msBars = document.getElementById("ms-bars");
+const msFit = document.getElementById("ms-fit");
+const msGenerate = document.getElementById("ms-generate");
+const msReset = document.getElementById("ms-reset");
+const msStatus = document.getElementById("ms-status");
+
+// What can carry a top line, and what can hold down harmony. These mirror the
+// two roles the generator actually has - solo instruments get a melodic
+// profile and play one note at a time, chordal ones voice a chord - rather
+// than being a flat list of everything, because putting a pad in the melody
+// slot and a kick in the chord slot are different kinds of mistake.
+const MS_SOLO_INSTRUMENTS = ["lead", "autolead", "arp", "piano", "sax", "woodwind",
+  "leadguitar", "guitar", "kalimba", "marimba", "talkbox", "organ", "strings",
+  "horn", "vocal", "pad"];
+const MS_CHORD_INSTRUMENTS = ["piano", "pad", "strings", "organ", "stab", "horn",
+  "vocal", "guitar"];
+// Kits worth offering directly. The bass is first because for most of these
+// genres it is the single most consequential choice on the page.
+const MS_KIT_TRACKS = ["bass", "kick", "snare", "hihat", "perc", "lead", "piano",
+  "pad", "stab"];
+
+// Which instruments this genre would not normally field. Read from the same
+// place the genre audit reads: an instrument is "off-genre" here if the genre
+// has no melodic profile for it AND it is not in the genre's own pools. This
+// is advisory - the whole point of the panel is that the user overrides it -
+// but an unmarked kalimba in a trap line-up is a trap the user walks into
+// rather than a decision they make.
+function msOffGenre(inst, styleId) {
+  const style = STYLES[styleId];
+  if (!style) return false;
+  const inSolo = (SOLO_POOLS[styleId] || []).some(([i]) => i === inst);
+  const inChord = (style.melodic.chordInstruments || []).includes(inst);
+  const inMono = (style.melodic.monoInstruments || []).includes(inst);
+  return !(inSolo || inChord || inMono);
+}
+
+function msChipRow(container, instruments, role) {
+  container.innerHTML = "";
+  const styleId = msGenre.value;
+  for (const inst of instruments) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "example-chip ms-chip";
+    b.dataset.inst = inst;
+    b.dataset.role = role;
+    b.textContent = TRACK_LABELS[inst] || inst;
+    b.setAttribute("aria-pressed", "false");
+    if (msOffGenre(inst, styleId)) {
+      b.dataset.offgenre = "1";
+      b.title = `Not something ${STYLES[styleId].name} usually uses — pick it if you want it anyway.`;
+    }
+    b.addEventListener("click", () => {
+      b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") === "true" ? "false" : "true");
+      msUpdateFit();
+    });
+    container.appendChild(b);
+  }
+}
+
+function msSelected(container) {
+  return Array.from(container.querySelectorAll('.ms-chip[aria-pressed="true"]'))
+    .map((b) => b.dataset.inst);
+}
+
+// Kit dropdowns, one per offered track, restricted to what fits the genre -
+// with an explicit "all kits" entry so the restriction is never a wall. The
+// bass list is grouped, because with 39 bass kits an ungrouped list of names
+// is unusable and the grouping (clean / warm / hard / filthy) is the actual
+// decision being made.
+function msBuildKits() {
+  const styleId = msGenre.value;
+  msKits.innerHTML = "";
+  for (const track of MS_KIT_TRACKS) {
+    if (!FLAVOR_POOLS[track]) continue;
+    const wrap = document.createElement("label");
+    wrap.className = "mystyle-kit-row";
+    const span = document.createElement("span");
+    span.textContent = TRACK_LABELS[track] || track;
+    const sel = document.createElement("select");
+    sel.className = "mystyle-select";
+    sel.dataset.track = track;
+    const def = document.createElement("option");
+    def.value = "";
+    def.textContent = "Genre default";
+    sel.appendChild(def);
+    const fitting = poolForGenre(track, styleId);
+    const rest = FLAVOR_POOLS[track].filter((f) => !fitting.includes(f));
+    const addGroup = (label, list) => {
+      if (!list.length) return;
+      const g = document.createElement("optgroup");
+      g.label = label;
+      for (const f of list) {
+        const o = document.createElement("option");
+        o.value = f;
+        o.textContent = FLAVOR_LABELS[f] || f;
+        g.appendChild(o);
+      }
+      sel.appendChild(g);
+    };
+    addGroup(`Fits ${STYLES[styleId].name}`, fitting);
+    addGroup("Everything else", rest);
+    wrap.append(span, sel);
+    msKits.appendChild(wrap);
+  }
+}
+
+// Say plainly what has been asked for that the genre would not normally do.
+// Not a warning and not a block - a note, so an unexpected result is an
+// expected one.
+function msUpdateFit() {
+  const styleId = msGenre.value;
+  const odd = [...msSelected(msSolo), ...msSelected(msChord)]
+    .filter((i) => msOffGenre(i, styleId));
+  const unique = [...new Set(odd)].map((i) => TRACK_LABELS[i] || i);
+  if (!unique.length) { msFit.hidden = true; return; }
+  msFit.hidden = false;
+  msFit.textContent = `${unique.join(", ")} ${unique.length === 1 ? "is not something" : "are not things"} ` +
+    `${STYLES[styleId].name} normally uses. You will get ${unique.length === 1 ? "it" : "them"} anyway — ` +
+    `this panel builds what you ask for.`;
+}
+
+// Genre defaults into the form, so the panel always opens on something that
+// already works and the user edits from there rather than from nothing.
+function msLoadGenreDefaults() {
+  const styleId = msGenre.value;
+  const style = STYLES[styleId];
+  msChipRow(msSolo, MS_SOLO_INSTRUMENTS, "solo");
+  msChipRow(msChord, MS_CHORD_INSTRUMENTS, "chord");
+  msBuildKits();
+
+  const soloDefaults = (SOLO_POOLS[styleId] || []).slice(0, 2).map(([i]) => i);
+  for (const b of msSolo.querySelectorAll(".ms-chip")) {
+    b.setAttribute("aria-pressed", soloDefaults.includes(b.dataset.inst) ? "true" : "false");
+  }
+  const chordDefaults = style.melodic.chordInstruments || [];
+  for (const b of msChord.querySelectorAll(".ms-chip")) {
+    b.setAttribute("aria-pressed", chordDefaults.includes(b.dataset.inst) ? "true" : "false");
+  }
+
+  msTempo.min = style.tempo.min;
+  msTempo.max = style.tempo.max;
+  msTempo.value = style.tempo.default;
+  msTempoOut.textContent = `${style.tempo.default} BPM`;
+  msSwing.value = Math.round((style.swing || 0) * 100);
+  msSwingOut.textContent = `${msSwing.value}%`;
+
+  msKey.innerHTML = "";
+  const letter = style.key.match(/^[A-G]#?/)[0];
+  for (const name of NOTE_NAMES) {
+    const o = document.createElement("option");
+    o.value = name;
+    o.textContent = name;
+    if (name === letter) o.selected = true;
+    msKey.appendChild(o);
+  }
+  msUpdateFit();
+}
+
+if (msGenre) {
+  for (const id of Object.keys(STYLES)) {
+    const o = document.createElement("option");
+    o.value = id;
+    o.textContent = STYLES[id].name;
+    msGenre.appendChild(o);
+  }
+  msGenre.value = "trap";
+  msGenre.addEventListener("change", msLoadGenreDefaults);
+  msTempo.addEventListener("input", () => { msTempoOut.textContent = `${msTempo.value} BPM`; });
+  msSwing.addEventListener("input", () => { msSwingOut.textContent = `${msSwing.value}%`; });
+  msComplexity.addEventListener("input", () => { msComplexityOut.textContent = msComplexity.value; });
+  msReset.addEventListener("click", () => {
+    msLoadGenreDefaults();
+    msStatus.textContent = "Back to this genre's own defaults.";
+  });
+  msGenerate.addEventListener("click", buildUserStyleBeat);
+  msLoadGenreDefaults();
+}
+
+function buildUserStyleBeat() {
+  const styleId = msGenre.value;
+  const solo = msSelected(msSolo);
+  const chord = msSelected(msChord);
+  if (!solo.length && !chord.length) {
+    msStatus.textContent = "Pick at least one instrument first — a beat with no melodic parts is just drums.";
+    return;
+  }
+
+  // selectStyle does the heavy lifting - kit defaults, sidechain, accent
+  // colour, key population - and clears any previous shaping on the way, so
+  // the line-up has to be set AFTER it rather than before. It generates once
+  // itself; that pass is the genre's own beat and is immediately replaced by
+  // the generatePattern() below, which is the one the user hears.
+  setBeatComplexity(Number(msComplexity.value));
+  selectStyle(styleId);
+  setUserStyle({ solo, chord });
+
+  // Now the specifics, over the top of what selectStyle rolled.
+  const tempo = Number(msTempo.value);
+  tempoSlider.min = STYLES[styleId].tempo.min;
+  tempoSlider.max = STYLES[styleId].tempo.max;
+  tempoSlider.value = tempo;
+  tempoValue.textContent = tempo;
+  engine.updateTempo(tempo);
+
+  const octave = keySelect.dataset.octave || "2";
+  activeStyle.key = msKey.value + octave;
+  keySelect.value = msKey.value;
+  engine.updateKey(activeStyle);
+
+  const swing = Number(msSwing.value) / 100;
+  swingSlider.value = msSwing.value;
+  swingValue.textContent = msSwing.value;
+  engine.setSwing(swing);
+
+  complexitySlider.value = msComplexity.value;
+  complexityValue.textContent = msComplexity.value;
+  complexityName.textContent = " — " + COMPLEXITY_NAMES[Number(msComplexity.value)];
+
+  // Named kits win over the genre's defaults; a blank select leaves the
+  // genre's choice alone rather than forcing one.
+  const namedKits = [];
+  for (const sel of msKits.querySelectorAll("select")) {
+    if (!sel.value) continue;
+    currentFlavors[sel.dataset.track] = sel.value;
+    namedKits.push(`${TRACK_LABELS[sel.dataset.track]} ${FLAVOR_LABELS[sel.value] || sel.value}`);
+  }
+
+  // Mood, where the genre has not been given an explicit kit for a track.
+  // This is the same palette idea the shuffle uses - one character applied
+  // across the whole line-up rather than per instrument - so the result reads
+  // as one production instead of a pile of unrelated sounds.
+  const mood = msMood.value;
+  if (mood !== "genre") {
+    for (const inst of activeRows()) {
+      if (msKitNamed(inst)) continue;
+      const pool = poolForGenre(inst, styleId);
+      const tags = FLAVOR_TAGS[inst] || {};
+      const matching = pool.filter((f) => tags[f] === mood);
+      if (matching.length) currentFlavors[inst] = matching[Math.floor(Math.random() * matching.length)];
+    }
+  }
+
+  if (msBars.value === "song") {
+    arrangementMode = "song";
+    selectedBars = totalSongBars(activeStyle);
+  } else {
+    arrangementMode = "loop";
+    selectedBars = Number(msBars.value);
+  }
+  for (const b of barsButtons) b.classList.toggle("selected", b.dataset.bars === msBars.value);
+
+  generatePattern();
+  engine.updatePattern(currentPattern);
+
+  const parts = [...solo, ...chord].map((i) => TRACK_LABELS[i] || i);
+  collapseLauncher("mystyle", `Your ${STYLES[styleId].name}`,
+    `${parts.join(", ")} · ${tempo} BPM · ${msKey.value}`);
+  msStatus.textContent = `Built with ${parts.join(", ")}` +
+    (namedKits.length ? `, using ${namedKits.join(", ")}` : "") + ".";
+}
+
+function msKitNamed(track) {
+  const sel = msKits.querySelector(`select[data-track="${track}"]`);
+  return !!(sel && sel.value);
 }

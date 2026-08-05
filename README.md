@@ -1216,3 +1216,44 @@ Kit names are namespaced **per track** — the hi-hat's `bright` and the talkbox
 ### What is checked and what is not
 
 The spec this was built to asks whether a listener would think a producer made the beat. That is not decidable by a program, and pretending otherwise would make the checks a lie. What *is* decidable is checked and enforced: instruments belonging to the genre, the woodwind family, a lead voice existing, the bass being an 808 and following the chord roots, the snare landing where the genre puts it, the melody restating a motif rather than wandering, sections differing. Everything else is reported as fact for a person to judge.
+
+## Why the beats were scoring poorly — the bass was an octave too high
+
+The complaint was that the rate-this-beat feature scores the program's own output badly. `tools/measure-quality.js` (new) generates beats across all 19 genres, renders each offline, scores it exactly the way the app's own button does, and reports the per-TERM average. The single average says the beats are weak; the term table says *which part*, and those lead to completely different work.
+
+**The composition was never the problem.** Downbeat anchoring 1.000, harmonic movement 0.99, melodic range 0.85, syncopation 0.83, drum density 0.84, arrangement size 0.89 — the structural half of the rating is at or near maximum. Every large loss was a *spectral balance* term:
+
+| term | avg | points lost |
+|---|---|---|
+| Midrange presence | 0.25 | 4.1 |
+| Low-end weight | 0.31 | 3.4 |
+| Sub-bass balance | 0.35 | 3.2 |
+| Loudness | 0.65 | 3.0 |
+| Stereo image | 0.37 | 2.7 |
+
+Three band-share terms failing at once is suspicious, because shares must sum to 1 — so they were checked against the raw measurements rather than trusted. They summed to exactly 1.0, the splitter was fine, and the numbers were real: **trap had 4% of its energy below 60Hz and 61% between 60 and 250Hz.** For a genre built on an 808 that is backwards.
+
+**The cause:** `REGISTER.bass` was `0` — the bass sat in the *same octave as the song's root*, which is C2 (65Hz) for most genres. Measured directly, trap's 808 was playing **65–175Hz**, rap **110–165Hz**, rock **92–233Hz**. A trap 808's root is C1 at 33Hz; a bass guitar's open E is 41Hz. The program had never had a bass in bass register.
+
+Two further things widened it. The motif fold gave the bass a *larger* span than the melody (backwards — bass parts sit inside about an octave). And the bar root carried the whole line with it, so when the progression moved from i to v **the bass leapt up a fifth** and climbed out of its own instrument over four bars. No bass player does that; moving to the v chord they drop a fourth and stay down where the strings are.
+
+Fixed by putting the bass an octave below the root, narrowing its span, and folding each note into a register window — which changes only which octave a note is played in, never which note. Trap now plays **33–49Hz**, exactly C1–G1; the highest bass in any of the 19 genres is 73Hz. Sub-bass balance moved **0.35 → 0.62**. `tools/test-content.js` now fails if any genre's bass climbs above 130Hz, checked as absolute frequency rather than as a register constant, because the constant was only half of it.
+
+### Panning a mono source does not make it stereo
+
+Stereo image scored 0.37 with channel correlation measured at 0.94–0.99 — effectively mono — *despite* every textural track being panned. The reason is worth stating plainly: **panning a mono signal does not decorrelate it.** Both channels carry the same waveform at different gains, so the correlation stays at 1 no matter how far the pan pot is pushed. Width comes from *different signal* in each channel, which is why real records get it from double-tracking, chorus, delay and stereo reverb.
+
+Each wide track now also feeds a short delayed copy panned to the opposite side — the Haas trick — under 25ms so it reads as width rather than echo. Kick, snare and bass are deliberately excluded: the low end and the backbeat belong dead centre. Stereo image 0.37 → 0.43.
+
+### A measurement that has to be trusted before it is used
+
+Every beat is a fresh random generation, so the mean is an estimate. Two runs differing by a point look like a change when they are the same number measured twice — which is how you end up tuning a mix against noise. The tool now prints a confidence interval: **72.3 ± 1.5 across 114 beats**, and states outright that anything under ~2.1 points is not distinguishable.
+
+That standard was then applied to this round's own work. Two changes were made and then **reverted because they did not survive it**:
+
+1. **A melodic level cut.** Trimmed from a single soloed render showing a saxophone 9dB above the bass — and the solo-render method turned out to be unreliable, reporting several parts as silent that a call-count check proved were playing. A level table tuned on a measurement that was wrong is worse than one left alone, so it went back even though the total score had gone *up*.
+2. **Master makeup gain and a limiter.** The diagnosis behind it stands and is documented in the code: the bus compressor has no makeup, so it only pulls loud mixes down and never lifts quiet ones, and output ranged 10.6dB between beats. But +4dB of makeup closed the spread by barely a decibel while pushing the mean hotter than the unmastered target and letting true peaks reach **+0.55 dBTP — actual clipping**, in a term that had been perfect. A `DynamicsCompressor` has no lookahead and is not a true-peak limiter.
+
+### What is still open, and why
+
+**Loudness (3.5 pts) and midrange (3.9 pts).** The loudness spread does not come from the bus: it comes from a sparse arrangement being genuinely quieter than a dense one, which no downstream gain fixes without either heavy compression that would cost the dynamics terms, or per-track gain staging that makes each part's contribution predictable. That is the real fix, and it needs reliable per-track level measurement first — which this round established does not yet exist.

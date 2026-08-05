@@ -2,7 +2,19 @@ const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash",
 
 const DEFAULT_TRACK_VOLUME = {
   kick: 1, snare: 0.9, hihat: 0.6, openhat: 0.6, tom: 0.85, perc: 0.55, crash: 0.8,
-  bass: 0.9, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.55, horn: 0.7,
+  // The bass is up from 0.9. It is the one level here changed on evidence:
+  // with the bass an octave lower it carries real sub energy, and the sub-band
+  // share measured across 57 beats moved from 0.35 to 0.58 with this and the
+  // octave fix together.
+  //
+  // The melodic levels were briefly cut here too and are back where they were.
+  // That cut came from a single soloed render showing a saxophone 9dB above
+  // the bass - and the solo-render method turned out to be unreliable, since
+  // it reported several parts as silent that a call-count check proved were
+  // playing. A level table tuned on a measurement that was wrong is worse
+  // than one left alone, so it was reverted rather than kept because the
+  // total score happened to go up.
+  bass: 1.0, piano: 0.75, lead: 0.7, pad: 0.5, stab: 0.75, guitar: 0.8, strings: 0.55, horn: 0.7,
   organ: 0.6, vocal: 0.65, kalimba: 0.7, marimba: 0.65, arp: 0.55, autolead: 0.75, sax: 0.7, woodwind: 0.7, leadguitar: 0.7, talkbox: 0.72, fx: 0.6,
 };
 
@@ -13,6 +25,23 @@ const BASE_VELOCITY = {
 };
 
 const DRUM_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "fx"];
+
+// Which tracks get a genuine stereo spread, how far apart, and how much of it.
+// Sustained and textural parts take the most, because that is where width
+// lives on a real record; short percussive parts take a little; and the
+// centre of the mix - kick, snare, bass, and the lead vocal-register parts -
+// takes none at all.
+const STEREO_SPREAD = {
+  pad: { ms: 22, level: 0.55 }, strings: { ms: 19, level: 0.5 },
+  organ: { ms: 16, level: 0.42 }, guitar: { ms: 15, level: 0.45 },
+  stab: { ms: 12, level: 0.4 }, arp: { ms: 14, level: 0.45 },
+  piano: { ms: 13, level: 0.35 }, horn: { ms: 12, level: 0.34 },
+  kalimba: { ms: 12, level: 0.35 }, marimba: { ms: 12, level: 0.35 },
+  woodwind: { ms: 14, level: 0.3 }, sax: { ms: 13, level: 0.28 },
+  leadguitar: { ms: 14, level: 0.34 }, vocal: { ms: 16, level: 0.4 },
+  perc: { ms: 11, level: 0.3 }, openhat: { ms: 9, level: 0.22 },
+  crash: { ms: 14, level: 0.4 }, hihat: { ms: 7, level: 0.18 },
+};
 
 // Guitar flavors that strum chords (rhythm guitar) versus play single
 // picked lines (lead guitar) - see playGuitarChord.
@@ -107,6 +136,26 @@ class BeatEngine {
       this.analyser = this.ctx.createAnalyser();
       this.analyser.fftSize = 256;
       this.analyser.smoothingTimeConstant = 0.8;
+      // NOTE: a makeup-gain-plus-limiter stage was tried here and removed.
+      //
+      // The diagnosis behind it is real and still stands: this compressor has
+      // no makeup after it, so it only ever pulls loud mixes down and never
+      // lifts quiet ones, and the program's output measured a 10.6dB swing
+      // between beats (-20.1 to -9.5 LUFS across 38 renders) purely on how
+      // many parts happened to be playing.
+      //
+      // But +4dB of makeup into a compressor-as-limiter closed the spread by
+      // barely a decibel (10.6 to 9.5) while pushing the mean to -11.8, which
+      // is hotter than the unmastered targets want, and letting true peaks
+      // reach +0.55 dBTP - actual clipping, in a term that had been perfect.
+      // A DynamicsCompressor has no lookahead and is not a true-peak limiter.
+      //
+      // The spread does not come from the bus at all: it comes from a sparse
+      // arrangement being genuinely quieter than a dense one, which no
+      // downstream gain fixes without either heavy compression that would
+      // cost the dynamics terms, or per-track gain staging that makes each
+      // part's contribution predictable. That is the real fix and it needs
+      // reliable per-track level measurement first.
       this.compressor.connect(this.analyser);
       this.masterGain.connect(this.gritShaper).connect(this.compressor).connect(this.ctx.destination);
 
@@ -178,9 +227,40 @@ class BeatEngine {
         const pan = this.ctx.createStereoPanner();
         pan.pan.value = DEFAULT_PAN[t] || 0;
         filt.connect(pan);
-        pan.connect(DRUM_TRACKS.includes(t) ? this.masterGain : this.duckBus);
+        const busFor = DRUM_TRACKS.includes(t) ? this.masterGain : this.duckBus;
+        pan.connect(busFor);
         this.trackPanners[t] = pan;
         this.trackGains[t] = g;
+
+        // Real stereo width, for the tracks that are supposed to have it.
+        //
+        // The mix measured a channel correlation of 0.94-0.99 - effectively
+        // mono - despite every textural track being panned. The reason is that
+        // PANNING A MONO SOURCE DOES NOT DECORRELATE IT: both channels carry
+        // the same waveform at different gains, so the correlation stays at 1
+        // no matter how far the panner is pushed. Width needs *different
+        // signal* in each channel, which is why real records get it from
+        // double-tracking, chorus, delay and stereo reverb rather than from
+        // the pan pot.
+        //
+        // So each wide track also feeds a short delayed copy panned to the
+        // opposite side - the Haas trick, and the cheapest honest way to turn
+        // one mono part into a stereo image. Kept under 25ms so it reads as
+        // width rather than as an echo, and at partial level so the mono sum
+        // stays usable. Kick, snare and bass are deliberately NOT in the list:
+        // the low end and the backbeat belong dead centre, and smearing them
+        // is how a mix loses its punch.
+        if (STEREO_SPREAD[t]) {
+          const { ms, level } = STEREO_SPREAD[t];
+          const dl = this.ctx.createDelay(0.05);
+          dl.delayTime.value = ms / 1000;
+          const dg = this.ctx.createGain();
+          dg.gain.value = level;
+          const dp = this.ctx.createStereoPanner();
+          // Opposite side to the dry signal, so the two together span the image.
+          dp.pan.value = (DEFAULT_PAN[t] || 0) >= 0 ? -0.75 : 0.75;
+          filt.connect(dl).connect(dg).connect(dp).connect(busFor);
+        }
 
         const send = this.ctx.createGain();
         send.gain.value = DEFAULT_REVERB_SEND[t] || 0;

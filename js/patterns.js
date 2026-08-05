@@ -1,6 +1,11 @@
 const STEPS_PER_BAR = 16;
 
-const REGISTER = { bass: 0, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14, arp: 18, autolead: 14, sax: 14, woodwind: 17, leadguitar: 14, talkbox: 14 };
+// Where each part sits, in scale degrees relative to the song's root; 7
+// degrees is an octave. The bass is BELOW the root octave, which is where a
+// bass guitar, an upright and an 808 all actually live - it used to sit at 0,
+// in the same octave as the root, which put trap 808s at 65-175Hz when a trap
+// 808's root is C1 at 33Hz.
+const REGISTER = { bass: -7, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14, arp: 18, autolead: 14, sax: 14, woodwind: 17, leadguitar: 14, talkbox: 14 };
 
 const FLAVOR_POOLS = {
   kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "knock", "thump", "distorted", "tight", "woofer", "vinyl", "house909", "trapkick", "jazzkick", "breakkick", "softkick", "hardstyle", "909", "linn", "707", "606", "dmx", "sp1200", "lm1", "rz1", "hr16", "r8", "drumulator", "drumtraks", "rx5", "cr8000", "kr55", "dr110", "mpc60"],
@@ -716,7 +721,15 @@ function generateMonoMelody(register, structure, barRootDegrees, rawParams, tota
     }
     // A bass line can roam a little wider than a hook and still read as
     // one part; a melody is held to about an octave and a bit.
-    const halfSpan = isBass ? 5 : 4;
+    //
+    // The bass was the wider of the two, which is backwards. Measured across
+    // the whole program, basslines spanned about two octaves - 44Hz to 175Hz
+    // in hip hop, 55 to 208 in rock - because three things widened them at
+    // once: the motif fold, the phrase octave, and the bar root, which pushes
+    // the whole line up a fifth whenever the chord moves from i to v. Real
+    // bass parts sit inside about an octave. Narrowed here, and folded into a
+    // register window below.
+    const halfSpan = isBass ? 3 : 4;
     for (const ev of motifToUse) {
       if (ev.degreeOffset === null) continue;
       const stepPos = chunkStart + ev.offset;
@@ -725,7 +738,26 @@ function generateMonoMelody(register, structure, barRootDegrees, rawParams, tota
       const barRoot = barRootDegrees[barIdx];
       const dur = Math.min(ev.duration, totalSteps - stepPos);
       const folded = foldIntoSpan(ev.degreeOffset, halfSpan);
-      const note = { degree: barRoot + effectiveRegister + phraseOctave + folded, len: dur };
+      let degree = barRoot + effectiveRegister + phraseOctave + folded;
+      // Keep the bass in the register a bass actually occupies.
+      //
+      // Without this the bar root carries the bassline with it: when the
+      // progression moves from i to v the bass leaps up a fifth, and over four
+      // bars it climbs out of its own instrument. No bass player does that -
+      // moving to the v chord, they drop a fourth and stay down where the
+      // strings are. Folding by octaves is exactly that decision, and it
+      // changes only which octave the note is played in, never which note.
+      //
+      // This is what was putting the low end in the wrong place: trap was
+      // measured with 4% of its energy below 60Hz and 61% between 60 and
+      // 250Hz, because the "808" was averaging 100Hz and reaching 175Hz. An
+      // 808 that never goes below 60Hz is not an 808.
+      if (isBass) {
+        const lo = effectiveRegister - 2;
+        while (degree < lo) degree += 7;
+        while (degree >= lo + 7) degree -= 7;
+      }
+      const note = { degree, len: dur };
       const shape = harmonyForNote(params.harmony, stepPos % STEPS_PER_BAR, dur);
       if (shape) note.harmony = shape;
       arr[stepPos] = note;

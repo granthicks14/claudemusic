@@ -24,11 +24,11 @@ vm.createContext(sandbox);
 // (it needs Web Audio), so take just that one line from it.
 const engineSrc = fs.readFileSync(path.join(root, "js", "audio-engine.js"), "utf8");
 const allTracksLine = engineSrc.match(/^const ALL_TRACKS = \[[^\]]*\];/m)[0];
-const { ARTIST_PROFILES, STYLES, FLAVOR_POOLS, ALL_TRACKS, noteNameToMidi, findArtistProfile, DEFAULT_MELODY, generateVariation,
+const { ARTIST_PROFILES, STYLES, FLAVOR_POOLS, ALL_TRACKS, noteNameToMidi, degreeToFreq, findArtistProfile, DEFAULT_MELODY, generateVariation,
         setBeatComplexity, setArtistAvoid }
   = vm.runInContext(src + "\n;" + allTracksLine
       + `\n;({ ARTIST_PROFILES, STYLES, FLAVOR_POOLS, ALL_TRACKS,
-      noteNameToMidi, findArtistProfile, DEFAULT_MELODY, generateVariation,
+      noteNameToMidi, degreeToFreq, findArtistProfile, DEFAULT_MELODY, generateVariation,
         setBeatComplexity, setArtistAvoid })`, sandbox, { filename: "bundle.js" });
 
 let failures = 0;
@@ -240,6 +240,48 @@ if (thinSongs.length) {
   console.log(`  FAIL  genres with fewer than 8 songs: ${thinSongs.join(", ")}`);
   failures++;
 } else {
+  // The bass has to be in the register a bass occupies.
+  //
+  // It was not: REGISTER.bass sat at 0, the same octave as the song's root,
+  // so trap 808s played between 65 and 175Hz when a trap 808's root is C1 at
+  // 33Hz, and rock basses reached 233Hz. Measured across the whole program
+  // that put 61% of a trap beat's energy between 60 and 250Hz and 4% below
+  // 60Hz, which is the wrong way round for a genre built on an 808.
+  //
+  // Checked as absolute frequency rather than as a register constant, because
+  // the constant is only half of it - the bar root and the motif fold move the
+  // line too, and it was the bar root carrying the bass up a fifth on every
+  // chord change that made the range two octaves wide.
+  console.log("\n  Bass register");
+  {
+    const BASS_MIN = 25, BASS_MAX = 130;
+    let worstLo = Infinity, worstHi = 0, worstGenre = "", bad = [];
+    for (const g of Object.keys(STYLES)) {
+      const st = STYLES[g];
+      const rootMidi = noteNameToMidi(st.key);
+      let lo = Infinity, hi = 0;
+      for (let k = 0; k < 6; k++) {
+        setBeatComplexity(5);
+        const v = generateVariation(st, 4);
+        for (const s of v.instruments.bass || []) {
+          if (!s) continue;
+          let f = degreeToFreq(rootMidi, st.scale, s.degree);
+          while (f < 24) f *= 2;
+          lo = Math.min(lo, f); hi = Math.max(hi, f);
+        }
+      }
+      if (hi > BASS_MAX || lo > 90) bad.push(`${g} ${Math.round(lo)}-${Math.round(hi)}Hz`);
+      if (hi > worstHi) { worstHi = hi; worstLo = lo; worstGenre = g; }
+    }
+    if (bad.length) {
+      console.log(`  FAIL  bass climbs out of bass register: ${bad.join(", ")}`);
+      failures++;
+    } else {
+      console.log(`  PASS  every genre's bass stays under ${BASS_MAX}Hz  — ` +
+                  `highest is ${worstGenre} at ${Math.round(worstHi)}Hz`);
+    }
+  }
+
   console.log("  PASS  every genre has at least 8 reference songs");
 }
 

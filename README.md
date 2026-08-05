@@ -1257,3 +1257,35 @@ That standard was then applied to this round's own work. Two changes were made a
 ### What is still open, and why
 
 **Loudness (3.5 pts) and midrange (3.9 pts).** The loudness spread does not come from the bus: it comes from a sparse arrangement being genuinely quieter than a dense one, which no downstream gain fixes without either heavy compression that would cost the dynamics terms, or per-track gain staging that makes each part's contribution predictable. That is the real fix, and it needs reliable per-track level measurement first — which this round established does not yet exist.
+
+## The "jolly high pitch" — leads were an octave too high, in the wrong mode
+
+Same complaint shape as the bass octave, and same answer: measured, it was exactly right.
+
+**Where the melodies actually sat:** trap lead **G#4–C6**, drill **C5–F6**, R&B **E5–G6**. Every guide on the subject puts a trap or R&B melody in **C4–C5** with chords in C3–C5. C6 is piccolo register — that thin, bright placement is the "jolly" sound, and no kit change or scale change can fix it, because the notes are simply in the wrong octave.
+
+**Three causes stacked:**
+
+1. `REGISTER.lead` was **21** — three octaves above the root, so a C2 root put the lead's *base* at C5.
+2. The octave jitter was **`[[0,3],[7,1]]` — up an octave, a quarter of the time**, and never down. On top of a base already an octave high, that is how a melody reached C6.
+3. The bar root carried the melody with it, exactly as it had carried the bass, so a progression that moves i–VI–III walks the tune upward. Measured spans were well over two octaves; real melodies live inside about an octave and a third.
+
+Fixed by placing every part on the octave its repertoire actually uses, making the jitter drop rather than rise, and folding melodic notes into a register window. Trap lead is now **F3–C5**, drill **G#3–C5**, R&B **F3–F5**.
+
+**And real instrument ranges, because a part written above an instrument stops sounding like it.** A saxophone was reaching E6 — two octaves above an alto's actual top — and a "sax" up there reads as a synth lead, which is the same thin brightness by another route. `INSTRUMENT_CEILING` is written from where each instrument stops: alto sax around F#5, trombone F4, trumpet's comfortable top, a talkbox and a vocal both stopping where a voice does. The flute keeps its height on purpose — the trap flute hook belongs up there — but capped at a hook's C5–C6 rather than above it.
+
+**One call site bypassed all of it.** The refinement pass rewrites each part several times and keeps the best-scoring version, and it was the only `generateMonoMelody` caller that did not pass the instrument through — so every part it polished came back with no ceiling. That is why a lead could still reach F6 after the ceilings went in: the note was not written by the path that clamps, it was written by the path that improves.
+
+### Modes: genres had one scale, forever
+
+**R&B and neo-soul were set to `major`.** Neither is a major-key genre, and that is a large part of why they came out cheerful. Both are now dorian — the natural 6th over a minor 3rd is the mode the whole genre is written in.
+
+More broadly, each genre had exactly one scale for every beat it would ever make. Trap is natural minor most of the time but reaches for **harmonic minor** and **Phrygian** when it wants menace; drill leans on Phrygian and its b2 as a matter of course. `harmonicminor` and `phrygiandominant` are new, and `GENRE_MODES` gives each genre a weighted pool drawn per generation — the default staying dominant, the darker modes appearing at roughly the rate they do on records. Drill now draws Phrygian/minor/harmonic minor across generations instead of Phrygian every time.
+
+### What this did and did not do to the score
+
+**It did not move it: 72.3 ± 1.5, unchanged.** That is worth stating plainly rather than hiding. The rating engine measures spectral balance and structure, and a lead moved from C6 to C5 keeps its energy in the same "midrange" band either way — the rater has no term for *whether a melody is in the right octave for its genre*, which is a real gap in it.
+
+So this round fixed what a listener hears and not what the scorer counts. Both matter; they are not the same thing, and the honest version of that is not to claim the number went up.
+
+`tools/test-content.js` now fails if any melodic part is written above its instrument's range, checked as pitch per instrument rather than as a register constant — because the constant was only one of the three causes.

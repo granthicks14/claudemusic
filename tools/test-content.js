@@ -24,11 +24,11 @@ vm.createContext(sandbox);
 // (it needs Web Audio), so take just that one line from it.
 const engineSrc = fs.readFileSync(path.join(root, "js", "audio-engine.js"), "utf8");
 const allTracksLine = engineSrc.match(/^const ALL_TRACKS = \[[^\]]*\];/m)[0];
-const { ARTIST_PROFILES, STYLES, FLAVOR_POOLS, ALL_TRACKS, noteNameToMidi, degreeToFreq, findArtistProfile, DEFAULT_MELODY, generateVariation,
+const { ARTIST_PROFILES, STYLES, FLAVOR_POOLS, ALL_TRACKS, noteNameToMidi, degreeToFreq, midiToName, scaleDegreeToMidi, findArtistProfile, DEFAULT_MELODY, generateVariation,
         setBeatComplexity, setArtistAvoid }
   = vm.runInContext(src + "\n;" + allTracksLine
       + `\n;({ ARTIST_PROFILES, STYLES, FLAVOR_POOLS, ALL_TRACKS,
-      noteNameToMidi, degreeToFreq, findArtistProfile, DEFAULT_MELODY, generateVariation,
+      noteNameToMidi, degreeToFreq, midiToName, scaleDegreeToMidi, findArtistProfile, DEFAULT_MELODY, generateVariation,
         setBeatComplexity, setArtistAvoid })`, sandbox, { filename: "bundle.js" });
 
 let failures = 0;
@@ -279,6 +279,56 @@ if (thinSongs.length) {
     } else {
       console.log(`  PASS  every genre's bass stays under ${BASS_MAX}Hz  — ` +
                   `highest is ${worstGenre} at ${Math.round(worstHi)}Hz`);
+    }
+  }
+
+  // No melodic part above its instrument's real range.
+  //
+  // The complaint this checks was "everything is a jolly high pitch instead
+  // of the lower thing real trap and rap have", and measured it was exactly
+  // right: leads ran to C6, saxophones to E6, R&B to G6. Three separate
+  // causes stacked - a lead register three octaves above the root, an octave
+  // jitter that only ever went UP, and the bar root carrying a melody higher
+  // on every chord change - and one call site that polished parts without
+  // passing the instrument through, so the ceilings did not reach it.
+  //
+  // Checked as pitch, per instrument, because that is the thing that was
+  // wrong; a register constant is only one of the three causes.
+  console.log("\n  Melodic register");
+  {
+    const CEIL = { sax: "A5", lead: "A5", woodwind: "C6", arp: "A5", piano: "A5",
+                   leadguitar: "A5", organ: "G5", kalimba: "G5", marimba: "F5",
+                   talkbox: "E5", strings: "F5", guitar: "E5", autolead: "D5",
+                   horn: "C5", vocal: "E5", pad: "E5", stab: "G5" };
+    const midiOf = (n) => noteNameToMidi(n);
+    const worst = {};
+    for (const g of Object.keys(STYLES)) {
+      const st = STYLES[g];
+      const rootMidi = noteNameToMidi(st.key);
+      for (let k = 0; k < 5; k++) {
+        setBeatComplexity(5);
+        const v = generateVariation(st, 4);
+        const gs = v.genStyle || st;
+        for (const [inst, arr] of Object.entries(v.instruments)) {
+          if (!CEIL[inst] || !Array.isArray(arr)) continue;
+          for (const x of arr) {
+            if (!x || x.degree === undefined) continue;
+            const m = scaleDegreeToMidi(rootMidi, gs.scale, x.degree);
+            if (!worst[inst] || m > worst[inst].midi) worst[inst] = { midi: m, genre: g };
+          }
+        }
+      }
+    }
+    const over = Object.entries(worst)
+      .filter(([i, w]) => w.midi > midiOf(CEIL[i]))
+      .map(([i, w]) => `${i} reaches ${midiToName(w.midi)} in ${w.genre}, over ${CEIL[i]}`);
+    if (over.length) {
+      console.log(`  FAIL  parts written above their instrument: ${over.join("; ")}`);
+      failures++;
+    } else {
+      const top = Object.entries(worst).sort((a, b) => b[1].midi - a[1].midi)[0];
+      console.log("  PASS  every melodic part stays inside its instrument's range" +
+                  (top ? `  — highest is ${top[0]} at ${midiToName(top[1].midi)}` : ""));
     }
   }
 

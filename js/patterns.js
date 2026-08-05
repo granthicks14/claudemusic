@@ -5,7 +5,30 @@ const STEPS_PER_BAR = 16;
 // bass guitar, an upright and an 808 all actually live - it used to sit at 0,
 // in the same octave as the root, which put trap 808s at 65-175Hz when a trap
 // 808's root is C1 at 33Hz.
-const REGISTER = { bass: -7, piano: 14, pad: 7, lead: 21, stab: 14, guitar: 7, strings: 14, horn: 14, organ: 7, vocal: 14, kalimba: 14, marimba: 14, arp: 18, autolead: 14, sax: 14, woodwind: 17, leadguitar: 14, talkbox: 14 };
+// Where each part sits, in scale degrees relative to the song's root; 7
+// degrees is an octave. The bass is BELOW the root octave, which is where a
+// bass guitar, an upright and an 808 all actually live - it used to sit at 0,
+// in the same octave as the root, which put trap 808s at 65-175Hz when a trap
+// 808's root is C1 at 33Hz.
+//
+// The melodic parts came down an octave for the same kind of reason. The lead
+// sat at 21 - three octaves above the root - which with a C2 root puts its
+// base at C5 and let it reach C6, and measured that is exactly where it was:
+// trap leads ran G#4-C6, drill C5-F6, R&B E5-G6. Every guide on the subject
+// puts a trap or R&B melody in C4-C5 with chords in C3-C5, and C6 is piccolo
+// register. That thin, bright placement is what makes a beat sound cheerful
+// when it is supposed to sound dark, and it is not something a kit change or
+// a different scale can fix - the notes are simply in the wrong octave.
+const REGISTER = { bass: -7,
+  // Chordal and mid parts: around the root's own octave up to one above.
+  pad: 7, organ: 7, guitar: 7, piano: 10, strings: 10, horn: 10, vocal: 10,
+  stab: 12, talkbox: 12, kalimba: 12, marimba: 12,
+  // Solo voices: C4-C5 over a C2 root, which is 14.
+  lead: 14, autolead: 12, sax: 12, leadguitar: 12, arp: 14,
+  // Flutes genuinely are high instruments - the trap flute hook sits above
+  // the rest of the arrangement, and that one is not a mistake.
+  woodwind: 15,
+};
 
 const FLAVOR_POOLS = {
   kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "knock", "thump", "distorted", "tight", "woofer", "vinyl", "house909", "trapkick", "jazzkick", "breakkick", "softkick", "hardstyle", "909", "linn", "707", "606", "dmx", "sp1200", "lm1", "rz1", "hr16", "r8", "drumulator", "drumtraks", "rx5", "cr8000", "kr55", "dr110", "mpc60"],
@@ -656,7 +679,7 @@ function harmonyForNote(cfg, stepInBar, noteLen) {
   return Math.random() < chance ? shape : null;
 }
 
-function generateMonoMelody(register, structure, barRootDegrees, rawParams, totalSteps, registerJitter = 0, isBass = false) {
+function generateMonoMelody(register, structure, barRootDegrees, rawParams, totalSteps, registerJitter = 0, isBass = false, instKeyForRange = null) {
   const effectiveRegister = register + registerJitter;
   // Complexity shapes the LINE too, not just the drums: a simple setting
   // rests more, repeats more and stays on chord tones; a complex one
@@ -756,6 +779,33 @@ function generateMonoMelody(register, structure, barRootDegrees, rawParams, tota
         const lo = effectiveRegister - 2;
         while (degree < lo) degree += 7;
         while (degree >= lo + 7) degree -= 7;
+      } else if (INSTRUMENT_CEILING[instKeyForRange] !== undefined) {
+        // Real instruments have real ranges, and a part written above one
+        // does not sound like that instrument any more. A saxophone was
+        // reaching E6 - two octaves above where an alto's top actually is -
+        // and a "sax" up there reads as a synth lead, which is precisely the
+        // thin, bright character this whole round is about.
+        //
+        // Applied after the window fold so it is a hard backstop rather than
+        // a replacement for it: whatever route a note took to get up there,
+        // it comes back down by octaves until it is inside the instrument.
+        const lo = effectiveRegister - 3;
+        while (degree < lo) degree += 7;
+        while (degree > INSTRUMENT_CEILING[instKeyForRange]) degree -= 7;
+      } else {
+        // The same problem, one level up. A melodic part is carried by the bar
+        // root exactly as the bass was, so a progression that moves i-VI-III
+        // walks the whole tune upward, and measured the result spanned well
+        // over two octaves: trap leads G#4 to C6, autoleads C4 to D#6. Real
+        // melodies live inside about an octave and a third - a singer's range,
+        // which is the range every instrumental hook is written against.
+        //
+        // The window is wider than the bass's and sits mostly above the
+        // register rather than around it, because a melody is allowed to reach
+        // upward for a peak - it just is not allowed to keep going.
+        const lo = effectiveRegister - 3;
+        while (degree < lo) degree += 7;
+        while (degree > lo + 10) degree -= 7;
       }
       const note = { degree, len: dur };
       const shape = harmonyForNote(params.harmony, stepPos % STEPS_PER_BAR, dur);
@@ -794,7 +844,21 @@ function applyChorusHook(melody, inst, style, barMetas, barRootDegrees) {
   const register = REGISTER[inst];
   // Same ensemble discipline as the verse material: the bass hook stays in
   // the bass lane, everything else can sit at or above home register.
-  const registerJitter = inst === "bass" ? 0 : pickWeighted([[0, 3], [7, 1]]);
+  // Octave displacement, for variety between generations. It used to be "up an
+  // octave, a quarter of the time", which stacked on top of a lead register
+  // that was already an octave too high and is how melodies reached C6. A part
+  // is now as likely to drop as to rise, and rising is rarer than staying put.
+  // Octave displacement, for variety between generations. It used to be "up an
+  // octave, a quarter of the time", which stacked on top of a lead register
+  // that was already an octave too high and is how melodies reached C6.
+  //
+  // The upward option is gone entirely rather than merely made rarer. The
+  // registers below are already placed where each instrument's own repertoire
+  // sits, so there is nowhere useful above them to go - every octave up from
+  // there was the beat getting thinner and brighter, which is the one
+  // direction this program has been repeatedly wrong in. Dropping an octave
+  // still gives the variety the jitter was for.
+  const registerJitter = inst === "bass" ? 0 : pickWeighted([[0, 3], [-7, 1]]);
   const effectiveRegister = register + registerJitter;
   const hookParams = {
     ...params,
@@ -1497,7 +1561,8 @@ const STYLES = {
     swing: 0.13,
     humanize: { timingMs: 8, velocityJitter: 0.16 },
     key: "F2",
-    scale: "major",
+    // R&B is not a major-key genre. It was set to major, which is a large part of why it came out cheerful: the natural 6th of dorian gives the lift R&B has without the leading tone that makes major sound bright.
+    scale: "dorian",
     progressions: [[0,5,1,4],[0,3,5,4],[0,2,3,4],[5,3,0,4],[1,4,0,0],[3,2,1,0],[0,1,4,0]],
     // A real mono solo-line saxophone instead of a generic flute lead - a
     // sax solo is about as canonical a "smooth vocal-style top line" as
@@ -2143,7 +2208,8 @@ const STYLES = {
     // sloppiness.
     pockets: { snare: 16, hihat: 10, kick: 4, bass: -3 },
     key: "F2",
-    scale: "major",
+    // Neo-soul lives on dorian and minor with extended chords - the raised 6th over a minor 3rd is the mode the whole genre is written in.
+    scale: "dorian",
     progressions: [[0,2,5,4],[3,2,0,4],[0,5,1,4],[2,5,0,3],[1,4,0,3],[3,2,1,0],[5,1,4,0]],
     // Cross-stick, not a full snare: neo-soul's backbeat is almost always
     // the stick laid across the head tapping the rim - the dry woody
@@ -3199,6 +3265,72 @@ function planInstrumentation(style) {
   };
 }
 
+// Which modes each genre actually writes in.
+//
+// A genre had exactly one scale, forever, which is both less varied and less
+// accurate than the real thing: trap is natural minor most of the time but
+// reaches for harmonic minor and Phrygian when it wants menace, and drill
+// leans on Phrygian and its b2 as a matter of course. Weighted so each genre's
+// default stays dominant and the darker modes are the exception, which is the
+// proportion they appear in on records.
+//
+// Only genres with a real second mode are listed; anything absent keeps the
+// single scale written in its style block.
+const GENRE_MODES = {
+  trap:      [["minor", 5], ["harmonicminor", 2], ["phrygian", 2]],
+  rap:       [["minor", 6], ["harmonicminor", 2], ["phrygian", 1]],
+  drill:     [["phrygian", 5], ["minor", 3], ["harmonicminor", 2], ["phrygiandominant", 1]],
+  phonk:     [["minor", 5], ["phrygian", 3], ["harmonicminor", 2]],
+  dubstep:   [["minor", 6], ["phrygian", 2], ["harmonicminor", 1]],
+  jerseyclub:[["minor", 7], ["phrygian", 1]],
+  hiphop:    [["minor", 6], ["dorian", 3], ["harmonicminor", 1]],
+  techno:    [["minor", 6], ["phrygian", 2], ["dorian", 2]],
+  dnb:       [["minor", 6], ["dorian", 2], ["harmonicminor", 1]],
+  synthwave: [["minor", 6], ["harmonicminor", 2], ["dorian", 1]],
+  rnb:       [["dorian", 5], ["minor", 4]],
+  neosoul:   [["dorian", 6], ["minor", 3]],
+  lofi:      [["dorian", 5], ["minor", 4]],
+  house:     [["dorian", 5], ["minor", 4]],
+  ukgarage:  [["dorian", 5], ["minor", 4]],
+  amapiano:  [["minor", 5], ["dorian", 4]],
+  reggaeton: [["minor", 6], ["phrygian", 2]],
+};
+
+
+// The top of each instrument's usable range, in scale degrees above the song's
+// root. Written from where the instrument actually stops rather than from
+// where a synthesiser could keep going: an alto sax tops out around F5, a
+// tenor around D5, a trombone around F4. A line written above the instrument
+// does not sound like the instrument, and every one of those cases was making
+// the beat brighter and thinner than the genre wants.
+//
+// Given the usual C2 root, 21 degrees is C5, 24 is F5, 17 is F4.
+const INSTRUMENT_CEILING = {
+  sax: 22,          // alto's practical top, around F#5
+  woodwind: 25,     // flutes genuinely are high, and the trap flute hook sits
+                    // up here on purpose - but a hook lives C5-C6, not above it
+  leadguitar: 24,   // 22nd fret on the high E
+  guitar: 19,
+  talkbox: 20,      // it is a voice, and voices stop
+  vocal: 20,
+  horn: 20,         // trumpet's comfortable top
+  organ: 22,
+  piano: 26,
+  strings: 24,
+  kalimba: 24,
+  marimba: 24,
+  lead: 24,
+  autolead: 21,     // an autotuned vocal line is still a vocal line
+  arp: 22,
+  pad: 21,
+};
+
+function pickMode(style) {
+  const pool = GENRE_MODES[style.id];
+  if (!pool) return style.scale;
+  return pickWeighted(pool);
+}
+
 function resolveGenerationStyle(style, plan) {
   // style.tempo is a {min,max,default} range object, not a number. Passing
   // the object straight through made the policy's tempo input NaN, which
@@ -3209,13 +3341,19 @@ function resolveGenerationStyle(style, plan) {
     : (style.tempo && (style.tempo.current || style.tempo.default)) || undefined;
   setGenerationContext(style.id, style.swing !== undefined ? style.swing * 100 : undefined, tempoNum);
   const p = plan || planInstrumentation(style);
+  // The mode is drawn per generation, so a genre gets its own range of
+  // darkness instead of one fixed scale for every beat it will ever make.
+  // Chosen before the progression, because pickProgression scores candidate
+  // progressions against the scale and would otherwise be scoring against a
+  // mode this beat is not in.
+  const withMode = { ...style, scale: pickMode(style) };
   return {
-    ...style,
+    ...withMode,
     melody: p.melody,
     articulation: p.articulation,
     melodic: p.melodic,
     drums: { ...style.drums, main: mutateGroove(pickDrumMain(style), TRESILLO_GENRES.has(style.id)) },
-    progression: pickProgression(style),
+    progression: pickProgression(withMode),
     fillType: pickFillType(),
   };
 }
@@ -3276,7 +3414,7 @@ function generateVariationOnce(rawStyle, bars, plan) {
 
   const registerPlan = planRegisterJitters(style.melodic.monoInstruments);
   for (const inst of style.melodic.monoInstruments) {
-    instruments[inst] = generateMonoMelody(REGISTER[inst], structure, barRootDegrees, style.melody[inst], totalSteps, registerPlan[inst], inst === "bass");
+    instruments[inst] = generateMonoMelody(REGISTER[inst], structure, barRootDegrees, style.melody[inst], totalSteps, registerPlan[inst], inst === "bass", inst);
   }
   declutterMonoCollisions(instruments, style.melodic.monoInstruments);
 
@@ -3486,7 +3624,7 @@ function generateSongVariationOnce(rawStyle, plan) {
   }
   const registerPlan = planRegisterJitters(style.melodic.monoInstruments);
   for (const inst of style.melodic.monoInstruments) {
-    const melody = generateMonoMelody(REGISTER[inst], [], barRootDegrees, style.melody[inst], totalSteps, registerPlan[inst], inst === "bass");
+    const melody = generateMonoMelody(REGISTER[inst], [], barRootDegrees, style.melody[inst], totalSteps, registerPlan[inst], inst === "bass", inst);
     applyChorusHook(melody, inst, style, barMetas, barRootDegrees);
     for (let i = 0; i < bars; i++) {
       if (activeSets[i].has(inst)) continue;
@@ -3816,9 +3954,15 @@ function refineVariation(style, v, barRootDegrees, totalSteps, passes = 2) {
       const original = v.instruments[inst];
       let bestPart = original;
       for (let attempt = 0; attempt < 4; attempt++) {
+        // The refinement pass rewrites each part several times and keeps the
+        // best-scoring version - and it was the one call site that did not
+        // pass the instrument through, so every part it improved came back
+        // without a range ceiling. That is why a "lead" could still reach F6
+        // after the ceilings went in: the note was not written by the path
+        // that clamps, it was written by the path that polishes.
         const candidate = generateMonoMelody(
           REGISTER[inst], v.structure, barRootDegrees, style.melody[inst],
-          totalSteps, registerPlan[inst], inst === "bass"
+          totalSteps, registerPlan[inst], inst === "bass", inst
         );
         v.instruments[inst] = candidate;
         const sc = scoreVariation(style, v);

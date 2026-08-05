@@ -5,6 +5,15 @@ const SCALES = {
   minor: [0, 2, 3, 5, 7, 8, 10],
   dorian: [0, 2, 3, 5, 7, 9, 10],
   phrygian: [0, 1, 3, 5, 7, 8, 10],
+  // Natural minor with the 7th raised a semitone. The augmented second it
+  // opens up between the 6th and the raised 7th is the interval that makes it
+  // sound tense rather than merely sad, and it is one of the three scales
+  // every guide to trap melody names - natural minor as the default, harmonic
+  // minor and Phrygian for the darker and more aggressive end.
+  harmonicminor: [0, 2, 3, 5, 7, 8, 11],
+  // Phrygian with a major third. The most aggressive of the set: the b2
+  // against a major 3rd is the sound of the hardest drill and rage beats.
+  phrygiandominant: [0, 1, 4, 5, 7, 8, 10],
 };
 
 const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii"];

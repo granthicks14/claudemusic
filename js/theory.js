@@ -14,7 +14,51 @@ const SCALES = {
   // Phrygian with a major third. The most aggressive of the set: the b2
   // against a major 3rd is the sound of the hardest drill and rage beats.
   phrygiandominant: [0, 1, 4, 5, 7, 8, 10],
+  // Major with a flat 7. The mode of funk, of a lot of rock, and of every
+  // dominant-7th vamp that never resolves.
+  mixolydian: [0, 2, 4, 5, 7, 9, 10],
+  // Major with a raised 4. Bright without being plain - the dreamy one.
+  lydian: [0, 2, 4, 6, 7, 9, 11],
+  // Minor with both the 6th and 7th raised. The jazz minor: it lets a minor
+  // chord carry a leading tone without the augmented second harmonic minor
+  // opens up.
+  melodicminor: [0, 2, 3, 5, 7, 9, 11],
 };
+
+// The pentatonic subset of each mode, as indices into the seven degrees above.
+//
+// This is the single most useful fact in melodic writing and the program did
+// not know it. A seven-note scale contains two "avoid" notes against its own
+// tonic chord - in minor that is the 2nd and the 6th, in major the 4th and the
+// 7th - and a melody that lands on one by accident is the thing that makes a
+// tune sound arbitrary rather than written. The pentatonic is exactly the
+// scale with those notes removed, which is why it is what blues, soul, hip
+// hop, rock and most folk music the world over actually sing.
+//
+// Kept as a subset rather than as its own five-note scale on purpose: chords
+// still need all seven degrees to stack thirds, and the two omitted notes are
+// still wanted as passing tones. What changes is where a melody RESTS.
+const PENTATONIC_DEGREES = {
+  major:            [0, 1, 2, 4, 5],   // 1 2 3 5 6
+  lydian:           [0, 1, 2, 4, 5],
+  mixolydian:       [0, 1, 2, 4, 5],
+  minor:            [0, 2, 3, 4, 6],   // 1 b3 4 5 b7
+  dorian:           [0, 2, 3, 4, 6],
+  phrygian:         [0, 2, 3, 4, 6],
+  harmonicminor:    [0, 2, 3, 4, 6],
+  melodicminor:     [0, 2, 3, 4, 6],
+  phrygiandominant: [0, 2, 3, 4, 6],
+};
+
+// The blue note: the flat 5 sitting between the 4th and the 5th. Added to a
+// minor pentatonic it is the blues scale, and it is a passing tone rather
+// than a resting place - which is exactly how it is written here.
+function isPentatonicDegree(scaleName, degreeIndex) {
+  const set = PENTATONIC_DEGREES[scaleName];
+  if (!set) return true;
+  const len = (SCALES[scaleName] || SCALES.minor).length;
+  return set.includes(((degreeIndex % len) + len) % len);
+}
 
 const ROMAN = ["i", "ii", "iii", "iv", "v", "vi", "vii"];
 

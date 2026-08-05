@@ -679,8 +679,10 @@ function harmonyForNote(cfg, stepInBar, noteLen) {
   return Math.random() < chance ? shape : null;
 }
 
-function generateMonoMelody(register, structure, barRootDegrees, rawParams, totalSteps, registerJitter = 0, isBass = false, instKeyForRange = null) {
+function generateMonoMelody(register, structure, barRootDegrees, rawParams, totalSteps, registerJitter = 0, isBass = false, instKeyForRange = null, scaleName = null, rootMidi = null) {
   const effectiveRegister = register + registerJitter;
+  const rangeCeilingDegree = (instKeyForRange && scaleName && rootMidi !== null)
+    ? ceilingDegreeFor(instKeyForRange, rootMidi, scaleName) : null;
   // Complexity shapes the LINE too, not just the drums: a simple setting
   // rests more, repeats more and stays on chord tones; a complex one
   // moves more, varies its motif more, and uses more passing tones. The
@@ -762,6 +764,33 @@ function generateMonoMelody(register, structure, barRootDegrees, rawParams, tota
       const dur = Math.min(ev.duration, totalSteps - stepPos);
       const folded = foldIntoSpan(ev.degreeOffset, halfSpan);
       let degree = barRoot + effectiveRegister + phraseOctave + folded;
+      // Land resting notes on the pentatonic.
+      //
+      // A seven-note scale contains two notes that clash with its own tonic
+      // chord - the 2nd and 6th in minor, the 4th and 7th in major - and a
+      // melody that RESTS on one by accident is most of what makes a tune
+      // sound arbitrary instead of written. The pentatonic is that scale with
+      // exactly those two removed, which is why blues, soul, hip hop and rock
+      // are sung in it.
+      //
+      // Done BEFORE the range fold below, not after: folding by octaves
+      // preserves a note's scale degree, so the pentatonic choice survives
+      // it - whereas nudging after the fold could push a note back over its
+      // instrument's ceiling, which is exactly what it did.
+      //
+      // Applied only to notes long enough to be heard as a landing, and only
+      // by a single scale step, so the motif keeps its shape and its contour -
+      // the passing notes in between are left alone, because that is where
+      // those two degrees belong and where they sound intentional. A short
+      // note through a 6th is colour; a held one is a mistake.
+      if (!isBass && scaleName && dur >= 3 && typeof isPentatonicDegree === "function"
+          && !isPentatonicDegree(scaleName, degree)) {
+        // Step to whichever neighbour is in the pentatonic, preferring to
+        // fall - resolving downward is the stronger of the two.
+        if (isPentatonicDegree(scaleName, degree - 1)) degree -= 1;
+        else if (isPentatonicDegree(scaleName, degree + 1)) degree += 1;
+      }
+
       // Keep the bass in the register a bass actually occupies.
       //
       // Without this the bar root carries the bassline with it: when the
@@ -779,7 +808,7 @@ function generateMonoMelody(register, structure, barRootDegrees, rawParams, tota
         const lo = effectiveRegister - 2;
         while (degree < lo) degree += 7;
         while (degree >= lo + 7) degree -= 7;
-      } else if (INSTRUMENT_CEILING[instKeyForRange] !== undefined) {
+      } else if (rangeCeilingDegree !== null) {
         // Real instruments have real ranges, and a part written above one
         // does not sound like that instrument any more. A saxophone was
         // reaching E6 - two octaves above where an alto's top actually is -
@@ -791,7 +820,7 @@ function generateMonoMelody(register, structure, barRootDegrees, rawParams, tota
         // it comes back down by octaves until it is inside the instrument.
         const lo = effectiveRegister - 3;
         while (degree < lo) degree += 7;
-        while (degree > INSTRUMENT_CEILING[instKeyForRange]) degree -= 7;
+        while (degree > rangeCeilingDegree) degree -= 7;
       } else {
         // The same problem, one level up. A melodic part is carried by the bar
         // root exactly as the bass was, so a progression that moves i-VI-III
@@ -3305,25 +3334,52 @@ const GENRE_MODES = {
 // the beat brighter and thinner than the genre wants.
 //
 // Given the usual C2 root, 21 degrees is C5, 24 is F5, 17 is F4.
-const INSTRUMENT_CEILING = {
-  sax: 22,          // alto's practical top, around F#5
-  woodwind: 25,     // flutes genuinely are high, and the trap flute hook sits
-                    // up here on purpose - but a hook lives C5-C6, not above it
-  leadguitar: 24,   // 22nd fret on the high E
-  guitar: 19,
-  talkbox: 20,      // it is a voice, and voices stop
-  vocal: 20,
-  horn: 20,         // trumpet's comfortable top
-  organ: 22,
-  piano: 26,
-  strings: 24,
-  kalimba: 24,
-  marimba: 24,
-  lead: 24,
-  autolead: 21,     // an autotuned vocal line is still a vocal line
-  arp: 22,
-  pad: 21,
+// The top of each instrument's usable range, as an actual note.
+//
+// It was written in scale degrees above the song's root, which is wrong in a
+// way that only shows up in some keys: a saxophone's top is F#5 whatever key
+// the song is in, but "22 degrees above the root" is F#5 in C and C6 in G. An
+// instrument's range is a fact about the instrument, not about the tune.
+// Written from where each one actually stops.
+const INSTRUMENT_TOP_NOTE = {
+  sax: "F#5",         // alto's practical top
+  woodwind: "C6",     // flutes genuinely are high, and the trap flute hook
+                      // sits up here on purpose - but a hook lives C5-C6
+  leadguitar: "A5",   // 22nd fret on the high E
+  guitar: "E5",
+  talkbox: "D5",      // it is a voice, and voices stop
+  vocal: "E5",
+  horn: "C5",         // trumpet's comfortable top
+  organ: "G5",
+  piano: "A5",
+  strings: "F5",
+  kalimba: "G5",
+  marimba: "F5",
+  lead: "A5",
+  autolead: "D5",     // an autotuned vocal line is still a vocal line
+  arp: "A5",
+  pad: "E5",
+  stab: "G5",
 };
+
+// The highest scale degree that stays at or below an instrument's top note in
+// this particular key. Walks down from well above rather than solving it, so
+// it is correct for any scale shape without assuming even steps.
+function styleRootMidi(style) {
+  try { return noteNameToMidi(style.key); } catch (_) { return null; }
+}
+
+function ceilingDegreeFor(inst, rootMidi, scaleName) {
+  const top = INSTRUMENT_TOP_NOTE[inst];
+  if (!top || rootMidi === null || rootMidi === undefined) return null;
+  let topMidi;
+  try { topMidi = noteNameToMidi(top); } catch (_) { return null; }
+  for (let d = 40; d >= 0; d--) {
+    if (scaleDegreeToMidi(rootMidi, scaleName, d) <= topMidi) return d;
+  }
+  return 0;
+}
+
 
 function pickMode(style) {
   const pool = GENRE_MODES[style.id];
@@ -3414,7 +3470,7 @@ function generateVariationOnce(rawStyle, bars, plan) {
 
   const registerPlan = planRegisterJitters(style.melodic.monoInstruments);
   for (const inst of style.melodic.monoInstruments) {
-    instruments[inst] = generateMonoMelody(REGISTER[inst], structure, barRootDegrees, style.melody[inst], totalSteps, registerPlan[inst], inst === "bass", inst);
+    instruments[inst] = generateMonoMelody(REGISTER[inst], structure, barRootDegrees, style.melody[inst], totalSteps, registerPlan[inst], inst === "bass", inst, style.scale, styleRootMidi(style));
   }
   declutterMonoCollisions(instruments, style.melodic.monoInstruments);
 
@@ -3624,7 +3680,7 @@ function generateSongVariationOnce(rawStyle, plan) {
   }
   const registerPlan = planRegisterJitters(style.melodic.monoInstruments);
   for (const inst of style.melodic.monoInstruments) {
-    const melody = generateMonoMelody(REGISTER[inst], [], barRootDegrees, style.melody[inst], totalSteps, registerPlan[inst], inst === "bass", inst);
+    const melody = generateMonoMelody(REGISTER[inst], [], barRootDegrees, style.melody[inst], totalSteps, registerPlan[inst], inst === "bass", inst, style.scale, styleRootMidi(style));
     applyChorusHook(melody, inst, style, barMetas, barRootDegrees);
     for (let i = 0; i < bars; i++) {
       if (activeSets[i].has(inst)) continue;
@@ -3962,7 +4018,7 @@ function refineVariation(style, v, barRootDegrees, totalSteps, passes = 2) {
         // that clamps, it was written by the path that polishes.
         const candidate = generateMonoMelody(
           REGISTER[inst], v.structure, barRootDegrees, style.melody[inst],
-          totalSteps, registerPlan[inst], inst === "bass", inst
+          totalSteps, registerPlan[inst], inst === "bass", inst, style.scale, styleRootMidi(style)
         );
         v.instruments[inst] = candidate;
         const sc = scoreVariation(style, v);

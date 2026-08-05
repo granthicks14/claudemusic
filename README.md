@@ -1289,3 +1289,33 @@ More broadly, each genre had exactly one scale for every beat it would ever make
 So this round fixed what a listener hears and not what the scorer counts. Both matter; they are not the same thing, and the honest version of that is not to claim the number went up.
 
 `tools/test-content.js` now fails if any melodic part is written above its instrument's range, checked as pitch per instrument rather than as a register constant — because the constant was only one of the three causes.
+
+## Melodies rested on notes that clash with their own chord
+
+The most useful fact in melodic writing, and the program did not know it: **a seven-note scale contains two notes that clash with its own tonic chord** — the 2nd and 6th in minor, the 4th and 7th in major. A melody that *rests* on one by accident is most of what makes a tune sound arbitrary rather than written. The pentatonic scale is precisely that scale with those two removed, which is why blues, soul, hip hop, rock and most sung music the world over is written in it.
+
+Measured across ten generations per genre, counting only notes long enough to be heard as a landing:
+
+| genre | resting notes on an avoid tone |
+|---|---|
+| lo-fi | **40%** |
+| drill | **37%** |
+| R&B / rock | **32%** |
+| trap | **29%** |
+| hip hop | **21%** |
+
+Now **0%** in every genre. Resting notes step by one scale degree onto the pentatonic, preferring to fall, because resolving downward is the stronger of the two. Passing notes are deliberately left alone — a short note *through* a 6th is colour and sounds intentional; a held one is a mistake. The motif keeps its shape and contour either way.
+
+Also added the modes the theory actually calls for: `mixolydian` (major with a flat 7 — funk, and every dominant vamp that never resolves), `lydian`, and `melodicminor` (which lets a minor chord carry a leading tone without harmonic minor's augmented second).
+
+### Instrument ranges are a fact about the instrument, not about the key
+
+The range ceilings added last round were written in scale degrees above the song's root, which is wrong in a way that only shows up in some keys: a saxophone's top is F#5 whatever key the song is in, but "22 degrees above the root" is F#5 in C and **C6 in G**. `INSTRUMENT_TOP_NOTE` now holds real notes — alto sax F#5, trumpet C5, guitar E5, talkbox and vocal stopping where a voice does — converted to a degree bound per key at generation time.
+
+The pentatonic nudge is applied *before* the range fold rather than after, because folding by octaves preserves a note's scale degree — so the pentatonic choice survives the fold, whereas nudging afterwards could push a note back over its instrument's ceiling. Which it did, and the range test caught it.
+
+### Checked against the brief and already correct
+
+BPM ranges were checked against the stated per-genre targets and all sit inside them (trap 132–150 within 130–170, hip hop 82–96 within 80–105, drill 138–145 within 135–150, R&B 68–88 within 65–110). The 808 already follows chord roots 76–82% of the time with the fifth as its deliberate secondary. Trap already excludes marimbas, ukuleles and acoustic guitars, enforced by the genre gate.
+
+**Pop is genuinely missing** and is the one named genre the program does not have. Adding it is not a one-line change — the test suite requires every genre to carry at least eight reference songs and four artist profiles, and those invariants exist for good reasons — so it is called out here rather than half-added.

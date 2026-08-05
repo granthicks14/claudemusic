@@ -115,7 +115,7 @@ const FLAVOR_LABELS = {
   hangdrum: "Handpan", balafon: "Balafon", kora: "Kora",
   xylophone: "Xylophone", tubularbell: "Tubular Bells",
   // Woodwinds — the sax family's siblings.
-  flute: "Concert Flute", altoflute: "Alto Flute", bassclarinet: "Bass Clarinet",
+  flute: "Concert Flute", altoflute: "Alto Flute", bassbassclarinet: "Bass Clarinet",
   englishhorn: "English Horn", bassoon: "Bassoon", sopranosax: "Soprano Sax",
   shakuhachi: "Shakuhachi", bansuri: "Bansuri", duduk: "Duduk", recorder: "Recorder",
   // Lead guitar tones.
@@ -128,14 +128,29 @@ const FLAVOR_LABELS = {
   kr55: "Korg KR-55", dr110: "Boss DR-110", mpc60: "MPC60",
   shekere: "Shekere", ganza: "Ganzá", caxixi: "Caxixi", udu: "Udu", pandeiro: "Pandeiro",
   tamborim: "Tamborim", repinique: "Repinique", surdo: "Surdo", bata: "Batá", cuica: "Cuíca",
-  roger: "Zapp Talkbox", gfunk: "G-Funk Talkbox", robot: "Robot Talkbox", bright: "Bright Talkbox",
+  roger: "Zapp Talkbox", gfunk: "G-Funk Talkbox", robot: "Robot Talkbox", "talkbox:bright": "Bright Talkbox",
   hoover: "Hoover", ms20: "MS-20", d50: "D-50", prophet: "Prophet-5", obxa: "OB-Xa",
   phasedist: "CZ Phase Dist", jupiter8: "Jupiter-8", polysix: "Polysix", ppgwave: "PPG Wave",
 };
-function flavorLabel(key) {
+// Kit names are namespaced PER TRACK in FLAVOR_POOLS: the hi-hat's "bright"
+// and the talkbox's "bright" are unrelated sounds that happen to share a word.
+// This map was keyed by the bare name, so the hi-hat's kit picker read "Bright
+// Talkbox" - the same collision already found and fixed in FLAVOR_GENRES, in a
+// map nobody thought to check afterwards. Keys may now be written
+// "track:flavor", and a track-specific entry wins over the bare name.
+function flavorLabel(key, track) {
+  if (track && FLAVOR_LABELS[track + ":" + key]) return FLAVOR_LABELS[track + ":" + key];
+  // A bare entry that belongs to a DIFFERENT track must not be borrowed. Any
+  // name carrying a track-specific entry anywhere is treated as ambiguous, so
+  // the fallback is the kit's own name rather than another instrument's.
+  if (track && AMBIGUOUS_FLAVOR_NAMES.has(key)) {
+    return key.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  }
   if (FLAVOR_LABELS[key]) return FLAVOR_LABELS[key];
   return key.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
+const AMBIGUOUS_FLAVOR_NAMES = new Set(
+  Object.keys(FLAVOR_LABELS).filter((k) => k.includes(":")).map((k) => k.split(":")[1]));
 
 // What each rung of the complexity dial actually sounds like, so the
 // number is not just a number. These track the measured behaviour: at 1
@@ -3699,7 +3714,7 @@ function msBuildKits() {
       for (const f of list) {
         const o = document.createElement("option");
         o.value = f;
-        o.textContent = FLAVOR_LABELS[f] || f;
+        o.textContent = flavorLabel(f, track);
         g.appendChild(o);
       }
       sel.appendChild(g);
@@ -3829,7 +3844,7 @@ function buildUserStyleBeat() {
   for (const sel of msKits.querySelectorAll("select")) {
     if (!sel.value) continue;
     currentFlavors[sel.dataset.track] = sel.value;
-    namedKits.push(`${TRACK_LABELS[sel.dataset.track]} ${FLAVOR_LABELS[sel.value] || sel.value}`);
+    namedKits.push(`${TRACK_LABELS[sel.dataset.track]} ${flavorLabel(sel.value, sel.dataset.track)}`);
   }
 
   // Mood, where the genre has not been given an explicit kit for a track.
@@ -3869,4 +3884,116 @@ function buildUserStyleBeat() {
 function msKitNamed(track) {
   const sel = msKits.querySelector(`select[data-track="${track}"]`);
   return !!(sel && sel.value);
+}
+
+// ===========================================================================
+// The production plan
+// ===========================================================================
+// The program has always made decisions. It has never stated them. This
+// renders what it actually did for the beat currently loaded - the roots it
+// used, the instruments really playing, the 808's character, the section
+// breakdown - alongside the reason each of those is what it is, and the
+// checks the beat had to pass before it was allowed to exist.
+//
+// Everything here is read off the generated pattern. Nothing is read off the
+// genre's tables of what it COULD have done, because the entire history of
+// this program's genre bugs is the gap between those two things.
+
+const planPanel = document.getElementById("plan-panel");
+
+function renderProductionPlan() {
+  if (!planPanel) return;
+  if (!currentPattern || !activeStyle) {
+    planPanel.innerHTML = '<p class="plan-why">Generate a beat and its plan appears here.</p>';
+    return;
+  }
+  const p = buildProductionPlan(currentPattern, activeStyle, currentFlavors, {
+    tempo: Number(tempoSlider.value),
+    key: keySelect.value + " " + (activeStyle.scale || "minor"),
+  });
+
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const label = (i) => TRACK_LABELS[i] || i;
+  const kitOf = (i) => (p.kits[i] ? `${label(i)} · ${flavorLabel(p.kits[i], i)}` : label(i));
+
+  const facts = [
+    ["Genre", p.genre],
+    ["BPM", p.bpm],
+    ["Key", p.key],
+    ["Progression", p.progression.length ? p.progression.join(" – ") : "—"],
+    ["Swing", `${swingSlider.value}%`],
+    ["Complexity", `${complexitySlider.value}/10`],
+  ];
+
+  const section = (title, body, why) =>
+    `<div class="plan-section"><h4>${esc(title)}</h4>${body}` +
+    (why ? `<p class="plan-why">${esc(why)}</p>` : "") + "</div>";
+
+  const chips = (list, fmt) =>
+    `<ul class="plan-list">${list.map((i) => `<li>${esc(fmt ? fmt(i) : i)}</li>`).join("")}</ul>`;
+
+  let html = `<div class="plan-head">${facts.map(([k, v]) =>
+    `<span class="plan-fact"><b>${esc(k)}</b><span>${esc(v)}</span></span>`).join("")}</div>`;
+
+  html += section("Instruments",
+    p.instruments.length ? chips(p.instruments, kitOf) : '<p class="plan-why">Drums only.</p>',
+    p.reasoning.genre);
+
+  html += section("Drums",
+    p.drums.length ? chips(p.drums, kitOf) : "",
+    p.reasoning.drums);
+
+  if (p.eight08) {
+    html += section("The 808",
+      `<p><b>${esc(flavorLabel(p.eight08.kit, "bass"))}</b> — ${esc(p.eight08.character)}` +
+      (p.eight08.how ? `: ${esc(p.eight08.how)}` : "") + "</p>",
+      p.reasoning.bass);
+  } else if (p.kits.bass) {
+    html += section("Bass",
+      `<p>${esc(flavorLabel(p.kits.bass, "bass"))}</p>`, p.reasoning.bass);
+  }
+
+  html += section("Harmony",
+    `<p>${esc(p.progression.join(" – ") || "—")} in ${esc(p.key)}</p>`, p.reasoning.chords);
+
+  html += section("Groove", "", p.reasoning.groove);
+
+  if (p.sections.length) {
+    html += section("Arrangement",
+      `<ul class="plan-list plan-arrangement">${p.sections.map((s) =>
+        `<li>${esc(s.label)}<small>${esc(s.bars)}</small></li>`).join("")}</ul>`,
+      "Sections differ in density as well as in name — choruses fire more of the " +
+      "authored optional hits, verses hold back, and the bar before each chorus " +
+      "drops out on its last beat so the return lands bigger than it measures.");
+  }
+
+  const bad = p.checks.filter((c) => !c.ok).length;
+  html += section(`Checks — ${p.checks.length - bad} of ${p.checks.length} hold`,
+    `<ul class="plan-checks">${p.checks.map((c) =>
+      `<li class="plan-check ${c.ok ? "ok" : "bad"}">` +
+      `<span class="plan-check-mark">${c.ok ? "✓" : "✕"}</span>` +
+      `<span>${esc(c.name)}${c.hard && !c.ok ? " (hard)" : ""}` +
+      `<span class="plan-check-detail">${esc(c.detail)}</span></span></li>`).join("")}</ul>`,
+    "Hard checks run inside the generator: a candidate beat that fails one is " +
+    "thrown away and a fresh line-up is drawn, so a beat that reaches you has " +
+    "already passed them. The rest are reported rather than enforced, because " +
+    "not every observation is worth rejecting a beat over.");
+
+  planPanel.innerHTML = html;
+}
+
+// The plan is only meaningful for the beat on screen, so it is rebuilt
+// whenever that changes rather than once at load.
+const _generatePatternBase = generatePattern;
+generatePattern = function () {
+  // The gate needs to know which kits the beat will be played with; the
+  // generator does not choose those, the app does.
+  if (typeof setFlavorsForValidation === "function") setFlavorsForValidation(currentFlavors);
+  _generatePatternBase.apply(this, arguments);
+  renderProductionPlan();
+};
+
+for (const t of document.querySelectorAll('.tools-tab[data-tool="plan"]')) {
+  t.addEventListener("click", renderProductionPlan);
 }

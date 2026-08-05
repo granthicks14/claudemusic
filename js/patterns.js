@@ -3811,11 +3811,61 @@ function learnedBonus(style, v) {
 // Candidate counts are tuned so selection is meaningful without making
 // "Generate" feel slow - a full beat is only array math, so this stays
 // well inside a single frame.
+
+// A candidate that fails a hard production check is not a candidate.
+//
+// The best-of-N search below scores candidates on musical balance, and a
+// balanced beat with a saxophone in it is still a saxophone in a trap beat -
+// the scorer has no opinion about that, because it measures the mix rather
+// than the taste. So the gate runs first and rejects outright, and only what
+// survives gets scored.
+//
+// It is deliberately a filter and not a penalty. A penalty is a preference
+// that a high enough score elsewhere can outvote, which is exactly how these
+// problems survived several rounds of scoring in the first place.
+function passesProduction(style, cand, flavors) {
+  if (typeof validateProduction !== "function") return true;
+  try {
+    return !validateProduction(cand, style, flavors).some((c) => c.hard && !c.ok);
+  } catch (_) {
+    // A broken check must not be able to stop the program making music.
+    return true;
+  }
+}
+
+// The kits a candidate would actually be played with. The generator does not
+// choose kits - the app does, per track - so the gate is handed whatever is
+// current, falling back to the genre's defaults when nothing has been chosen
+// yet (which is the case on the very first generation).
+let CURRENT_FLAVORS_HOOK = null;
+function setFlavorsForValidation(flavors) { CURRENT_FLAVORS_HOOK = flavors || null; }
+function flavorsForValidation(style) {
+  return CURRENT_FLAVORS_HOOK || style.defaultFlavors || {};
+}
+
 function generateVariation(rawStyle, bars) {
-  const plan = planInstrumentation(rawStyle);
+  let plan = planInstrumentation(rawStyle);
+  const flavors = flavorsForValidation(rawStyle);
   let best = null, bestScore = -Infinity;
+  // A failing candidate is kept only as a last resort, and can never outscore
+  // a passing one. The first version of this let a rejected candidate fall
+  // through into the scoring once a retry budget ran out, so it competed with
+  // the passing candidates on musical balance and sometimes won - a forbidden
+  // saxophone still reached 15% of trap beats with the gate nominally on. A
+  // hard failure is not a low score, it is a disqualification.
+  let fallback = null, fallbackScore = -Infinity;
   for (let i = 0; i < 12; i++) {
     const cand = generateVariationOnce(rawStyle, bars, plan);
+    if (!passesProduction(rawStyle, cand, flavors)) {
+      const fs = scoreVariation(cand.genStyle || rawStyle, cand) + learnedBonus(cand.genStyle || rawStyle, cand);
+      if (fs > fallbackScore) { fallbackScore = fs; fallback = cand; }
+      // Almost every hard failure is a LINE-UP failure - a forbidden
+      // instrument, or no lead voice at all - so redraw the line-up rather
+      // than re-rolling the notes underneath an unchanged one, which would
+      // fail for the same reason every time.
+      plan = planInstrumentation(rawStyle);
+      continue;
+    }
     // Each candidate now picks its own instrumentation, so it must be
     // scored and refined against the instruments it actually used - not
     // against the genre's nominal list, which may name parts this
@@ -3826,16 +3876,31 @@ function generateVariation(rawStyle, bars) {
     const sc = scoreVariation(cand.genStyle || rawStyle, cand) + learnedBonus(cand.genStyle || rawStyle, cand);
     if (sc > bestScore) { bestScore = sc; best = cand; }
   }
+  // Nothing passed in twelve attempts. That means the genre's own tables
+  // cannot produce a line-up that satisfies its own written-down plan, which
+  // is a bug in the tables - but refusing to make a beat is a worse way to
+  // report it than making one and letting the plan panel show the failed
+  // check, which is exactly what happens.
+  if (!best) best = fallback;
   return refineVariation(best.genStyle || rawStyle, best, best.barRootDegrees, bars * STEPS_PER_BAR, 2);
 }
 
 function generateSongVariation(rawStyle) {
-  const plan = planInstrumentation(rawStyle);
+  let plan = planInstrumentation(rawStyle);
   let best = null, bestScore = -Infinity;
+  const flavors = flavorsForValidation(rawStyle);
+  let fallback = null, fallbackScore = -Infinity;
   for (let i = 0; i < 6; i++) {
     const cand = generateSongVariationOnce(rawStyle, plan);
+    if (!passesProduction(rawStyle, cand, flavors)) {
+      const fs = scoreVariation(cand.genStyle || rawStyle, cand) + learnedBonus(cand.genStyle || rawStyle, cand);
+      if (fs > fallbackScore) { fallbackScore = fs; fallback = cand; }
+      plan = planInstrumentation(rawStyle);
+      continue;
+    }
     const sc = scoreVariation(cand.genStyle || rawStyle, cand) + learnedBonus(cand.genStyle || rawStyle, cand);
     if (sc > bestScore) { bestScore = sc; best = cand; }
   }
+  if (!best) best = fallback;
   return refineVariation(best.genStyle || rawStyle, best, best.barRootDegrees, best.structure.length * STEPS_PER_BAR, 1);
 }

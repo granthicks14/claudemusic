@@ -286,7 +286,59 @@ const path = require("path");
   check("a later genre pick clears the custom line-up",
     (await page.evaluate(() => userStyleActive())) === false);
 
-  console.log("\n8. No page errors");
+  console.log("\n8. The production plan");
+  // The plan must be read off the beat that exists, not off the genre's table
+  // of what it could have done - that gap is where every genre bug in this
+  // project has lived. So the test changes the beat and checks the plan
+  // follows it.
+  await page.click('.tools-tab[data-tool="plan"]');
+  const plan1 = await page.evaluate(() => {
+    selectStyle("trap");
+    return {
+      text: document.getElementById("plan-panel").textContent,
+      checks: [...document.querySelectorAll(".plan-check")].map((e) => ({
+        ok: e.classList.contains("ok"),
+        name: e.textContent.trim().slice(0, 60),
+      })),
+      key: keySelect.value,
+      bpm: tempoSlider.value,
+    };
+  });
+  check("the plan names the genre, tempo and key",
+    /Trap/.test(plan1.text) && plan1.text.includes(plan1.bpm) && plan1.text.includes(plan1.key),
+    `looking for Trap / ${plan1.bpm} / ${plan1.key}`);
+  check("the plan states a chord progression",
+    /[ivIV]+\s+–\s+[ivIV]+/.test(plan1.text),
+    (plan1.text.match(/[ivIV°]+(?:\s+–\s+[ivIV°]+)+/) || ["none found"])[0]);
+  check("the plan explains the 808 it chose",
+    /tanh saturation|hard clipping|wavefolder|clean sub|asymmetric fuzz/.test(plan1.text),
+    (plan1.text.match(/(tanh saturation|hard clipping|wavefolder|clean sub|asymmetric fuzz)[^.]*/) || ["none described"])[0]);
+  check("the plan lists checks and they hold",
+    plan1.checks.length >= 5 && plan1.checks.every((c) => c.ok),
+    plan1.checks.filter((c) => !c.ok).map((c) => c.name).join(" | ") || `${plan1.checks.length} checks, all pass`);
+
+  // Same beat, different genre: the plan has to actually change.
+  const plan2 = await page.evaluate(() => {
+    selectStyle("rock");
+    return document.getElementById("plan-panel").textContent;
+  });
+  check("the plan follows the beat rather than being boilerplate",
+    /Rock/.test(plan2) && /guitars/i.test(plan2) && !/Metro Boomin/.test(plan2),
+    plan2.slice(0, 80) + "…");
+
+  // The kit labels must name the track's own sound. The hi-hat's "bright" and
+  // the talkbox's "bright" are different kits that share a word, and the label
+  // map used to hand the hi-hat the talkbox's name.
+  const label = await page.evaluate(() => ({
+    hat: flavorLabel("bright", "hihat"),
+    talkbox: flavorLabel("bright", "talkbox"),
+    clarinet: flavorLabel("clarinet", "woodwind"),
+  }));
+  check("a kit label names the right instrument",
+    label.hat === "Bright" && label.talkbox === "Bright Talkbox" && label.clarinet === "Clarinet",
+    `hi-hat "${label.hat}", talkbox "${label.talkbox}", clarinet "${label.clarinet}"`);
+
+  console.log("\n9. No page errors");
   check("no uncaught errors", errors.length === 0, errors.slice(0, 3).join(" | "));
 
   await browser.close();

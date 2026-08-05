@@ -23,12 +23,13 @@ const vm = require("vm");
 const root = path.join(__dirname, "..");
 const FILES = ["js/theory.js", "js/instruments.js", "js/performance.js", "js/learning.js",
                "js/policy.js", "js/audio-analysis.js", "js/artists.js", "js/midi-export.js",
-               "js/patterns.js"];
+               "js/production.js", "js/patterns.js"];
 const src = FILES.map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n;\n");
 const sandbox = { module: { exports: {} }, console, JSON };
 vm.createContext(sandbox);
 const api = vm.runInContext(src + `\n;({ STYLES, FLAVOR_POOLS, flavorFitsGenre, SOLO_POOLS,
-  generateVariation, setBeatComplexity, planInstrumentation })`, sandbox, { filename: "bundle.js" });
+  generateVariation, setBeatComplexity, planInstrumentation,
+  GENRE_PLAN, WOODWIND_FAMILY_OF, WOODWIND_ALLOWED, setFlavorsForValidation })`, sandbox, { filename: "bundle.js" });
 
 const RUNS = Number(process.argv[2] || 60);
 const ONLY = process.argv.slice(3);
@@ -52,137 +53,17 @@ const ONLY = process.argv.slice(3);
 //
 // Which woodwinds a genre may load is handled separately, by family, in
 // WOODWIND_ALLOWED below - naming the whole track here bans it outright.
-const FORBIDDEN_INSTRUMENTS = {
-  // --- the hard genres -----------------------------------------------------
-  // Trap's melodic palette is bells, plucks, dark synth leads, dark piano,
-  // cinematic strings and choirs. A flute lead is genuinely part of it. A
-  // kalimba, marimba, saxophone, church organ or electric guitar is not, and
-  // a thumb piano in particular reads as a lo-fi/afrobeats sound the moment
-  // it enters.
-  trap:      ["kalimba", "marimba", "sax", "organ", "leadguitar", "guitar", "talkbox"],
-  rap:       ["kalimba", "marimba", "organ"],
-  drill:     ["kalimba", "marimba", "sax", "organ", "leadguitar", "guitar", "talkbox"],
-  // Phonk keeps the guitar - Memphis and drift phonk are built on distorted
-  // guitar samples - but nothing acoustic and pretty.
-  phonk:     ["kalimba", "marimba", "sax", "organ", "talkbox"],
-  // Jersey club is chopped vocals, a bed-squeak kick and a simple synth.
-  // There is no room in it for an orchestra.
-  jerseyclub:["kalimba", "marimba", "sax", "woodwind", "leadguitar", "guitar", "strings", "horn", "talkbox"],
-
-  // --- electronic ----------------------------------------------------------
-  // Techno is a synthesised genre by definition: any acoustic solo voice in
-  // it is a sample-library intrusion.
-  techno:    ["kalimba", "marimba", "sax", "woodwind", "leadguitar", "guitar", "horn", "talkbox"],
-  dubstep:   ["kalimba", "marimba", "sax", "woodwind", "leadguitar", "guitar", "horn", "talkbox"],
-  // Liquid drum & bass is full of saxophone and flute, so those stay. Reeds,
-  // mallets and thumb pianos do not appear on those records.
-  dnb:       ["kalimba", "marimba", "talkbox"],
-  // Synthwave's one acoustic import is the 80s sax solo, which is a real and
-  // beloved trope. Everything else is a keyboard.
-  synthwave: ["kalimba", "marimba", "woodwind", "talkbox"],
-  // UK garage: organ stabs and sax stabs are period-correct, mallets are not.
-  ukgarage:  ["kalimba", "marimba", "leadguitar"],
-  // House is the permissive one of this group - deep house really does field
-  // mallets, flutes, sax, organ and disco guitar. Only reeds are excluded.
-  house:     [],
-
-  // --- band and song genres ------------------------------------------------
-  // Rock is guitars. An autotuned lead or an arpeggiator belongs to another
-  // century, and a flute recital over a rock beat was turning up in 43% of
-  // them.
-  rock:      ["kalimba", "marimba", "autolead", "arp", "talkbox", "woodwind"],
-  // Neo-soul: Rhodes, guitar, sax, flute, organ. Not a thumb piano, and not
-  // an autotune lead - the whole genre is a reaction against that.
-  neosoul:   ["kalimba", "autolead", "arp"],
-  rnb:       ["kalimba", "arp"],
-  // Boom-bap hip hop samples soul records: organ, horns, guitar, sax and
-  // vibes are all fair game. Thumb piano is not, and neither is an
-  // arpeggiator.
-  hiphop:    ["kalimba", "arp"],
-  lofi:      ["autolead", "arp", "talkbox"],
-  // Latin percussion genres field marimba freely; the kalimba is African,
-  // not Caribbean, and reads wrong.
-  reggaeton: ["kalimba", "talkbox"],
-  // The two genuinely African/Afro-diasporic genres. Kalimba, marimba, sax
-  // and flute all belong; only the orchestral reeds are excluded.
-  afrobeats: [],
-  amapiano:  [],
-};
-
-// A genre that plays NOTHING on top is as wrong as one playing the wrong
-// thing. These are the voices each genre may use to carry its top line -
-// checked as "at least one of these was CHOSEN as a solo, in at least this
-// share of beats". It is the counterweight to the list above: without it, the
-// cheapest way to pass a forbidden-instrument check is to ban everything and
-// ship nineteen genres of drums.
-//
-// Measured on the solo picks rather than on what sounded, because those are
-// different questions. Drill comps on a piano in 100% of its beats, so "did a
-// piano play?" says nothing at all about whether the beat has a melody.
-const REQUIRED_LEAD = {
-  trap:      [["lead", "autolead", "woodwind", "piano", "strings"], 0.98],
-  rap:       [["lead", "autolead", "piano", "woodwind", "sax", "talkbox"], 0.98],
-  drill:     [["lead", "autolead", "woodwind", "piano", "strings"], 0.98],
-  phonk:     [["lead", "autolead", "leadguitar", "woodwind"], 0.98],
-  jerseyclub:[["lead", "autolead", "arp"], 0.98],
-  rock:      [["leadguitar", "lead", "organ", "piano"], 0.98],
-  techno:    [["arp", "lead"], 0.98],
-  dnb:       [["arp", "lead", "woodwind"], 0.98],
-  dubstep:   [["lead", "arp"], 0.98],
-  synthwave: [["lead", "arp", "leadguitar"], 0.98],
-  house:     [["lead", "arp", "sax", "woodwind", "marimba", "talkbox"], 0.98],
-  ukgarage:  [["lead", "arp", "sax", "woodwind"], 0.98],
-  hiphop:    [["lead", "sax", "leadguitar", "woodwind", "piano", "marimba", "horn", "talkbox"], 0.98],
-  lofi:      [["lead", "sax", "woodwind", "marimba", "kalimba", "leadguitar"], 0.98],
-  rnb:       [["sax", "woodwind", "leadguitar", "marimba", "lead", "talkbox"], 0.98],
-  neosoul:   [["leadguitar", "sax", "woodwind", "lead", "marimba", "talkbox"], 0.98],
-  reggaeton: [["lead", "woodwind", "marimba", "leadguitar"], 0.98],
-  afrobeats: [["woodwind", "marimba", "kalimba", "sax", "leadguitar", "lead"], 0.98],
-  amapiano:  [["woodwind", "sax", "lead", "marimba", "kalimba", "leadguitar"], 0.98],
-};
-
-// Woodwind is not one instrument, it is four families, and which of them a
-// genre can field is a different question per genre. A flute over a trap beat
-// is real and extremely common - it is most of the Metro Boomin catalogue. A
-// clarinet over one is not. But a clarinet over a lo-fi or boom-bap beat is
-// entirely at home, because those genres sample jazz records.
-//
-// The previous version of this file collapsed all of that into one
-// "flute-like or not" set, which meant the only two settings available were
-// "flute only" and "anything", and every genre that wanted a soprano sax had
-// to be given an oboe as well.
-const WOODWIND_FAMILIES = {
-  // Flutes and the dark end-blown winds. Duduk and shakuhachi are reed and
-  // end-blown rather than flutes, but they group here: a breathy ethnic wind
-  // carrying a minor melody is a staple of drill and phonk, not an intruder.
-  flute:      ["flute", "altoflute", "shakuhachi", "bansuri", "duduk", "piccolo",
-               "panflute", "ocarina", "tinwhistle", "dizi", "ney", "bassflute",
-               "overblown", "woodflute"],
-  // The jazz reeds. These follow sampled jazz and soul into a beat.
-  jazzreed:   ["clarinet", "bassclarinet", "sopranosax", "basset"],
-  // Orchestral double reeds. These follow sampled classical records, which
-  // is a much narrower doorway.
-  doublereed: ["oboe", "englishhorn", "bassoon", "contrabassoon"],
-  early:      ["recorder"],
-};
-const WOODWIND_FAMILY_OF = {};
-for (const [fam, list] of Object.entries(WOODWIND_FAMILIES)) {
-  for (const f of list) WOODWIND_FAMILY_OF[f] = fam;
-}
-// Which families each genre may draw on. An empty list means the woodwind
-// track has no business in the genre at all.
-const WOODWIND_ALLOWED = {
-  trap: ["flute"], rap: ["flute"], drill: ["flute"], phonk: ["flute"],
-  ukgarage: ["flute"], dnb: ["flute"],
-  jerseyclub: [], techno: [], dubstep: [], synthwave: [], rock: [],
-  hiphop: ["flute", "jazzreed"], house: ["flute", "jazzreed"],
-  reggaeton: ["flute", "jazzreed"], afrobeats: ["flute", "jazzreed"],
-  amapiano: ["flute", "jazzreed"], neosoul: ["flute", "jazzreed"],
-  // Orchestral R&B is a real tradition, so the double reeds get in here.
-  rnb: ["flute", "jazzreed", "doublereed"],
-  // Lo-fi is the one genre that samples anything at all, classical included.
-  lofi: ["flute", "jazzreed", "doublereed", "early"],
-};
+// The expectations themselves now live in js/production.js, next to the
+// runtime gate that enforces them. They used to live here, which meant this
+// audit could check the program but the PROGRAM could not check itself - and
+// a rule that only exists in a tool nobody runs before shipping is a rule the
+// generator is free to break. One source, read by both.
+const FORBIDDEN_INSTRUMENTS = {};
+for (const [g, plan] of Object.entries(api.GENRE_PLAN)) FORBIDDEN_INSTRUMENTS[g] = plan.forbidden;
+const REQUIRED_LEAD = {};
+for (const [g, plan] of Object.entries(api.GENRE_PLAN)) REQUIRED_LEAD[g] = [plan.lead, 0.98];
+const WOODWIND_FAMILY_OF = api.WOODWIND_FAMILY_OF;
+const WOODWIND_ALLOWED = api.WOODWIND_ALLOWED;
 
 // Derived rather than listed. A hardcoded set went stale the moment eight new
 // 808 kits were added, and reported every one of them as a violation - the

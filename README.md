@@ -1181,3 +1181,38 @@ The woodwind got the most on purpose: the hard genres are restricted to the flut
 **Why the test missed them.** Almost every voice randomises something per hit, which is right for music and ruinous for a comparison: it put the distance between two renders of *one* kit on the same scale as the distance between two different kits, and no threshold separates those once they overlap. Renders are now driven by a seeded PRNG, so a second render of a kit is identical to the first and a shared code path measures **exactly zero**. Three scales then separate cleanly — a clone at 0, float noise at ~1e-6, the closest genuinely-different pair at ~0.03 — and the test also fails if renders stop being reproducible, because that assumption is what the whole check rests on.
 
 `pluck-chord` was caught the same way and given the physically-modelled plucked stab its name had always promised.
+
+## The program states its plan now, and checks its own work
+
+Everything in this program made musical decisions. Nothing until now **stated** them. A beat came out, you could like it or not, and there was no way to ask "why is there a flute on this?" — nor any way for the program to check its own work before handing it over.
+
+**The Production plan tab** reports what the beat actually is: BPM, key, the chord progression as roman numerals read off the roots the generator really used, the instruments really playing with the kit each is using, the 808's character and how it is driven, the section breakdown bar by bar, and the reasoning behind each of those. Every line is read off the finished arrangement — never off the genre's table of what it *could* have done, because the gap between those two things is where every genre bug in this project has lived.
+
+**The checks are a gate, not a report.** `validateProduction()` runs inside the generator on every candidate. A candidate that fails a *hard* check — a forbidden instrument, no lead voice, a bass that is not an 808 in a genre whose low end is one, an 808 that does not follow the chord roots — is thrown away and a **fresh line-up** is drawn, since almost every hard failure is a line-up failure rather than a note-choice one.
+
+Measured, by deliberately weighting a saxophone and a kalimba into trap's solo pool and generating 80 beats:
+
+| | sax | kalimba | has a lead voice |
+|---|---|---|---|
+| gate off | 23% | 45% | 75% |
+| gate on | 1% | 0% | **100%** |
+
+The residual 1% is the documented last resort: if twelve attempts all fail, the best of them is used rather than refusing to make a beat, and the plan panel shows the failed check.
+
+**A filter, not a penalty** — and that distinction is the whole point. The candidate scorer measures *balance*: loudness, spectral spread, dynamics, a findable pulse. It has no opinion about a saxophone in a trap beat, so a well-balanced wrong beat could always outscore a slightly-worse right one. That is exactly how these problems survived several rounds of scoring. A hard failure is now a disqualification.
+
+**One source of truth.** The genre expectations moved from `tools/audit-genre-fit.js` into `js/production.js`, next to the gate that enforces them, and the audit now reads them from there. A rule that lives only in a tool nobody runs before shipping is a rule the generator is free to break.
+
+### Three things this found
+
+1. **The gate leaked.** The first version let a rejected candidate fall through into the scoring once a retry budget ran out, so it competed with the passing candidates on musical balance — and sometimes won. A forbidden saxophone still reached 15% of trap beats with the gate nominally on.
+2. **One check could never fire.** "The drums are played, not stamped" measured velocity spread across the drum lanes — but drum steps in a pattern are plain booleans, and velocity is applied downstream by the engine's metric accenting. It read a field that does not exist, so it passed silently every time. Replaced with one that measures what *is* in the pattern: whether the snare lands on beat 3 (half-time genres) or on 2 and 4 (backbeat genres), which is the clearest structural signature a drum pattern has.
+3. **Another check was simply wrong.** "The arrangement has distinct sections" failed every four-bar loop in the program. A loop is a loop; sections are a full-song concept. Song mode already produces `Intro → Verse 1 → Chorus 1 → Verse 2 → Chorus 2 → Bridge → Final Chorus → Outro`, with DJ intro and outro for house.
+
+### And a kit-label collision, in a map nobody thought to re-check
+
+Kit names are namespaced **per track** — the hi-hat's `bright` and the talkbox's `bright` are unrelated sounds that share a word. `FLAVOR_GENRES` was fixed for this two rounds ago. `FLAVOR_LABELS` never was, so the hi-hat's kit picker read **"Bright Talkbox"**. `clarinet` was also defined twice in the same object literal, and the second entry — `"Bass Clarinet"` — silently won, so every clarinet in the program read as a bass clarinet. Both fixed, labels are now track-aware, and the UI test checks a hi-hat is not called a talkbox.
+
+### What is checked and what is not
+
+The spec this was built to asks whether a listener would think a producer made the beat. That is not decidable by a program, and pretending otherwise would make the checks a lie. What *is* decidable is checked and enforced: instruments belonging to the genre, the woodwind family, a lead voice existing, the bass being an 808 and following the chord roots, the snare landing where the genre puts it, the melody restating a motif rather than wandering, sections differing. Everything else is reported as fact for a person to judge.

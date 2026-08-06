@@ -239,12 +239,63 @@ function measureAudio(channels, sampleRate) {
 // Genre loudness targets. Streaming platforms normalise to about -14 LUFS,
 // but the level a mix is BUILT at differs by genre: hip-hop and electronic
 // records are made hot and dense, acoustic and jazz records are not.
+// What "correct" looks like structurally, per genre.
+//
+// The density, pulse and harmonic-movement targets below started as one set
+// of numbers aimed at a dense, drum-led, chord-changing record. That is the
+// right default - most of what this program makes is one of those - but it
+// is measurably the wrong yardstick for the genres whose identity IS the
+// absence of those things. Ambient scored 48/100 while doing exactly what
+// ambient does: marked down for a drum grid it is not supposed to fill, a
+// pulse it is not supposed to have, and a chord progression it is not
+// supposed to move through. Those are the genre, not faults in it - the same
+// argument LOUDNESS_TARGET already makes about level.
+//
+// The bar for adding an entry here is that the genre's records genuinely
+// measure differently, not that the program scores badly in it. Only four
+// qualify; the other twenty-seven keep the defaults.
+const SHAPE_DEFAULT = {
+  density: [0.26, 0.13],   // share of the drum grid filled: centre, tolerance
+  layers: [9, 4],          // active parts
+  pulse: [0.10, 0.55],     // salience ramp: floor, full marks
+  harmony: [0, 0.6],       // share of bar lines that change chord: ramp
+};
+const GENRE_SHAPE = {
+  // Ambient has no backbeat and often no drums at all, and a two-chord drift
+  // held for eight bars is the form, not a failure to write a progression.
+  ambient:    { density: [0.06, 0.07], layers: [6, 3], pulse: [0.02, 0.30], harmony: [0, 0.25] },
+  // An orchestra keeps time with a conductor, not a kick drum. Timpani and a
+  // bass drum on structural downbeats is the whole percussion part.
+  orchestral: { density: [0.12, 0.09], layers: [8, 4], pulse: [0.05, 0.40], harmony: [0, 0.5] },
+  // Trailer music is built on long swells over a slow harmonic floor.
+  cinematic:  { density: [0.14, 0.10], layers: [8, 4], pulse: [0.06, 0.42], harmony: [0, 0.4] },
+  // Jazz keeps time on a ride cymbal and brushes. There is a pulse, but it
+  // is nothing like the machine pulse a four-on-the-floor record has.
+  jazz:       { pulse: [0.08, 0.48] },
+};
+function shapeFor(genre, key) {
+  const g = GENRE_SHAPE[genre];
+  return (g && g[key]) || SHAPE_DEFAULT[key];
+}
+
 const LOUDNESS_TARGET = {
   hiphop: -9, trap: -8, drill: -8, rap: -8.5, phonk: -8, jerseyclub: -8,
   house: -9, techno: -8.5, dnb: -8, dubstep: -7.5, ukgarage: -9, amapiano: -9,
   rock: -10, reggaeton: -8.5, afrobeats: -9.5, synthwave: -10,
   lofi: -13, rnb: -11, neosoul: -12,
   _default: -10,
+  rage: -8,
+  pluggnb: -9,
+  pop: -9.5,
+  metal: -9,
+  jazz: -14,
+  edm: -8,
+  country: -11,
+  orchestral: -16,
+  cinematic: -13,
+  funk: -11,
+  soul: -12,
+  ambient: -18,
 };
 
 // Mastered or not?
@@ -339,8 +390,9 @@ function rateAudio(channels, sampleRate, opts = {}) {
   }
 
   // A beat should have a findable tempo and a findable key.
+  const pTarget = shapeFor(genre, "pulse");
   add("pulse", "Rhythmic clarity", 1.3,
-    m.bpm === null ? 0 : rampTerm(m.pulseSalience, 0.10, 0.55),
+    m.bpm === null ? 0 : rampTerm(m.pulseSalience, pTarget[0], pTarget[1]),
     m.bpm ? `${m.bpm} BPM, pulse strength ${m.pulseSalience.toFixed(2)}` : "no clear pulse");
   add("tonal", "Tonal clarity", 0.9, rampTerm(m.keyConfidence, 0.25, 0.75),
     m.key ? `${m.key.tonic} ${m.key.mode} (r=${m.keyConfidence.toFixed(2)})` : "no clear key");
@@ -358,6 +410,7 @@ function rateAudio(channels, sampleRate, opts = {}) {
 // whether the harmony makes sense, and a pattern can tell you the harmony
 // makes sense but nothing about how it will sound once rendered.
 function ratePattern(style, pattern) {
+  const genreId = (style && (style.id || style.genre)) || null;
   const terms = [];
   const add = (key, label, weight, g, detail) => {
     if (g === null || g === undefined || !isFinite(g)) return;
@@ -389,7 +442,8 @@ function ratePattern(style, pattern) {
     for (const x of t) { slots++; if (x) on++; }
   }
   const density = slots ? on / slots : 0;
-  add("density", "Drum density", 1.0, gaussianTerm(density, 0.26, 0.13), `${(density * 100).toFixed(0)}% of the grid`);
+  const dTarget = shapeFor(genreId, "density");
+  add("density", "Drum density", 1.0, gaussianTerm(density, dTarget[0], dTarget[1]), `${(density * 100).toFixed(0)}% of the grid`);
 
   // Downbeat anchoring - a beat whose pulse cannot be found is not
   // sophisticated, it is broken.
@@ -404,7 +458,8 @@ function ratePattern(style, pattern) {
 
   // How many parts are playing. Too few is thin, too many is mud.
   const layers = Object.keys(inst).filter((k) => Array.isArray(inst[k]) && inst[k].some(Boolean)).length;
-  add("layers", "Arrangement size", 0.9, gaussianTerm(layers, 9, 4), `${layers} active parts`);
+  const lTarget = shapeFor(genreId, "layers");
+  add("layers", "Arrangement size", 0.9, gaussianTerm(layers, lTarget[0], lTarget[1]), `${layers} active parts`);
 
   // Harmonic movement.
   const roots = pattern.barRootDegrees || [];
@@ -420,7 +475,8 @@ function ratePattern(style, pattern) {
   // no upper limit at this resolution: one chord per bar is the ceiling the
   // measurement can even see, so anything from 60% of bars upward is full
   // marks and a static loop is what actually scores low.
-  add("harmony", "Harmonic movement", 0.9, rampTerm(hr, 0, 0.6),
+  const hTarget = shapeFor(genreId, "harmony");
+  add("harmony", "Harmonic movement", 0.9, rampTerm(hr, hTarget[0], hTarget[1]),
     `${(hr * 100).toFixed(0)}% of bars change chord`);
 
   // Melodic range - enough to be a line, not so much it stops being singable.

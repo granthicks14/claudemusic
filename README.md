@@ -1,6 +1,6 @@
 # Beat Studio
 
-Describe the beat you want in plain English, or pick from 19 genres, and get either a quick loop or a full ~2-minute song with a real intro/verse/chorus/bridge/outro arrangement — drums, bass, piano, organ, lead, guitar, kalimba, marimba, arp, strings, horns, vocal chops, pads, synth stabs, and FX — then edit and mix it like a mini DAW, right in the browser, and export it as a vertical video for Reels/TikTok/Shorts. Everything is synthesized live with the Web Audio API; no audio files or dependencies required.
+Describe the beat you want in plain English, or pick from 31 genres, and get either a quick loop or a full ~2-minute song with a real intro/verse/chorus/bridge/outro arrangement — drums, bass, piano, organ, lead, guitar, kalimba, marimba, arp, strings, horns, vocal chops, pads, synth stabs, and FX — then edit and mix it like a mini DAW, right in the browser, and export it as a vertical video for Reels/TikTok/Shorts. Everything is synthesized live with the Web Audio API; no audio files or dependencies required.
 
 ## Run it
 
@@ -102,7 +102,7 @@ This is genuinely conditional, not decoration: a genre like Drill or Lo-Fi that'
 
 ## Genres
 
-Nineteen styles, each modeled on real production conventions researched for this build, with instrumentation chosen to actually fit the genre (no synth stabs on a rock track, no four-on-the-floor kick pretending to be a dembow):
+Thirty-one styles, each modeled on real production conventions researched for this build, with instrumentation chosen to actually fit the genre (no synth stabs on a rock track, no four-on-the-floor kick pretending to be a dembow):
 
 - **Hip-Hop** — boom bap kick/snare, ~58%-swing hi-hats, a soulful sustained melody and pitched string stabs (Kanye-style soul-sample chord loops).
 - **Trap** — sparse kick, sliding 808, rolling hi-hats, a spacious bell hook (Metro Boomin-style restraint).
@@ -123,6 +123,23 @@ Nineteen styles, each modeled on real production conventions researched for this
 - **UK Garage** *(new)* — the 2-step signature is a *missing* drum: **no kick on beat 3**, which is exactly what gives garage its skippy, off-balance bounce, plus the heaviest shuffle in the app (22%), chopped pitched vocal stabs, and a warm sub.
 - **Techno** *(new)* — deliberately distinct from House: darker, harder, more hypnotic and minimal, with **near-static harmony** (some progressions are a single held root — the groove and timbre carry a techno track, not chord changes), a relentless 909 four-on-the-floor, offbeat open hats, and an acid TB-303 line as the default bass.
 - **Neo-Soul** *(new)* — the D'Angelo/Erykah Badu school, distinct from R&B/Soul: the **"drunk" behind-the-beat drum feel** (14ms timing humanization, the highest in the app — the J Dilla drag), genuinely richer harmony (5-note stacked-third voicings = real 9th chords, which plain triads and 7ths never reach), and a jazz guitar as a second melodic voice.
+
+### Twelve more styles
+
+Added in one pass, each wired through the same machinery as the original nineteen rather than bolted on: its own tempo range and mode pool, harmonic rhythm, drum grooves, solo-instrument weighting, kit palette, loudness target, eight reference songs and four artist profiles.
+
+- **Rage** *(new)* — the Opium sound: a filthy, hard-clipped 808 under a distorted phase-distortion lead, and deliberately almost nothing else. Half-time snare on beat 3, sixteenth hats, one long 808 per chord so the distortion has room to be the loudest thing in the record.
+- **PluggnB** *(new)* — plugg's dreamy R&B cousin (SlayWorld: Summrs, Autumn!, Kankan, Ka$hdami). The opposite end of the 808 family from rage: round, barely-driven, gliding between chord tones, under detuned bells and Rhodes.
+- **Pop** *(new)* — bass as support rather than feature, steady eighths under the vocal range, backbeat on 2 and 4, and the widest kit palette in the app.
+- **Metal** *(new)* — the rhythm guitar is the riff: chugging eighths and sixteenths voiced as **power chords** (a fifth, no third — which is exactly why they survive that much distortion), double-kick under a backbeat, bass doubling the riff rather than writing against it.
+- **Jazz** *(new)* — a real **walking bass**: one note per beat, essentially no rests, and chromatic approach weighted heavier than anywhere else in the program, because in jazz the passing tone is the point rather than a decoration. Brushed/jazz kit, ride cymbal, tenor sax and trumpet on top.
+- **EDM** *(new)* — four-on-the-floor with a sidechained pulse bass, supersaw leads, and a near-continuous sixteenth-note trance arp where the filter and the chord change carry the interest rather than the note choice.
+- **Country** *(new)* — root-fifth alternating bass, strummed open-position acoustic, brushed hats, twang lead guitar and honky-tonk piano.
+- **Orchestral** *(new)* — the double-bass section moves slowly and holds; violins, woodwinds and horns sit an octave above it. Timpani and a bass drum on structural downbeats is the whole percussion part.
+- **Cinematic** *(new)* — trailer music: a sub pedal in whole notes, low brass, and **taiko toms answering the kick rather than doubling it**, which is what makes trailer percussion feel enormous.
+- **Funk** *(new)* — the bass IS the lead: syncopated sixteenths, wide intervals, heavy rests to leave the one exposed, and the highest variation rate of any bass part here. Clav, wah guitar chanks and a horn section answering rather than leading.
+- **Soul** *(new)* — melodic electric bass with enough non-chord tone to sound like a player answering the vocal, gospel organ, Rhodes, string swells and a horn section.
+- **Ambient** *(new)* — a drone: one bass note per phrase, held. No snare at all, near-static harmony, and the piano and strings placed above the drone's own octave because they are the only things carrying pitch.
 
 ## Master-bus "grit": genres that are supposed to sound driven
 
@@ -1428,3 +1445,71 @@ Genuinely absent, and named in the brief. The final-chorus lift is the oldest de
 Applied in `midiForDegree`, because that is the single funnel every pitched note in the program passes through. Anywhere else would modulate some parts and not others, which is not a key change — it is a wrong note in every bar of it. Returned as a per-bar semitone offset rather than by rewriting notes, which would have to rewrite bass, chords and melody consistently and would go wrong the first time one was missed.
 
 Full-song mode only, on the final chorus and outro only, in about two songs in five — a device, not a formula. Measured: **0 bars lifted anywhere else.**
+
+## Round 16: twelve more genres, and four bugs the genres exposed
+
+Adding rage, PluggnB, pop, metal, jazz, EDM, country, orchestral, cinematic, funk, soul and ambient meant running twelve genres through every table in the program at once, which is a good way to find the places where a rule was written down twice.
+
+### The woodwind palette was two lists that had already drifted apart
+
+`patterns.js` hand-kept two constants, `WW_FLUTE` and `WW_FLUTE_JAZZ`, next to a completely separate per-genre family table, `WOODWIND_ALLOWED`, in `production.js`. Two sources for one rule. The twelve new genres desynced them immediately: pop, country and funk declared "flute and jazz reeds only" in one file while the other left their pool wide open, so all three could load an **oboe or a contrabassoon**. The audit caught it; nothing in the program would have.
+
+The palette is now *derived* from `WOODWIND_ALLOWED` — one list, in one place. `patterns.js` throws if `production.js` was not loaded first, deliberately, rather than silently skipping the derivation: three tools were bundling `patterns.js` without `production.js` and would have been measuring a program that is not the one that ships.
+
+### Swing was rushing the offbeat and slowing the tempo
+
+The scheduler only ever *added* time, to odd steps:
+
+```js
+let duration = this.stepDuration();
+if (step % 2 === 1) duration += this.swing * this.stepDuration();
+```
+
+That gets both halves of swing wrong at once. Measured at swing 0.30, over a 16-step bar:
+
+| | downbeats land at | offbeat sits at |
+|---|---|---|
+| before | 0, 4.6, 9.2 | **43.5%** of its pair |
+| after | 0, 4.0, 8.0 | **65.0%** of its pair |
+
+Every downbeat after the first drifted late, so a bar ran 15% longer than the tempo said and the whole beat played slow. And because the pair got longer while the offbeat stayed at one step, the offbeat landed *early* inside its own pair — a rush, the exact opposite of swing.
+
+A pair now always spans two steps: the downbeat is stretched by `s` and the offbeat shortened by the same amount. The grid survives, and `s = 1/3` is exactly triplet swing, which is what the word means. The ceiling moved from 30% to 33% so a jazz profile can actually reach the feel it is named for.
+
+### Twenty artist profiles were dead
+
+`ARTIST_PROFILES` is an object literal, and twenty keys were written twice — `Object.keys` cannot see that, the later entry just wins, and the earlier one vanishes. Two of the losers were profiles written for brand-new genres, which then reported as under-served with no hint as to why. Fourteen were same-genre accidents; six were cross-genre and got resolved on the merits (Playboi Carti to rage, Avicii to EDM, Kanye and 9th Wonder to hip-hop, Kaytranada to house, the Neptunes to hip-hop). `test-content.js` now scans the *source*, since that is the only place a duplicate is visible.
+
+### The orchestral family was 96% low end with the tune buried under it
+
+Measured across ambient, orchestral and cinematic: the sub and low bands held 96%+ of the energy, and the midrange — where the ear reads detail — came out at **2–4%**, roughly 17dB down. Two causes, both real:
+
+- **Register.** Strings and horns sit at register 10, which over the C2 root these genres use puts a film-score string line around 200Hz — a cello, not the violins the line is meant to be. `REGISTER_SHIFT` now lets a genre move an instrument without moving it everywhere else.
+- **Level.** The default table is built for a record whose bass *is* the record — an 808 at 1.0, the loudest thing in the mix. That is right for trap and wrong for an orchestra. `GENRE_TRACK_VOLUME` overrides only the three genres that measurably needed it; a level the user moved by hand is never taken back.
+
+Mid-band share on cinematic went from 2/3/3% across three renders to 3/20/29%.
+
+### The rater was judging every genre as if it were a drum record
+
+The density, pulse, layer-count and harmonic-movement targets were one set of numbers aimed at a dense, drum-led, chord-changing record. Ambient scored **48/100 while doing exactly what ambient does** — marked down for a drum grid it is not supposed to fill, a pulse it is not supposed to have, and a progression it is not supposed to move through. Those are the genre, not faults in it, which is the same argument `LOUDNESS_TARGET` already made about level.
+
+`GENRE_SHAPE` gives four genres their own targets (ambient, orchestral, cinematic, jazz); the other twenty-seven keep the defaults. The bar for an entry is that the genre's records genuinely measure differently, not that the program scores badly in it — and the rater still rejects broken patterns just as hard inside the lenient genres:
+
+| genre | real beat | empty | one chord, one note |
+|---|---|---|---|
+| ambient | 83.6 | 16.0 | 44.4 |
+| orchestral | 76.4 | 10.8 | 38.7 |
+| cinematic | 69.3 | 10.3 | 37.0 |
+| jazz | 94.1 | 8.1 | 29.6 |
+
+### Also fixed along the way
+
+- **A track cannot be both a mono line and a chord part.** Metal, country, funk and cinematic each listed one instrument in both; the chord pass runs second and overwrote the melody, so the mono config was dead weight. Funk's rhythm guitar was also in the *solo* pool despite being always-on, which is why 8% of funk beats had no lead voice at all over the vamp.
+- **Non-Latin song titles were unsearchable.** `normalise()` stripped everything outside `[a-z0-9]`, which reduces a fully Cyrillic, Japanese or Korean title to the empty string. Now Unicode-aware.
+- **Two song validators were wrong, not the data.** "Giant Steps" really is ~290 BPM and "Tennessee Whiskey" really is ~49; a catalogue that now covers Pachelbel needs a year floor earlier than 1900.
+- **Twelve catalogue entries named tracks that do not exist.** Checked against real tracklists and replaced — Destroy Lonely's *If Looks Could Kill* has no "Fake Love", Biosphere's *Substrata* has no title track, and Hammock has no Cyrillic-titled song.
+- **Four trailer-composer profiles asked for a taiko on a track that has never had one.** Taiko is a tom kit and cinematic had no tom track — despite the genre's own description saying "low strings, brass swells and taiko". Cinematic now has one.
+- **Three genres' own default kit was outside their own strict palette** (rock and neo-soul's `pluck` bass, drum & bass's acoustic kick), so the default silently lost to a shuffle.
+- **`crash` has no flavor pool at all**, so the `crash: "bright"` defaults two new genres carried were dead config.
+
+Overall score across all 31 genres: **71.1 ± 1.5** (95% CI, 93 beats), with the spread tightening from sd 9.4 to 7.2. The aggregate move is inside the noise threshold at this sample size; what is not inside it is ambient going 44 → 56 and the mid-band starvation being gone.

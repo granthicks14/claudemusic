@@ -207,6 +207,114 @@ const GENRE_PLAN = {
     groove: "112–115, shuffled, spacious",
     notes: "A soprano sax or a flute over amapiano is the sound. An oboe belongs to a different record entirely.",
   },
+  rage: {
+    lead: ["lead","autolead","woodwind"],
+    forbidden: ["kalimba","marimba","sax","organ","leadguitar","guitar","talkbox"],
+    drums: "808 kick, snare on 3, hats in bursts with hard rolls",
+    chords: "one or two chords, minor, held for bars at a time - the space is the point",
+    bass: "a heavily distorted 808, often the loudest thing in the mix",
+    groove: "half-time at 150-165, everything hanging off beat 3",
+    notes: "Rage is deliberately, aggressively sparse: a distorted synth lead, an 808 pushed past the point of politeness, and almost nothing else. Anything pretty is out of place by construction.",
+  },
+  pluggnb: {
+    lead: ["lead","autolead","piano","marimba","woodwind"],
+    forbidden: ["sax","organ","leadguitar","guitar","kalimba","talkbox"],
+    drums: "808 kick with a soft clap, light rolls, nothing aggressive",
+    chords: "dorian sevenths and ninths - the harmony is warmer than trap's and that is the whole distinction",
+    bass: "a round, detuned 808 with little drive",
+    groove: "swung 130-145, spacious",
+    notes: "Plugg's R&B cousin: detuned bells and soft plucks, major-leaning dorian colour, and an 808 that is felt rather than heard. The point is dreaminess - anything harsh belongs to trap instead.",
+  },
+  pop: {
+    lead: ["lead","piano","arp","leadguitar","sax","woodwind"],
+    forbidden: ["kalimba","talkbox"],
+    drums: "punchy kick, clap layered on the backbeat, straight or lightly rolled hats",
+    chords: "four chords, diatonic, almost always I-V-vi-IV or a rotation of it",
+    bass: "a synth bass following the root, straight eighths",
+    groove: "straight, 100-130, the backbeat unmissable",
+    notes: "Pop is built to be sung back, so everything serves the hook: a four-chord loop, a clear top line in a singable register, and an arrangement that gets out of its way.",
+  },
+  metal: {
+    lead: ["leadguitar","lead","organ"],
+    forbidden: ["kalimba","marimba","autolead","arp","talkbox","woodwind","sax","vocal"],
+    drums: "double-kick under a hard backbeat, tight metallic hats, real toms for fills",
+    chords: "power chords - roots and fifths - moving in Phrygian, the b2 doing the work",
+    bass: "a distorted electric locked to the guitar's rhythm, note for note",
+    groove: "dead straight and fast; the aggression is in the density, not the swing",
+    notes: "Metal is guitars and drums. The riff is the song, the bass doubles it, and there is no room for anything decorative - a pad or a mallet in here is a different record.",
+  },
+  jazz: {
+    lead: ["sax","piano","horn","woodwind","leadguitar"],
+    forbidden: ["autolead","arp","kalimba","talkbox"],
+    drums: "brushes on the snare, the ride carrying the pulse, kick used for accents not time",
+    chords: "ii-V-I everywhere, sevenths and ninths minimum, chords changing every bar or faster",
+    bass: "an upright walking in quarter notes between chord tones",
+    groove: "heavily swung - the eighth notes are triplets, and that is not optional",
+    notes: "Jazz is the one genre here where the harmony moves faster than anything else and the drums stay out of its way. Brushes, a walking upright, comping piano, and a horn on the head.",
+  },
+  edm: {
+    lead: ["lead","arp","autolead"],
+    forbidden: ["kalimba","marimba","sax","woodwind","leadguitar","guitar","horn","talkbox"],
+    drums: "four-to-the-floor, clap on the backbeat, open hat on the off-beat",
+    chords: "four bars of minor, the same four every time, because the drop is the event",
+    bass: "a sidechained reese or saw, ducking hard under every kick",
+    groove: "dead straight at 128 - the pump is the groove",
+    notes: "EDM is an arrangement genre: the chords and the riff are simple on purpose because the whole shape is tension and release. Supersaws, sidechain, and a riser into every drop.",
+  },
+  country: {
+    lead: ["leadguitar","piano","woodwind","lead","guitar"],
+    forbidden: ["autolead","arp","kalimba","talkbox","marimba","organ"],
+    drums: "a real kit played lightly - brushes or rods, the kick keeping time rather than punching",
+    chords: "I-IV-V and its rotations, major, plain and unembarrassed about it",
+    bass: "a played electric or upright on the root and fifth",
+    groove: "a light shuffle at 90-130, the backbeat relaxed",
+    notes: "Country is an acoustic guitar, a lead that bends into its notes, and a rhythm section that stays out of the way of the words.",
+  },
+  orchestral: {
+    lead: ["woodwind","strings","horn","piano"],
+    forbidden: ["autolead","arp","talkbox","kalimba","leadguitar","guitar","sax"],
+    drums: "timpani and a concert bass drum marking structure, not keeping time",
+    chords: "functional tonal harmony - I-IV-V-I and its relatives, resolved properly",
+    bass: "a double-bass section doubling the cellos",
+    groove: "rubato-leaning; the pulse is felt rather than hammered",
+    notes: "Written for a room. The strings carry the harmony, the horns carry weight, and the woodwinds carry the line - and none of it wants a drum machine anywhere near it.",
+  },
+  cinematic: {
+    lead: ["strings","horn","woodwind","piano","pad"],
+    forbidden: ["autolead","arp","talkbox","kalimba","marimba","leadguitar","guitar","sax"],
+    drums: "taiko and a deep kick marking the swell, snare used once and meaningfully",
+    chords: "two or three minor chords held for bars - the harmony is a bed, not an event",
+    bass: "a sub doubling the low strings",
+    groove: "slow and enormous; every hit is an arrival",
+    notes: "Trailer music. It works by scale rather than by detail - low strings, brass swells and one drum that sounds like a building falling over.",
+  },
+  funk: {
+    lead: ["horn","organ","sax","piano","leadguitar"],
+    forbidden: ["autolead","arp","kalimba","talkbox"],
+    drums: "the one is everything - a hard kick on beat 1, ghost notes everywhere else, 16th hats",
+    chords: "one or two chords, dominant sevenths and ninths, vamped rather than progressed",
+    bass: "slap, syncopated, and the most important instrument in the room",
+    groove: "16th-note swung, everything pushing and pulling around the downbeat",
+    notes: "Funk is a rhythm genre wearing harmony as a hat: one chord, a bass line that is the actual song, and horns answering rather than leading.",
+  },
+  soul: {
+    lead: ["sax","organ","horn","piano","leadguitar","woodwind"],
+    forbidden: ["autolead","arp","kalimba","talkbox"],
+    drums: "a real kit, behind the beat, ghost notes on the snare and a tambourine on the backbeat",
+    chords: "sevenths and ninths with real voice leading - ii-V motion and gospel movement",
+    bass: "a fingered electric, melodic, walking between roots",
+    groove: "swung and laid back; the whole point is that it leans",
+    notes: "Rhodes, Hammond, horn stabs and strings. Soul is played by people slightly behind the click, and everything about the arrangement serves a vocal that is not there.",
+  },
+  ambient: {
+    lead: ["piano","woodwind","strings","marimba","pad"],
+    forbidden: ["autolead","arp","talkbox","leadguitar","sax","organ"],
+    drums: "barely any - a soft kick marking a bar, maybe a shaker, often nothing at all",
+    chords: "two chords, held for four bars each, moving as slowly as the ear will tolerate",
+    bass: "a sustained sub with no attack",
+    groove: "there is no groove, and that is the genre",
+    notes: "Ambient treats space as the instrument. Everything is long, quiet and slow, and the most common correct decision is to leave something out.",
+  },
 };
 
 // Which woodwind families each genre may field. A flute over trap is real; a
@@ -234,11 +342,23 @@ const WOODWIND_ALLOWED = {
   amapiano: ["flute", "jazzreed"], neosoul: ["flute", "jazzreed"],
   rnb: ["flute", "jazzreed", "doublereed"],
   lofi: ["flute", "jazzreed", "doublereed", "early"],
+  rage: ["flute"],
+  pluggnb: ["flute"],
+  pop: ["flute","jazzreed"],
+  metal: [],
+  jazz: ["flute","jazzreed","doublereed"],
+  edm: [],
+  country: ["flute","jazzreed"],
+  orchestral: ["flute","jazzreed","doublereed","early"],
+  cinematic: ["flute","jazzreed","doublereed"],
+  funk: ["flute","jazzreed"],
+  soul: ["flute","jazzreed","doublereed"],
+  ambient: ["flute","jazzreed","doublereed","early"],
 };
 
 // The genres whose bass IS an 808. An upright double bass in a trap beat is
 // not a variation on trap, it is a different genre.
-const EIGHT_OH_EIGHT_GENRES = new Set(["trap", "rap", "drill", "phonk", "jerseyclub"]);
+const EIGHT_OH_EIGHT_GENRES = new Set(["trap", "rap", "drill", "phonk", "jerseyclub", "rage", "pluggnb"]);
 const BASS_808_EXTRA = new Set(["sub", "drillslide", "distorted", "growl"]);
 const is808Kit = (f) => /808/.test(f || "") || BASS_808_EXTRA.has(f);
 
@@ -360,8 +480,9 @@ function validateProduction(pattern, style, flavors) {
   // put it on 2 and 4. Getting that wrong does not sound like a variation, it
   // sounds like a different genre, and it is the single clearest structural
   // signature a drum pattern has.
-  const HALF_TIME = new Set(["trap", "drill", "phonk", "dubstep"]);
-  const BACKBEAT = new Set(["rap", "hiphop", "rock", "rnb", "neosoul", "lofi", "house", "synthwave"]);
+  const HALF_TIME = new Set(["trap", "drill", "phonk", "dubstep", "rage", "cinematic"]);
+  const BACKBEAT = new Set(["rap", "hiphop", "rock", "rnb", "neosoul", "lofi", "house", "synthwave",
+                            "pluggnb", "pop", "metal", "jazz", "edm", "country", "funk", "soul"]);
   const snare = inst.snare || [];
   if (snare.length >= 16 && (HALF_TIME.has(id) || BACKBEAT.has(id))) {
     const perBar = 16;

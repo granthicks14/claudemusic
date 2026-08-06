@@ -16,7 +16,7 @@ const fs = require("fs"), vm = require("vm"), path = require("path");
 const ROOT = path.join(__dirname, "..");
 const ctx = { Math, console, Date, JSON, localStorage: null };
 vm.createContext(ctx);
-for (const f of ["theory.js", "instruments.js", "performance.js", "learning.js", "artists.js", "policy.js", "patterns.js"]) {
+for (const f of ["theory.js", "instruments.js", "performance.js", "learning.js", "artists.js", "policy.js", "production.js", "patterns.js"]) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, "js", f), "utf8"), ctx);
 }
 const R = (code) => vm.runInContext(code, ctx);

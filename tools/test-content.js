@@ -16,7 +16,7 @@ const vm = require("vm");
 const root = path.join(__dirname, "..");
 const FILES = ["js/theory.js", "js/instruments.js", "js/performance.js", "js/learning.js",
                "js/policy.js", "js/audio-analysis.js", "js/artists.js", "js/midi-export.js",
-               "js/patterns.js"];
+               "js/production.js", "js/patterns.js"];
 const src = FILES.map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n;\n");
 const sandbox = { module: { exports: {} }, console, JSON };
 vm.createContext(sandbox);
@@ -37,6 +37,24 @@ const note = (artist, msg) => { problems.push(`${artist}: ${msg}`); failures++; 
 
 const names = Object.keys(ARTIST_PROFILES);
 console.log(`\nChecking ${names.length} artist profiles\n`);
+
+// Object.keys cannot see a key written twice - the later entry just wins and
+// the earlier one vanishes. Twenty profiles had been lost that way, including
+// two written for brand-new genres that then reported as under-served with no
+// hint as to why. The only place the duplicate is visible is the source, so
+// that is where it gets checked.
+{
+  const seen = new Map();
+  const artistSrc = fs.readFileSync(path.join(root, "js", "artists.js"), "utf8");
+  const re = /\n {2}"([^"]+)": \{\n {4}genre: "(\w+)"/g;
+  let m;
+  while ((m = re.exec(artistSrc))) {
+    if (seen.has(m[1])) {
+      note(m[1], `defined twice (as ${seen.get(m[1])} and ${m[2]}) — the first is dead`);
+    }
+    seen.set(m[1], m[2]);
+  }
+}
 
 for (const name of names) {
   const p = ARTIST_PROFILES[name];
@@ -62,7 +80,7 @@ for (const name of names) {
   if (!p.keys || !p.keys.length) note(name, "no keys");
 
   if (!(p.complexity >= 1 && p.complexity <= 10)) note(name, `complexity ${p.complexity} out of 1-10`);
-  if (!(p.swing >= 0 && p.swing <= 30)) note(name, `swing ${p.swing} out of 0-30`);
+  if (!(p.swing >= 0 && p.swing <= 33)) note(name, `swing ${p.swing} out of 0-33`);
   if (!p.notes) note(name, "no notes line");
 
   // THE BIG ONE: a kit named on a track that does not carry it is dropped
@@ -184,8 +202,8 @@ const snote = (m) => { songProblems.push(m); failures++; };
 const seen = new Map();
 for (const s of SONG_DB) {
   if (!STYLES[s.g]) snote(`"${s.t}" has unknown genre "${s.g}"`);
-  if (!(s.bpm >= 50 && s.bpm <= 220)) snote(`"${s.t}" has implausible tempo ${s.bpm}`);
-  if (!(s.y >= 1900 && s.y <= 2030)) snote(`"${s.t}" has implausible year ${s.y}`);
+  if (!(s.bpm >= 40 && s.bpm <= 300)) snote(`"${s.t}" has implausible tempo ${s.bpm}`);
+  if (!(s.y >= 1600 && s.y <= 2030)) snote(`"${s.t}" has implausible year ${s.y}`);
   if (!s.a) snote(`"${s.t}" has no artist`);
   // A key is optional, but if present it has to parse - the whole beat gets
   // built around it.

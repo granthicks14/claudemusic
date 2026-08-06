@@ -25,6 +25,317 @@
 //   notes       what actually characterises it, in one line
 
 const ARTIST_PROFILES = {
+  // ---- rage
+  "playboi carti": {
+    genre: "rage", tempo: [148, 162], keys: ["F", "C#", "G"], scale: "minor",
+    complexity: 6, swing: 2, kits: {"kick": "808", "snare": "trapsnap", "hihat": "sizzle", "bass": "rage808"},
+    solos: ["lead", "autolead"],
+    notes: "Sparse to the point of empty, a distorted lead and an 808 that dominates everything.",
+  },
+  "ken carson": {
+    genre: "rage", tempo: [150, 168], keys: ["G", "D#", "A#"], scale: "minor",
+    complexity: 7, swing: 2, kits: {"kick": "808", "snare": "trapsnap", "hihat": "sizzle", "bass": "grimy808"},
+    solos: ["lead"],
+    notes: "Faster and denser than Carti, hats constantly rolling.",
+  },
+  "destroy lonely": {
+    genre: "rage", tempo: [145, 160], keys: ["C#", "F#", "A"], scale: "minor",
+    complexity: 6, swing: 3, kits: {"kick": "808", "snare": "clap", "hihat": "bright", "bass": "distort808"},
+    solos: ["lead", "autolead"],
+    notes: "Melodic rage - the lead is a hook rather than a texture.",
+  },
+  "f1lthy": {
+    genre: "rage", tempo: [150, 165], keys: ["F", "A#", "D"], scale: "phrygian",
+    complexity: 8, swing: 2, kits: {"kick": "808", "snare": "trapsnap", "hihat": "sizzle", "bass": "rage808"},
+    solos: ["lead"],
+    notes: "The producer who defined the sound: everything distorted, nothing pretty.",
+  },
+
+  // ---- pluggnb
+  "summrs": {
+    genre: "pluggnb", tempo: [130, 145], keys: ["D#", "G", "A#"], scale: "dorian",
+    complexity: 5, swing: 7, kits: {"kick": "808", "snare": "clap", "hihat": "bright", "bass": "detuned808"},
+    solos: ["lead", "piano"],
+    notes: "Detuned bells, soft 808, dreamy and warm.",
+  },
+  "autumn!": {
+    genre: "pluggnb", tempo: [128, 142], keys: ["F", "C", "G#"], scale: "dorian",
+    complexity: 5, swing: 8, kits: {"kick": "808", "snare": "clap", "hihat": "tick", "bass": "glide808"},
+    solos: ["lead", "marimba"],
+    notes: "The originator of plugg's melodic side - bright plucks over almost no drums.",
+  },
+  "nettspend": {
+    genre: "pluggnb", tempo: [135, 150], keys: ["A#", "D#", "F#"], scale: "minor",
+    complexity: 6, swing: 5, kits: {"kick": "808", "snare": "trapsnap", "hihat": "bright", "bass": "true808"},
+    solos: ["lead", "autolead"],
+    notes: "Harder than most plugg, but the bells stay.",
+  },
+  "ka$hdami": {
+    genre: "pluggnb", tempo: [132, 146], keys: ["C", "G", "D"], scale: "dorian",
+    complexity: 6, swing: 6, kits: {"kick": "808", "snare": "clap", "hihat": "bright", "bass": "detuned808"},
+    solos: ["autolead", "lead"],
+    notes: "Melodic and fast, autotune carrying the hook.",
+  },
+
+  // ---- pop
+  "max martin": {
+    genre: "pop", tempo: [100, 128], keys: ["C", "G", "A"], scale: "major",
+    complexity: 5, swing: 2, kits: {"kick": "punch", "snare": "clap", "hihat": "bright", "bass": "synth"},
+    solos: ["lead", "piano"],
+    notes: "The four-chord chorus, engineered to be inescapable.",
+  },
+  "jack antonoff": {
+    genre: "pop", tempo: [100, 124], keys: ["D", "F", "C"], scale: "major",
+    complexity: 5, swing: 3, kits: {"kick": "punch", "snare": "gated", "hihat": "bright", "bass": "synth"},
+    solos: ["piano", "lead"],
+    notes: "80s drums and a wide chorus, warmer and less clinical.",
+  },
+  "finneas": {
+    genre: "pop", tempo: [90, 120], keys: ["G", "D#", "A#"], scale: "minor",
+    complexity: 4, swing: 4, kits: {"kick": "deep", "snare": "snap", "hihat": "tick", "bass": "sub"},
+    solos: ["piano", "lead"],
+    notes: "Sparse, close, sub-heavy - a whisper with a huge bottom end.",
+  },
+  "ryan tedder": {
+    genre: "pop", tempo: [100, 130], keys: ["C", "F", "A"], scale: "major",
+    complexity: 6, swing: 2, kits: {"kick": "punch", "snare": "clap", "hihat": "bright", "bass": "synth"},
+    solos: ["piano", "lead"],
+    notes: "Builds and drops borrowed from dance music into a pop frame.",
+  },
+
+  // ---- metal
+  "metallica": {
+    genre: "metal", tempo: [140, 200], keys: ["E", "A", "D"], scale: "minor",
+    complexity: 7, swing: 0, kits: {"kick": "punch", "snare": "crack", "hihat": "metallic", "bass": "distorted"},
+    solos: ["leadguitar"],
+    notes: "Downpicked riffs, galloping kick, long instrumental sections.",
+  },
+  "slipknot": {
+    genre: "metal", tempo: [150, 190], keys: ["A", "D", "F#"], scale: "phrygian",
+    complexity: 8, swing: 0, kits: {"kick": "punch", "snare": "crack", "hihat": "metallic", "bass": "distorted"},
+    solos: ["leadguitar"],
+    notes: "Double kick under a hard backbeat, percussion layered over everything.",
+  },
+  "meshuggah": {
+    genre: "metal", tempo: [110, 160], keys: ["F", "C", "A#"], scale: "phrygian",
+    complexity: 9, swing: 0, kits: {"kick": "punch", "snare": "crack", "hihat": "metallic", "bass": "distorted"},
+    solos: ["leadguitar"],
+    notes: "Polyrhythmic riffing against a steady backbeat.",
+  },
+  "pantera": {
+    genre: "metal", tempo: [110, 170], keys: ["E", "G", "D"], scale: "minor",
+    complexity: 7, swing: 0, kits: {"kick": "punch", "snare": "crack", "hihat": "metallic", "bass": "distorted"},
+    solos: ["leadguitar"],
+    notes: "Groove metal - the riff swings even at speed.",
+  },
+
+  // ---- jazz
+  "miles davis": {
+    genre: "jazz", tempo: [110, 160], keys: ["D", "F", "C"], scale: "dorian",
+    complexity: 6, swing: 32, kits: {"kick": "jazzkick", "snare": "brush", "hihat": "ride", "bass": "upright"},
+    solos: ["horn", "sax"],
+    notes: "Modal rather than chordal - long stretches over one scale.",
+  },
+  "john coltrane": {
+    genre: "jazz", tempo: [130, 180], keys: ["F", "C", "A#"], scale: "dorian",
+    complexity: 8, swing: 30, kits: {"kick": "jazzkick", "snare": "brush", "hihat": "ride", "bass": "upright"},
+    solos: ["sax"],
+    notes: "Dense harmonic movement, sheets of sound over fast changes.",
+  },
+  "bill evans": {
+    genre: "jazz", tempo: [100, 150], keys: ["G", "D", "F"], scale: "dorian",
+    complexity: 6, swing: 33, kits: {"kick": "jazzkick", "snare": "brush", "hihat": "ride", "bass": "upright"},
+    solos: ["piano"],
+    notes: "Impressionistic voicings and an interactive trio.",
+  },
+  "herbie hancock": {
+    genre: "jazz", tempo: [105, 150], keys: ["F", "C", "D"], scale: "mixolydian",
+    complexity: 7, swing: 28, kits: {"kick": "jazzkick", "snare": "brush", "hihat": "ride", "bass": "upright"},
+    solos: ["piano", "sax"],
+    notes: "Funk-leaning jazz with vamps instead of changes.",
+  },
+
+  // ---- edm
+  "avicii": {
+    genre: "edm", tempo: [124, 130], keys: ["A", "F#", "C#"], scale: "minor",
+    complexity: 5, swing: 0, kits: {"kick": "fourfloor", "snare": "clap", "hihat": "bright", "bass": "reese"},
+    solos: ["lead", "arp"],
+    notes: "Folk-tinged melodies over a festival drop.",
+  },
+  "martin garrix": {
+    genre: "edm", tempo: [125, 132], keys: ["A", "E", "B"], scale: "minor",
+    complexity: 6, swing: 0, kits: {"kick": "fourfloor", "snare": "clap", "hihat": "bright", "bass": "reese"},
+    solos: ["lead"],
+    notes: "Big-room: enormous lead, huge kick, minimal harmony.",
+  },
+  "zedd": {
+    genre: "edm", tempo: [126, 132], keys: ["C", "G", "F"], scale: "minor",
+    complexity: 6, swing: 0, kits: {"kick": "fourfloor", "snare": "clap", "hihat": "bright", "bass": "synth"},
+    solos: ["lead", "arp"],
+    notes: "Complextro - detailed, chopped, harmonically busier than most.",
+  },
+  "swedish house mafia": {
+    genre: "edm", tempo: [126, 130], keys: ["F#", "A", "D"], scale: "minor",
+    complexity: 5, swing: 0, kits: {"kick": "fourfloor", "snare": "clap", "hihat": "bright", "bass": "reese"},
+    solos: ["lead", "arp"],
+    notes: "Long builds, piano-led progressive house drops.",
+  },
+
+  // ---- country
+  "chris stapleton": {
+    genre: "country", tempo: [60, 110], keys: ["A", "E", "G"], scale: "mixolydian",
+    complexity: 5, swing: 12, kits: {"kick": "acoustic", "snare": "acoustic", "hihat": "brushhat", "bass": "warm"},
+    solos: ["leadguitar"],
+    notes: "Blues-soaked country with a soul singer's phrasing.",
+  },
+  "kacey musgraves": {
+    genre: "country", tempo: [90, 120], keys: ["G", "C", "D"], scale: "major",
+    complexity: 4, swing: 10, kits: {"kick": "acoustic", "snare": "acoustic", "hihat": "brushhat", "bass": "warm"},
+    solos: ["leadguitar", "piano"],
+    notes: "Clean modern country with pedal steel and space.",
+  },
+  "johnny cash": {
+    genre: "country", tempo: [95, 130], keys: ["G", "A", "E"], scale: "major",
+    complexity: 4, swing: 8, kits: {"kick": "acoustic", "snare": "rimshot", "hihat": "brushhat", "bass": "upright"},
+    solos: ["leadguitar"],
+    notes: "Boom-chick rhythm guitar and a train-beat snare.",
+  },
+  "morgan wallen": {
+    genre: "country", tempo: [95, 132], keys: ["D", "A", "B"], scale: "major",
+    complexity: 5, swing: 10, kits: {"kick": "punch", "snare": "acoustic", "hihat": "bright", "bass": "warm"},
+    solos: ["leadguitar", "piano"],
+    notes: "Country with modern pop drums under it.",
+  },
+
+  // ---- orchestral
+  "john williams": {
+    genre: "orchestral", tempo: [70, 130], keys: ["D", "C", "G"], scale: "major",
+    complexity: 7, swing: 0, kits: {"kick": "acoustic", "snare": "acoustic", "perc": "timpani", "bass": "upright"},
+    solos: ["horn", "strings"],
+    notes: "Leitmotif writing - brass carries the theme, strings the motion.",
+  },
+  "ludwig van beethoven": {
+    genre: "orchestral", tempo: [66, 140], keys: ["C", "F", "A"], scale: "minor",
+    complexity: 8, swing: 0, kits: {"kick": "acoustic", "snare": "acoustic", "perc": "timpani", "bass": "upright"},
+    solos: ["strings", "woodwind"],
+    notes: "Motivic development from the smallest possible cell.",
+  },
+  "wolfgang amadeus mozart": {
+    genre: "orchestral", tempo: [80, 140], keys: ["G", "D", "F"], scale: "major",
+    complexity: 6, swing: 0, kits: {"kick": "acoustic", "snare": "acoustic", "perc": "timpani", "bass": "upright"},
+    solos: ["strings", "woodwind"],
+    notes: "Balanced classical phrasing, clear cadences.",
+  },
+  "gustav holst": {
+    genre: "orchestral", tempo: [70, 120], keys: ["C", "E", "A"], scale: "minor",
+    complexity: 8, swing: 0, kits: {"kick": "acoustic", "snare": "acoustic", "perc": "timpani", "bass": "upright"},
+    solos: ["horn", "strings"],
+    notes: "Huge orchestration and ostinato-driven movement.",
+  },
+
+  // ---- cinematic
+  "hans zimmer": {
+    genre: "cinematic", tempo: [60, 110], keys: ["D", "C", "A"], scale: "minor",
+    complexity: 6, swing: 0, kits: {"kick": "deep", "snare": "gated", "tom": "taiko", "perc": "timpani", "bass": "sub"},
+    solos: ["strings", "horn"],
+    notes: "Ostinato strings, low brass, and enormous simple harmony.",
+  },
+  "ludwig goransson": {
+    genre: "cinematic", tempo: [70, 115], keys: ["F", "C", "G"], scale: "minor",
+    complexity: 6, swing: 0, kits: {"kick": "deep", "snare": "gated", "tom": "taiko", "perc": "timpani", "bass": "sub"},
+    solos: ["strings", "horn"],
+    notes: "Hybrid orchestral and electronic, texture-led.",
+  },
+  "ramin djawadi": {
+    genre: "cinematic", tempo: [70, 110], keys: ["A", "D", "E"], scale: "minor",
+    complexity: 6, swing: 0, kits: {"kick": "deep", "snare": "gated", "tom": "taiko", "perc": "timpani", "bass": "sub"},
+    solos: ["strings", "piano"],
+    notes: "Cello ostinatos and a single memorable theme repeated.",
+  },
+  "two steps from hell": {
+    genre: "cinematic", tempo: [85, 120], keys: ["C", "G", "D"], scale: "minor",
+    complexity: 7, swing: 0, kits: {"kick": "deep", "snare": "gated", "tom": "taiko", "perc": "timpani", "bass": "sub"},
+    solos: ["horn", "strings"],
+    notes: "Trailer music at maximum - choir, brass, and relentless build.",
+  },
+
+  // ---- funk
+  "james brown": {
+    genre: "funk", tempo: [96, 120], keys: ["E", "D", "A"], scale: "mixolydian",
+    complexity: 7, swing: 15, kits: {"kick": "punch", "snare": "crisp", "hihat": "tick", "bass": "slap"},
+    solos: ["guitar", "horn"],
+    notes: "Everything on the one, one chord, the band as a rhythm section.",
+  },
+  "parliament": {
+    genre: "funk", tempo: [98, 115], keys: ["E", "G", "C"], scale: "mixolydian",
+    complexity: 7, swing: 14, kits: {"kick": "punch", "snare": "crisp", "hihat": "tick", "bass": "slap"},
+    solos: ["guitar", "organ"],
+    notes: "P-Funk: synth bass, huge horns, deliberately absurd.",
+  },
+  "nile rodgers": {
+    genre: "funk", tempo: [110, 124], keys: ["A", "E", "B"], scale: "mixolydian",
+    complexity: 6, swing: 12, kits: {"kick": "punch", "snare": "crisp", "hihat": "tick", "bass": "slap"},
+    solos: ["guitar"],
+    notes: "Chic - the guitar IS the song, 16th-note chops.",
+  },
+  "vulfpeck": {
+    genre: "funk", tempo: [95, 115], keys: ["D", "G", "A"], scale: "dorian",
+    complexity: 6, swing: 16, kits: {"kick": "punch", "snare": "crisp", "hihat": "tick", "bass": "slap"},
+    solos: ["guitar", "organ"],
+    notes: "Minimalist modern funk built around bass and drums alone.",
+  },
+
+  // ---- soul
+  "marvin gaye": {
+    genre: "soul", tempo: [70, 105], keys: ["F", "C", "A#"], scale: "dorian",
+    complexity: 6, swing: 18, kits: {"kick": "boombap", "snare": "fat", "hihat": "dark", "bass": "warm"},
+    solos: ["sax", "organ"],
+    notes: "Layered vocals over lush strings and a laid-back pocket.",
+  },
+  "al green": {
+    genre: "soul", tempo: [75, 105], keys: ["A", "E", "D"], scale: "dorian",
+    complexity: 5, swing: 20, kits: {"kick": "boombap", "snare": "fat", "hihat": "dark", "bass": "warm"},
+    solos: ["organ", "horn"],
+    notes: "Hi Records: tight horns, brushed feel, Hammond underneath.",
+  },
+  "aretha franklin": {
+    genre: "soul", tempo: [80, 120], keys: ["C", "F", "G"], scale: "major",
+    complexity: 6, swing: 16, kits: {"kick": "boombap", "snare": "fat", "hihat": "dark", "bass": "warm"},
+    solos: ["piano", "horn"],
+    notes: "Gospel piano and a full horn section behind a huge voice.",
+  },
+  "curtis mayfield": {
+    genre: "soul", tempo: [85, 110], keys: ["F#", "B", "E"], scale: "dorian",
+    complexity: 6, swing: 17, kits: {"kick": "boombap", "snare": "fat", "hihat": "dark", "bass": "warm"},
+    solos: ["guitar", "strings"],
+    notes: "Falsetto over wah guitar, congas and strings.",
+  },
+
+  // ---- ambient
+  "brian eno": {
+    genre: "ambient", tempo: [56, 80], keys: ["D", "C", "G"], scale: "lydian",
+    complexity: 3, swing: 0, kits: {"kick": "softkick", "perc": "shaker", "bass": "sub", "pad": "airy"},
+    solos: ["piano", "woodwind"],
+    notes: "Systems music - loops of different lengths drifting apart.",
+  },
+  "aphex twin": {
+    genre: "ambient", tempo: [60, 92], keys: ["A", "F", "C"], scale: "dorian",
+    complexity: 4, swing: 0, kits: {"kick": "softkick", "perc": "shaker", "bass": "sub", "pad": "airy"},
+    solos: ["piano", "strings"],
+    notes: "Melodic ambient with detuned, slightly unsettling harmony.",
+  },
+  "stars of the lid": {
+    genre: "ambient", tempo: [56, 72], keys: ["C", "G", "E"], scale: "lydian",
+    complexity: 2, swing: 0, kits: {"kick": "softkick", "perc": "shaker", "bass": "sub", "pad": "warm"},
+    solos: ["strings", "woodwind"],
+    notes: "Drone and slow string swells, almost no rhythm at all.",
+  },
+  "biosphere": {
+    genre: "ambient", tempo: [60, 88], keys: ["F", "A#", "D"], scale: "dorian",
+    complexity: 3, swing: 0, kits: {"kick": "softkick", "perc": "shaker", "bass": "sub", "pad": "airy"},
+    solos: ["pad", "piano"],
+    notes: "Cold, wide, arctic-sounding textures over a distant pulse.",
+  },
   // ---- trap / modern rap ------------------------------------------------
   "metro boomin": {
     genre: "trap", tempo: [130, 145], keys: ["C#", "F", "G#"], scale: "minor",
@@ -95,11 +406,6 @@ const ARTIST_PROFILES = {
   },
 
   // ---- R&B / neo-soul ----------------------------------------------------
-  "the neptunes": {
-    genre: "rnb", tempo: [96, 110], keys: ["F#", "B", "E"], scale: "minor",
-    complexity: 6, swing: 8, kits: { kick: "punch", snare: "rimshot", perc: "shaker", piano: "clav", bass: "synth" },
-    solos: ["lead", "talkbox"], notes: "Sparse, percussive, off-kilter syncopation with almost no low mid.",
-  },
   "timbaland": {
     genre: "rnb", tempo: [92, 108], keys: ["G", "C", "D"], scale: "minor",
     complexity: 7, swing: 12, kits: { kick: "punch", snare: "layered", perc: "tabla", bass: "sub" },
@@ -173,11 +479,6 @@ const ARTIST_PROFILES = {
     genre: "trap", tempo: [128, 142], keys: ["F", "A#", "D#"], scale: "minor",
     complexity: 4, swing: 3, kits: { kick: "808", snare: "trapsnap", hihat: "dark", bass: "hard808" },
     solos: ["lead"], notes: "Minimal and menacing - almost nothing but drums, 808 and one dark motif.",
-  },
-  "playboi carti": {
-    genre: "trap", tempo: [130, 155], keys: ["D", "G", "A"], scale: "minor",
-    complexity: 5, swing: 6, kits: { kick: "808", snare: "clap", hihat: "sizzle", bass: "hard808", lead: "square" },
-    solos: ["lead"], notes: "Extremely sparse, bright synth stabs, everything built around negative space.",
   },
   "lil uzi vert": {
     genre: "trap", tempo: [145, 165], keys: ["D", "F#", "A"], scale: "major",
@@ -353,11 +654,6 @@ const ARTIST_PROFILES = {
     genre: "house", tempo: [122, 128], keys: ["A", "D", "F#"], scale: "minor",
     complexity: 5, swing: 2, kits: { kick: "fourfloor", snare: "clap", hihat: "bright", bass: "synth", stab: "brass-chord" },
     solos: ["lead"], notes: "Big, clean, festival-scaled; simple hooks and enormous drops.",
-  },
-  "avicii": {
-    genre: "house", tempo: [124, 130], keys: ["G", "C", "D"], scale: "major",
-    complexity: 5, swing: 2, kits: { kick: "fourfloor", snare: "clap", hihat: "bright", piano: "m1piano", bass: "synth" },
-    solos: ["lead", "woodwind"], notes: "Major-key folk melodies over four-to-the-floor - piano house with a sing-along top.",
   },
   "deadmau5": {
     genre: "techno", tempo: [122, 128], keys: ["A", "D", "F"], scale: "minor",
@@ -648,11 +944,6 @@ const ARTIST_PROFILES = {
     complexity: 7, swing: 4, kits: { kick: "punch", snare: "fat", hihat: "bright", bass: "warm", piano: "grand" },
     solos: ["strings", "lead"], notes: "Hard, driving, string-led menace with a relentless pocket.",
   },
-  "kanye west": {
-    genre: "rap", tempo: [85, 100], keys: ["C", "G", "A"], scale: "minor",
-    complexity: 7, swing: 10, kits: { kick: "boombap", snare: "layered", hihat: "vinyl", bass: "warm", piano: "rhodes" },
-    solos: ["vocal", "strings"], notes: "Soul-chop DNA: pitched vocal stabs, big drums, gospel harmony underneath.",
-  },
   "just blaze": {
     genre: "rap", tempo: [90, 102], keys: ["C", "F", "Bb"], scale: "major",
     complexity: 8, swing: 8, kits: { kick: "punch", snare: "fat", hihat: "bright", bass: "warm", horn: "section" },
@@ -667,11 +958,6 @@ const ARTIST_PROFILES = {
     genre: "rap", tempo: [95, 115], keys: ["G#", "D#", "A#"], scale: "minor",
     complexity: 6, swing: 5, kits: { kick: "punch", snare: "trapsnap", hihat: "bright", bass: "true808", piano: "felt" },
     solos: ["lead", "woodwind"], notes: "Clean modern boom-bap hybrid, tight low end, restrained melodic hook.",
-  },
-  "9th wonder": {
-    genre: "rap", tempo: [88, 96], keys: ["Eb", "Bb", "F"], scale: "major",
-    complexity: 5, swing: 14, kits: { kick: "boombap", snare: "crisp", hihat: "vinyl", bass: "upright", piano: "rhodes" },
-    solos: ["vocal", "sax"], notes: "Warm soul loops, unquantised swing, drums that sit back in the pocket.",
   },
   "havoc": {
     genre: "rap", tempo: [88, 96], keys: ["F#", "C#", "B"], scale: "minor",
@@ -702,11 +988,6 @@ const ARTIST_PROFILES = {
   },
 
   // ---- phonk --------------------------------------------------------------
-  "dj smokey": {
-    genre: "phonk", tempo: [130, 145], keys: ["F", "C", "G"], scale: "minor",
-    complexity: 6, swing: 8, kits: { kick: "gritty", snare: "rimshot", hihat: "lofi808", bass: "distorted", perc: "cowbell" },
-    solos: ["lead", "vocal"], notes: "Memphis revival: tape-saturated cowbell, murky low end, chopped vocal sample feel.",
-  },
   "soudiere": {
     genre: "phonk", tempo: [135, 150], keys: ["A#", "D#", "G#"], scale: "minor",
     complexity: 7, swing: 6, kits: { kick: "gritty", snare: "trapsnap", hihat: "sizzle", bass: "distorted", perc: "cowbell" },
@@ -716,11 +997,6 @@ const ARTIST_PROFILES = {
     genre: "phonk", tempo: [128, 142], keys: ["C#", "F#", "B"], scale: "minor",
     complexity: 6, swing: 10, kits: { kick: "lofi", snare: "rimshot", hihat: "vinyl", bass: "sub", piano: "electric" },
     solos: ["vocal", "lead"], notes: "Dreamy, hazy phonk - slowed melodic loop over dusty Memphis drums.",
-  },
-  "kordhell": {
-    genre: "phonk", tempo: [150, 160], keys: ["G", "D", "A"], scale: "minor",
-    complexity: 8, swing: 0, kits: { kick: "punch", snare: "trapsnap", hihat: "metallic", bass: "distorted", lead: "hoover" },
-    solos: ["lead"], notes: "Drift phonk: relentless cowbell lead, hard-clipped kick, no space at all.",
   },
   "playa phonk": {
     genre: "phonk", tempo: [140, 152], keys: ["D#", "A#", "F"], scale: "minor",
@@ -761,11 +1037,6 @@ const ARTIST_PROFILES = {
     complexity: 7, swing: 4, kits: { kick: "snappy", snare: "crisp", hihat: "metallic", bass: "wobble", lead: "square" },
     solos: ["lead"], notes: "Skippier, funkier early dubstep with a busy syncopated drum pattern.",
   },
-  "excision": {
-    genre: "dubstep", tempo: [138, 145], keys: ["E", "B", "F#"], scale: "minor",
-    complexity: 9, swing: 0, kits: { kick: "punch", snare: "gated", hihat: "sizzle", bass: "growl", lead: "hoover" },
-    solos: ["lead"], notes: "Maximal riddim: gut-punch drops, screaming growl bass, zero subtlety by design.",
-  },
   "flux pavilion": {
     genre: "dubstep", tempo: [138, 142], keys: ["C", "G", "D"], scale: "minor",
     complexity: 7, swing: 0, kits: { kick: "punch", snare: "gatedverb", hihat: "bright", bass: "wobble", lead: "supersaw" },
@@ -773,25 +1044,10 @@ const ARTIST_PROFILES = {
   },
 
   // ---- dnb ----------------------------------------------------------------
-  "goldie": {
-    genre: "dnb", tempo: [168, 174], keys: ["A", "E", "D"], scale: "minor",
-    complexity: 8, swing: 4, kits: { kick: "punch", snare: "crisp", hihat: "metallic", bass: "reese", pad: "airy" },
-    solos: ["pad", "strings"], notes: "Atmospheric jungle: chopped breaks, cavernous pads, timestretched melancholy.",
-  },
   "roni size": {
     genre: "dnb", tempo: [168, 174], keys: ["F", "C", "G"], scale: "minor",
     complexity: 8, swing: 6, kits: { kick: "punch", snare: "crisp", hihat: "ride", bass: "upright", piano: "rhodes" },
     solos: ["sax", "piano"], notes: "Jazz-step: double bass, live-feel breaks, real instruments over the drums.",
-  },
-  "netsky": {
-    genre: "dnb", tempo: [172, 176], keys: ["C", "G", "F"], scale: "major",
-    complexity: 6, swing: 0, kits: { kick: "snappy", snare: "crisp", hihat: "bright", bass: "sub", piano: "grand" },
-    solos: ["piano", "strings"], notes: "Liquid drum and bass: warm piano chords, rolling amen, uplifting harmony.",
-  },
-  "sub focus": {
-    genre: "dnb", tempo: [172, 176], keys: ["D", "A", "E"], scale: "minor",
-    complexity: 7, swing: 0, kits: { kick: "punch", snare: "gated", hihat: "sizzle", bass: "reese", lead: "supersaw" },
-    solos: ["lead", "pad"], notes: "Big-room neurofunk-adjacent: huge synth lead, precise engineering, festival energy.",
   },
 
   // ---- ukgarage -----------------------------------------------------------
@@ -812,11 +1068,6 @@ const ARTIST_PROFILES = {
   },
 
   // ---- reggaeton ----------------------------------------------------------
-  "tainy": {
-    genre: "reggaeton", tempo: [90, 100], keys: ["G#", "D#", "A#"], scale: "minor",
-    complexity: 7, swing: 4, kits: { kick: "punch", snare: "clap", hihat: "bright", bass: "sub", pad: "airy" },
-    solos: ["lead", "pad"], notes: "Modern atmospheric reggaeton - airy pads, restrained dembow, huge low end.",
-  },
   "luny tunes": {
     genre: "reggaeton", tempo: [92, 100], keys: ["A", "E", "D"], scale: "minor",
     complexity: 6, swing: 2, kits: { kick: "snappy", snare: "crisp", hihat: "metallic", bass: "synth", perc: "timbale" },
@@ -829,11 +1080,6 @@ const ARTIST_PROFILES = {
   },
 
   // ---- afrobeats ----------------------------------------------------------
-  "sarz": {
-    genre: "afrobeats", tempo: [100, 110], keys: ["F", "C", "G"], scale: "minor",
-    complexity: 7, swing: 10, kits: { kick: "deep", snare: "rimshot", hihat: "analog", bass: "logdrum", perc: "talkingdrum" },
-    solos: ["lead", "pad"], notes: "Spacious, moody afrobeats with a hard log-drum and minimal top end.",
-  },
   "p priime": {
     genre: "afrobeats", tempo: [102, 110], keys: ["A", "E", "D"], scale: "minor",
     complexity: 6, swing: 12, kits: { kick: "punch", snare: "clap", hihat: "tape", bass: "warm", guitar: "clean" },
@@ -871,11 +1117,6 @@ const ARTIST_PROFILES = {
     complexity: 8, swing: 0, kits: { kick: "909", snare: "rimclick", hihat: "606", bass: "303", lead: "ms20" },
     solos: ["lead"], notes: "Minimal: tiny changes over long stretches, 303 acid, almost nothing else.",
   },
-  "charlotte de witte": {
-    genre: "techno", tempo: [132, 140], keys: ["F#", "C#", "G#"], scale: "minor",
-    complexity: 8, swing: 0, kits: { kick: "punch", snare: "909snare", hihat: "metallic", bass: "distorted", lead: "hoover" },
-    solos: ["lead"], notes: "Hard modern techno - distorted kick, acid stabs, unrelenting pressure.",
-  },
 
   // ---- rock / synthwave ---------------------------------------------------
   "rick rubin": {
@@ -893,11 +1134,6 @@ const ARTIST_PROFILES = {
     complexity: 6, swing: 0, kits: { kick: "roomy", snare: "acoustic", hihat: "analog", bass: "warm", guitar: "power" },
     solos: ["leadguitar"], notes: "Room mics and honesty - drums recorded live and loud, nothing sweetened.",
   },
-  "com truise": {
-    genre: "synthwave", tempo: [95, 110], keys: ["C", "G", "A"], scale: "minor",
-    complexity: 6, swing: 8, kits: { kick: "linn", snare: "linn", hihat: "lm1", bass: "synth", pad: "juno" },
-    solos: ["lead", "pad"], notes: "Slow-motion synth funk: detuned analogue leads, tape wobble, half-speed groove.",
-  },
   "perturbator": {
     genre: "synthwave", tempo: [120, 135], keys: ["D", "A", "E"], scale: "minor",
     complexity: 8, swing: 0, kits: { kick: "punch", snare: "gated", hihat: "metallic", bass: "distorted", lead: "hoover" },
@@ -910,30 +1146,10 @@ const ARTIST_PROFILES = {
   },
 
   // ---- lofi / neosoul / rnb ------------------------------------------------
-  "knxwledge": {
-    genre: "lofi", tempo: [78, 90], keys: ["Eb", "Ab", "Bb"], scale: "minor",
-    complexity: 5, swing: 18, kits: { kick: "lofi", snare: "ghost", hihat: "vinyl", bass: "upright", piano: "rhodes" },
-    solos: ["vocal", "sax"], notes: "Loose, unquantised soul flips - drums deliberately behind, tape hiss left in.",
-  },
-  "mndsgn": {
-    genre: "lofi", tempo: [80, 92], keys: ["F", "C", "Bb"], scale: "major",
-    complexity: 6, swing: 16, kits: { kick: "lofi", snare: "brush", hihat: "tape", bass: "warm", piano: "wurlitzer" },
-    solos: ["piano", "vocal"], notes: "Woozy, slightly detuned soul with a drunken pocket and warm Wurlitzer.",
-  },
   "tomppabeats": {
     genre: "lofi", tempo: [72, 86], keys: ["C", "G", "F"], scale: "major",
     complexity: 4, swing: 15, kits: { kick: "lofi", snare: "brush", hihat: "vinyl", bass: "warm", piano: "felt" },
     solos: ["piano"], notes: "Gentle study-beat lofi: felt piano, soft drums, nothing that demands attention.",
-  },
-  "robert glasper": {
-    genre: "neosoul", tempo: [76, 92], keys: ["Eb", "Ab", "Db"], scale: "minor",
-    complexity: 9, swing: 16, kits: { kick: "acoustic", snare: "ghost", hihat: "ride", bass: "upright", piano: "rhodes" },
-    solos: ["piano", "sax"], notes: "Jazz harmony first: dense extended voicings, ghost-note drums, real improvisation.",
-  },
-  "hiatus kaiyote": {
-    genre: "neosoul", tempo: [88, 104], keys: ["F#", "B", "E"], scale: "dorian",
-    complexity: 9, swing: 12, kits: { kick: "punch", snare: "ghost", hihat: "analog", bass: "slap", piano: "rhodes" },
-    solos: ["guitar", "sax"], notes: "Future soul: shifting metres, wild extended chords, hyperactive rhythm section.",
   },
   "steve lacy": {
     genre: "neosoul", tempo: [84, 100], keys: ["E", "A", "B"], scale: "minor",
@@ -971,11 +1187,6 @@ const ARTIST_PROFILES = {
     genre: "hiphop", tempo: [95, 108], keys: ["C", "G", "D"], scale: "minor",
     complexity: 7, swing: 4, kits: { kick: "snappy", snare: "crisp", hihat: "metallic", bass: "synth", perc: "woodblock" },
     solos: ["lead", "vocal"], notes: "Skeletal funk: four sounds, enormous space, percussion doing the melody's job.",
-  },
-  "kaytranada": {
-    genre: "hiphop", tempo: [98, 112], keys: ["A", "E", "D"], scale: "minor",
-    complexity: 7, swing: 15, kits: { kick: "punch", snare: "clap", hihat: "analog", bass: "warm", piano: "rhodes" },
-    solos: ["pad", "vocal"], notes: "Swung house-leaning drums, filtered disco chords, bass mixed to the front.",
   },
   "ghostface800": {
     genre: "drill", tempo: [140, 148], keys: ["F", "C", "G#"], scale: "minor",

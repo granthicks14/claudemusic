@@ -44,7 +44,115 @@
 
 const SONG_DB = [
   // --- Hip-hop -------------------------------------------------------------
-  { t: "N.Y. State of Mind", a: "Nas", y: 1994, g: "hiphop", bpm: 88 },
+  // --- rage
+  { t: "Sky", a: "Playboi Carti", y: 2020, g: "rage", bpm: 153 },
+  { t: "Stop Breathing", a: "Playboi Carti", y: 2020, g: "rage", bpm: 148 },
+  { t: "Miss The Rage", a: "Trippie Redd", y: 2021, g: "rage", bpm: 160 },
+  { t: "Vamp Anthem", a: "Playboi Carti", y: 2020, g: "rage", bpm: 155 },
+  { t: "New Tank", a: "Playboi Carti", y: 2020, g: "rage", bpm: 150 },
+  { t: "how u feel?", a: "Destroy Lonely", y: 2023, g: "rage", bpm: 152 },
+  { t: "if Looks Could Kill", a: "Destroy Lonely", y: 2023, g: "rage", bpm: 158 },
+  { t: "Die4Guy", a: "Ken Carson", y: 2022, g: "rage", bpm: 156 },
+  // --- pluggnb
+  { t: "Wokeup", a: "Kankan", y: 2021, g: "pluggnb", bpm: 138 },
+  { t: "Love Me Again", a: "Summrs", y: 2021, g: "pluggnb", bpm: 140 },
+  { t: "Late Night", a: "Autumn!", y: 2021, g: "pluggnb", bpm: 136 },
+  { t: "Can't Cap", a: "Kankan", y: 2022, g: "pluggnb", bpm: 134 },
+  { t: "Sorry Bout That", a: "Yeat", y: 2021, g: "pluggnb", bpm: 142 },
+  { t: "Look N The Mirror", a: "Ka$hdami", y: 2021, g: "pluggnb", bpm: 138 },
+  { t: "Money Twerk", a: "Yeat", y: 2021, g: "pluggnb", bpm: 144 },
+  { t: "Goin' To Hell", a: "Kankan", y: 2022, g: "pluggnb", bpm: 132 },
+  // --- pop
+  { t: "Blinding Lights", a: "The Weeknd", y: 2019, g: "pop", bpm: 171 },
+  { t: "Levitating", a: "Dua Lipa", y: 2020, g: "pop", bpm: 103 },
+  { t: "Shape of You", a: "Ed Sheeran", y: 2017, g: "pop", bpm: 96 },
+  { t: "As It Was", a: "Harry Styles", y: 2022, g: "pop", bpm: 174 },
+  { t: "Uptown Funk", a: "Mark Ronson", y: 2014, g: "pop", bpm: 115 },
+  { t: "Bad Guy", a: "Billie Eilish", y: 2019, g: "pop", bpm: 135 },
+  { t: "Flowers", a: "Miley Cyrus", y: 2023, g: "pop", bpm: 118 },
+  { t: "Watermelon Sugar", a: "Harry Styles", y: 2019, g: "pop", bpm: 95 },
+  // --- metal
+  { t: "Master of Puppets", a: "Metallica", y: 1986, g: "metal", bpm: 212 },
+  { t: "Chop Suey!", a: "System of a Down", y: 2001, g: "metal", bpm: 127 },
+  { t: "Raining Blood", a: "Slayer", y: 1986, g: "metal", bpm: 212 },
+  { t: "Walk", a: "Pantera", y: 1992, g: "metal", bpm: 116 },
+  { t: "Duality", a: "Slipknot", y: 2004, g: "metal", bpm: 136 },
+  { t: "Bleed", a: "Meshuggah", y: 2008, g: "metal", bpm: 115 },
+  { t: "Hail to the King", a: "Avenged Sevenfold", y: 2013, g: "metal", bpm: 88 },
+  { t: "Blackened", a: "Metallica", y: 1988, g: "metal", bpm: 186 },
+  // --- jazz
+  { t: "So What", a: "Miles Davis", y: 1959, g: "jazz", bpm: 136 },
+  { t: "Take Five", a: "Dave Brubeck", y: 1959, g: "jazz", bpm: 174 },
+  { t: "Giant Steps", a: "John Coltrane", y: 1960, g: "jazz", bpm: 290 },
+  { t: "Autumn Leaves", a: "Cannonball Adderley", y: 1958, g: "jazz", bpm: 124 },
+  { t: "Blue in Green", a: "Miles Davis", y: 1959, g: "jazz", bpm: 60 },
+  { t: "Cantaloupe Island", a: "Herbie Hancock", y: 1964, g: "jazz", bpm: 110 },
+  { t: "My Favorite Things", a: "John Coltrane", y: 1961, g: "jazz", bpm: 176 },
+  { t: "Song for My Father", a: "Horace Silver", y: 1965, g: "jazz", bpm: 124 },
+  // --- edm
+  { t: "Levels", a: "Avicii", y: 2011, g: "edm", bpm: 126 },
+  { t: "Animals", a: "Martin Garrix", y: 2013, g: "edm", bpm: 128 },
+  { t: "Titanium", a: "David Guetta", y: 2011, g: "edm", bpm: 126 },
+  { t: "Clarity", a: "Zedd", y: 2012, g: "edm", bpm: 128 },
+  { t: "Wake Me Up", a: "Avicii", y: 2013, g: "edm", bpm: 124 },
+  { t: "Don't You Worry Child", a: "Swedish House Mafia", y: 2012, g: "edm", bpm: 129 },
+  { t: "Silence", a: "Marshmello", y: 2017, g: "edm", bpm: 143 },
+  { t: "Faded", a: "Alan Walker", y: 2015, g: "edm", bpm: 90 },
+  // --- country
+  { t: "Jolene", a: "Dolly Parton", y: 1973, g: "country", bpm: 110 },
+  { t: "Take Me Home, Country Roads", a: "John Denver", y: 1971, g: "country", bpm: 82 },
+  { t: "Friends in Low Places", a: "Garth Brooks", y: 1990, g: "country", bpm: 132 },
+  { t: "The Gambler", a: "Kenny Rogers", y: 1978, g: "country", bpm: 105 },
+  { t: "Ring of Fire", a: "Johnny Cash", y: 1963, g: "country", bpm: 108 },
+  { t: "Wagon Wheel", a: "Darius Rucker", y: 2013, g: "country", bpm: 150 },
+  { t: "Body Like a Back Road", a: "Sam Hunt", y: 2017, g: "country", bpm: 98 },
+  { t: "Tennessee Whiskey", a: "Chris Stapleton", y: 2015, g: "country", bpm: 49 },
+  // --- orchestral
+  { t: "Ode to Joy", a: "Ludwig van Beethoven", y: 1824, g: "orchestral", bpm: 120 },
+  { t: "Eine kleine Nachtmusik", a: "Wolfgang Amadeus Mozart", y: 1787, g: "orchestral", bpm: 132 },
+  { t: "The Blue Danube", a: "Johann Strauss II", y: "1866", g: "orchestral", bpm: 90 },
+  { t: "Symphony No. 5", a: "Ludwig van Beethoven", y: 1808, g: "orchestral", bpm: 108 },
+  { t: "Canon in D", a: "Johann Pachelbel", y: 1680, g: "orchestral", bpm: 64 },
+  { t: "Bol\u00e9ro", a: "Maurice Ravel", y: 1928, g: "orchestral", bpm: 72 },
+  { t: "In the Hall of the Mountain King", a: "Edvard Grieg", y: 1875, g: "orchestral", bpm: 138 },
+  { t: "The Four Seasons: Spring", a: "Antonio Vivaldi", y: 1725, g: "orchestral", bpm: 110 },
+  // --- cinematic
+  { t: "Time", a: "Hans Zimmer", y: 2010, g: "cinematic", bpm: 63 },
+  { t: "Now We Are Free", a: "Hans Zimmer", y: 2000, g: "cinematic", bpm: 84 },
+  { t: "The Imperial March", a: "John Williams", y: 1980, g: "cinematic", bpm: 104 },
+  { t: "Duel of the Fates", a: "John Williams", y: 1999, g: "cinematic", bpm: 144 },
+  { t: "Mombasa", a: "Hans Zimmer", y: 2010, g: "cinematic", bpm: 150 },
+  { t: "Cornfield Chase", a: "Hans Zimmer", y: 2014, g: "cinematic", bpm: 95 },
+  { t: "Main Title", a: "John Williams", y: 1977, g: "cinematic", bpm: 104 },
+  { t: "Why So Serious?", a: "Hans Zimmer", y: 2008, g: "cinematic", bpm: 90 },
+  // --- funk
+  { t: "Superstition", a: "Stevie Wonder", y: 1972, g: "funk", bpm: 101 },
+  { t: "Get Up Offa That Thing", a: "James Brown", y: 1976, g: "funk", bpm: 120 },
+  { t: "Give Up the Funk", a: "Parliament", y: 1975, g: "funk", bpm: 105 },
+  { t: "Play That Funky Music", a: "Wild Cherry", y: 1976, g: "funk", bpm: 110 },
+  { t: "Brick House", a: "Commodores", y: 1977, g: "funk", bpm: 104 },
+  { t: "Pick Up the Pieces", a: "Average White Band", y: 1974, g: "funk", bpm: 100 },
+  { t: "Flash Light", a: "Parliament", y: 1977, g: "funk", bpm: 110 },
+  { t: "Chameleon", a: "Herbie Hancock", y: 1973, g: "funk", bpm: 110 },
+  // --- soul
+  { t: "What's Going On", a: "Marvin Gaye", y: 1971, g: "soul", bpm: 100 },
+  { t: "Respect", a: "Aretha Franklin", y: 1967, g: "soul", bpm: 116 },
+  { t: "A Change Is Gonna Come", a: "Sam Cooke", y: 1964, g: "soul", bpm: 66 },
+  { t: "Let's Stay Together", a: "Al Green", y: 1972, g: "soul", bpm: 102 },
+  { t: "Sittin' On The Dock of the Bay", a: "Otis Redding", y: 1968, g: "soul", bpm: 104 },
+  { t: "Ain't No Sunshine", a: "Bill Withers", y: 1971, g: "soul", bpm: 78 },
+  { t: "I Heard It Through the Grapevine", a: "Marvin Gaye", y: 1968, g: "soul", bpm: 116 },
+  { t: "Superstar", a: "Luther Vandross", y: 1983, g: "soul", bpm: 72 },
+  // --- ambient
+  { t: "Music for Airports 1/1", a: "Brian Eno", y: 1978, g: "ambient", bpm: 60 },
+  { t: "An Ending (Ascent)", a: "Brian Eno", y: 1983, g: "ambient", bpm: 60 },
+  { t: "Weightless", a: "Marconi Union", y: 2011, g: "ambient", bpm: 60 },
+  { t: "Avril 14th", a: "Aphex Twin", y: 2001, g: "ambient", bpm: 66 },
+  { t: "Poa Alpina", a: "Biosphere", y: 1997, g: "ambient", bpm: 72 },
+  { t: "Requiem for Dying Mothers, Pt. 1", a: "Stars of the Lid", y: 2001, g: "ambient", bpm: 60 },
+  { t: "Then the Quiet Explosion", a: "Hammock", y: 2013, g: "ambient", bpm: 70 },
+  { t: "Xtal", a: "Aphex Twin", y: 1992, g: "ambient", bpm: 88 },
+{ t: "N.Y. State of Mind", a: "Nas", y: 1994, g: "hiphop", bpm: 88 },
   { t: "Juicy", a: "The Notorious B.I.G.", y: 1994, g: "hiphop", bpm: 95 },
   { t: "Dear Mama", a: "2Pac", y: 1995, g: "hiphop", bpm: 90 },
   { t: "Ms. Jackson", a: "OutKast", y: 2000, g: "hiphop", bpm: 95 },
@@ -383,7 +491,10 @@ function normalise(s) {
     .replace(/[‘’]/g, "'")
     // Strip accents so "Titi Me Pregunto" finds "Tití Me Preguntó".
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9' ]+/g, " ")
+    // Unicode-aware on purpose: stripping everything outside [a-z0-9]
+    // reduced a fully non-Latin title to the empty string, which no query
+    // could ever match.
+    .replace(/[^\p{L}\p{N}' ]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
 }

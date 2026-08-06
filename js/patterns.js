@@ -30,6 +30,34 @@ const REGISTER = { bass: -7,
   woodwind: 15,
 };
 
+// A genre may shift where an instrument sits, without moving the instrument
+// everywhere else.
+//
+// Measured across the orchestral family, mid-band energy (250Hz-2kHz, the
+// band the ear reads detail from) was 2-4% of the mix while the low band was
+// 35-62%. The reason is in the table above: strings and horns sit at register
+// 10, which over the C2 root these genres use puts a film-score string line
+// around 200Hz - a cello, not the violins the line is meant to be. The whole
+// arrangement was stacked underneath 250Hz with nothing above it.
+//
+// Only genres that name a shift get one; everything else reads the table
+// unchanged.
+const REGISTER_SHIFT = {
+  // Violins and the wind soloists sit an octave above the cellos. The bass
+  // stays exactly where it is - the low end was never the problem.
+  orchestral: { strings: 7, woodwind: 7, horn: 7, piano: 7 },
+  cinematic:  { strings: 7, horn: 7, piano: 7, pad: 7 },
+  // Ambient's piano and strings are the only things carrying pitch at all
+  // over the drone, so they cannot sit inside the drone's own octave.
+  ambient:    { piano: 7, strings: 7, pad: 7 },
+};
+
+function registerFor(style, inst) {
+  const base = REGISTER[inst];
+  const shift = style && REGISTER_SHIFT[style.id];
+  return (base === undefined ? 14 : base) + ((shift && shift[inst]) || 0);
+}
+
 const FLAVOR_POOLS = {
   kick: ["boombap", "808", "fourfloor", "acoustic", "lofi", "deep", "snappy", "click", "punch", "subkick", "gritty", "roomy", "knock", "thump", "distorted", "tight", "woofer", "vinyl", "house909", "trapkick", "jazzkick", "breakkick", "softkick", "hardstyle", "909", "linn", "707", "606", "dmx", "sp1200", "lm1", "rz1", "hr16", "r8", "drumulator", "drumtraks", "rx5", "cr8000", "kr55", "dr110", "mpc60"],
   snare: ["crisp", "clap", "fat", "rimshot", "trapsnap", "brush", "gated", "acoustic", "ghost", "layered", "909snare", "linn", "707", "dmx", "sp1200", "rimclick", "gatedverb", "lm1", "rz1", "hr16", "r8", "drumulator", "drumtraks", "rx5", "cr8000", "kr55", "dr110", "mpc60", "piccolo", "deepsnare", "crack", "roomsnare", "snap", "thicksnare", "brushswirl", "sidestick", "drillsnare", "housesnare", "dnbsnare", "lofisnare"],
@@ -95,146 +123,146 @@ const FLAVOR_GENRES = {
   // trap, drill, phonk or techno beat it does not read as a variation, it
   // reads as the wrong record. These were reachable everywhere because
   // nothing had ever said otherwise.
-  "kick:acoustic": ["rock", "lofi", "neosoul", "rnb", "hiphop", "afrobeats", "amapiano", "reggaeton", "house"],
-  "kick:jazzkick": ["lofi", "neosoul", "rnb", "hiphop", "house", "dnb"],
-  "snare:brush": ["lofi", "neosoul", "rnb", "hiphop", "afrobeats", "amapiano", "rock"],
-  "snare:brushswirl": ["lofi", "neosoul", "rnb", "hiphop", "afrobeats", "amapiano", "rock"],
-  "snare:acoustic": ["rock", "lofi", "neosoul", "rnb", "hiphop", "afrobeats", "amapiano", "reggaeton", "dnb", "house"],
+  "kick:acoustic": ["rock", "lofi", "neosoul", "rnb", "hiphop", "afrobeats", "amapiano", "reggaeton", "house", "jazz", "country", "soul", "funk", "metal", "pop", "orchestral", "cinematic", "ambient", "dnb"],
+  "kick:jazzkick": ["lofi", "neosoul", "rnb", "hiphop", "house", "dnb", "jazz", "soul"],
+  "snare:brush": ["lofi", "neosoul", "rnb", "hiphop", "afrobeats", "amapiano", "rock", "jazz", "soul", "country"],
+  "snare:brushswirl": ["lofi", "neosoul", "rnb", "hiphop", "afrobeats", "amapiano", "rock", "jazz", "soul", "country"],
+  "snare:acoustic": ["rock", "lofi", "neosoul", "rnb", "hiphop", "afrobeats", "amapiano", "reggaeton", "dnb", "house", "jazz", "country", "soul", "funk", "metal", "pop", "orchestral", "cinematic", "ambient"],
   // --- round 12 additions, each placed where the sound actually comes from
-  "arp:trance": ["synthwave", "techno", "house", "dnb", "dubstep", "ukgarage"],
-  "arp:acid": ["techno", "house", "dnb", "synthwave"],
-  "arp:harp": ["lofi", "neosoul", "rnb", "amapiano", "afrobeats", "hiphop"],
-  "arp:bellarp": ["synthwave", "lofi", "house", "ukgarage", "rnb", "amapiano"],
-  "tom:808tom": ["trap", "drill", "phonk", "rap", "hiphop", "jerseyclub"],
-  "tom:floor": ["rock", "neosoul", "rnb", "dnb", "afrobeats"],
-  "tom:gatedtom": ["synthwave", "rock", "phonk", "dubstep"],
-  "autolead:bright": ["rap", "trap", "jerseyclub", "reggaeton", "afrobeats"],
-  "autolead:wide": ["rnb", "trap", "drill", "synthwave"],
-  "autolead:gritty": ["drill", "phonk", "rap", "dubstep"],
+  "arp:trance": ["synthwave", "techno", "house", "dnb", "dubstep", "ukgarage", "edm", "rage", "pop"],
+  "arp:acid": ["techno", "house", "dnb", "synthwave", "edm"],
+  "arp:harp": ["lofi", "neosoul", "rnb", "amapiano", "afrobeats", "hiphop", "soul", "ambient", "cinematic", "orchestral", "pop"],
+  "arp:bellarp": ["synthwave", "lofi", "house", "ukgarage", "rnb", "amapiano", "pop", "ambient", "cinematic", "edm"],
+  "tom:808tom": ["trap", "drill", "phonk", "rap", "hiphop", "jerseyclub", "rage", "pluggnb"],
+  "tom:floor": ["rock", "neosoul", "rnb", "dnb", "afrobeats", "metal", "funk", "jazz", "soul", "country"],
+  "tom:gatedtom": ["synthwave", "rock", "phonk", "dubstep", "pop", "metal"],
+  "autolead:bright": ["rap", "trap", "jerseyclub", "reggaeton", "afrobeats", "pop", "pluggnb", "rage"],
+  "autolead:wide": ["rnb", "trap", "drill", "synthwave", "pluggnb", "pop"],
+  "autolead:gritty": ["drill", "phonk", "rap", "dubstep", "rage"],
   // --- drum machines, placed by the era and scene that actually used them
-  lm1: ["synthwave", "rnb", "rock", "lofi", "hiphop", "rap"],
-  rz1: ["lofi", "hiphop", "house", "phonk", "jerseyclub"],
-  hr16: ["rock", "rnb", "neosoul", "lofi"],
-  r8: ["rock", "dnb", "techno", "house"],
+  lm1: ["synthwave", "rnb", "rock", "lofi", "hiphop", "rap", "pop", "soul"],
+  rz1: ["lofi", "hiphop", "house", "phonk", "jerseyclub", "pluggnb"],
+  hr16: ["rock", "rnb", "neosoul", "lofi", "pop", "funk", "soul"],
+  r8: ["rock", "dnb", "techno", "house", "edm", "metal"],
   // --- world percussion
-  tabla: ["afrobeats", "lofi", "rnb", "amapiano"],
-  cabasa: ["afrobeats", "house", "reggaeton", "amapiano", "neosoul"],
-  guiro: ["reggaeton", "afrobeats", "house"],
-  agogo: ["afrobeats", "amapiano", "house", "reggaeton", "jerseyclub"],
-  vibraslap: ["rock", "lofi", "neosoul"],
-  cajon: ["lofi", "neosoul", "rnb", "afrobeats"],
-  djembe: ["afrobeats", "amapiano", "house"],
-  timbale: ["reggaeton", "house", "afrobeats", "jerseyclub"],
-  roto: ["rock", "synthwave", "dnb"],
-  taiko: ["dubstep", "drill", "trap", "dnb", "rap"],
+  tabla: ["afrobeats", "lofi", "rnb", "amapiano", "ambient", "cinematic"],
+  cabasa: ["afrobeats", "house", "reggaeton", "amapiano", "neosoul", "funk", "soul", "jazz", "pop"],
+  guiro: ["reggaeton", "afrobeats", "house", "funk", "soul"],
+  agogo: ["afrobeats", "amapiano", "house", "reggaeton", "jerseyclub", "funk"],
+  vibraslap: ["rock", "lofi", "neosoul", "funk", "country"],
+  cajon: ["lofi", "neosoul", "rnb", "afrobeats", "country", "ambient", "soul"],
+  djembe: ["afrobeats", "amapiano", "house", "ambient", "cinematic"],
+  timbale: ["reggaeton", "house", "afrobeats", "jerseyclub", "funk", "soul"],
+  roto: ["rock", "synthwave", "dnb", "metal"],
+  taiko: ["dubstep", "drill", "trap", "dnb", "rap", "cinematic", "orchestral", "metal", "rage"],
   // --- synths and keyboards
-  sh101: ["house", "techno", "ukgarage", "synthwave", "dnb", "jerseyclub"],
-  fretless: ["neosoul", "rnb", "lofi"],
-  m1organbass: ["house", "ukgarage", "amapiano", "techno", "jerseyclub"],
-  m1piano: ["house", "ukgarage", "amapiano", "jerseyclub", "dnb"],
-  m1organ: ["house", "ukgarage", "amapiano", "techno", "jerseyclub"],
-  cp70: ["synthwave", "rnb", "neosoul", "rock"],
-  honkytonk: ["lofi", "hiphop"],
-  solina: ["synthwave", "lofi", "neosoul", "rnb", "house", "dnb", "ukgarage"],
-  cs80: ["synthwave", "dubstep", "techno", "dnb"],
-  voxhumana: ["synthwave", "lofi", "house"],
-  farfisa: ["rock", "lofi", "house"],
-  accordion: ["afrobeats", "lofi", "reggaeton"],
-  harmonium: ["lofi", "neosoul", "afrobeats"],
+  sh101: ["house", "techno", "ukgarage", "synthwave", "dnb", "jerseyclub", "edm"],
+  fretless: ["neosoul", "rnb", "lofi", "soul", "jazz", "ambient"],
+  m1organbass: ["house", "ukgarage", "amapiano", "techno", "jerseyclub", "pop"],
+  m1piano: ["house", "ukgarage", "amapiano", "jerseyclub", "dnb", "pop"],
+  m1organ: ["house", "ukgarage", "amapiano", "techno", "jerseyclub", "pop", "funk"],
+  cp70: ["synthwave", "rnb", "neosoul", "rock", "pop", "soul"],
+  honkytonk: ["lofi", "hiphop", "country"],
+  solina: ["synthwave", "lofi", "neosoul", "rnb", "house", "dnb", "ukgarage", "ambient", "cinematic", "pop", "soul"],
+  cs80: ["synthwave", "dubstep", "techno", "dnb", "cinematic", "ambient", "edm"],
+  voxhumana: ["synthwave", "lofi", "house", "ambient", "cinematic"],
+  farfisa: ["rock", "lofi", "house", "funk", "soul", "country"],
+  accordion: ["afrobeats", "lofi", "reggaeton", "country", "cinematic", "funk"],
+  harmonium: ["lofi", "neosoul", "afrobeats", "ambient", "country", "cinematic"],
   // --- winds
-  theremin: ["synthwave", "lofi", "dubstep"],
-  panflute: ["afrobeats", "lofi", "amapiano"],
-  harmonica: ["rock", "lofi", "hiphop", "rnb"],
-  ocarina: ["lofi", "synthwave", "afrobeats"],
-  trombone: ["afrobeats", "neosoul", "rnb", "house", "rock"],
-  tuba: ["rock", "hiphop", "afrobeats"],
-  flugelhorn: ["neosoul", "rnb", "lofi", "amapiano"],
+  theremin: ["synthwave", "lofi", "dubstep", "cinematic", "ambient"],
+  panflute: ["afrobeats", "lofi", "amapiano", "ambient", "cinematic", "country"],
+  harmonica: ["rock", "lofi", "hiphop", "rnb", "country", "funk", "soul", "jazz"],
+  ocarina: ["lofi", "synthwave", "afrobeats", "ambient", "cinematic"],
+  trombone: ["afrobeats", "neosoul", "rnb", "house", "rock", "jazz", "funk", "soul", "pop"],
+  tuba: ["rock", "hiphop", "afrobeats", "jazz", "orchestral", "cinematic", "country"],
+  flugelhorn: ["neosoul", "rnb", "lofi", "amapiano", "jazz", "soul", "ambient"],
   // The high flute/piccolo lead over a dark 808 is a trap and drill
   // signature, not an orchestral gesture.
-  piccolo: ["drill", "trap", "dubstep", "rap"],
-  alto: ["neosoul", "rnb", "house", "afrobeats"],
-  bari: ["neosoul", "rnb", "rock", "hiphop", "rap"],
+  piccolo: ["drill", "trap", "dubstep", "rap", "rage", "orchestral", "cinematic"],
+  alto: ["neosoul", "rnb", "house", "afrobeats", "jazz", "funk", "soul", "pop"],
+  bari: ["neosoul", "rnb", "rock", "hiphop", "rap", "jazz", "funk", "soul"],
   // --- plucked and bowed strings
-  sitar: ["lofi", "hiphop", "trap", "afrobeats", "phonk", "rap"],
-  banjo: ["rock", "lofi", "hiphop"],
-  mandolin: ["rock", "lofi", "afrobeats"],
-  ukulele: ["lofi", "afrobeats", "amapiano"],
-  slide: ["rock", "lofi", "hiphop", "phonk", "rap"],
+  sitar: ["lofi", "hiphop", "trap", "afrobeats", "phonk", "rap", "pluggnb", "ambient"],
+  banjo: ["rock", "lofi", "hiphop", "country"],
+  mandolin: ["rock", "lofi", "afrobeats", "country", "cinematic"],
+  ukulele: ["lofi", "afrobeats", "amapiano", "country", "pop"],
+  slide: ["rock", "lofi", "hiphop", "phonk", "rap", "country", "soul"],
   // Dark, sustained low strings are central to UK drill and to the
   // orchestral side of trap.
-  cello: ["rnb", "neosoul", "drill", "trap", "dnb", "rap"],
-  spiccato: ["drill", "trap", "dubstep", "dnb", "rap"],
-  harp: ["rnb", "neosoul", "lofi", "trap", "rap"],
+  cello: ["rnb", "neosoul", "drill", "trap", "dnb", "rap", "orchestral", "cinematic", "ambient", "pop", "metal", "rage"],
+  spiccato: ["drill", "trap", "dubstep", "dnb", "rap", "orchestral", "cinematic", "rage", "metal"],
+  harp: ["rnb", "neosoul", "lofi", "trap", "rap", "orchestral", "cinematic", "ambient", "pop", "pluggnb"],
   // --- tuned percussion
-  hangdrum: ["lofi", "amapiano", "afrobeats", "neosoul"],
-  balafon: ["afrobeats", "amapiano", "house"],
-  kora: ["afrobeats", "amapiano", "lofi"],
-  xylophone: ["afrobeats", "amapiano", "house", "lofi"],
-  tubularbell: ["drill", "trap", "phonk", "dubstep", "rap"],
+  hangdrum: ["lofi", "amapiano", "afrobeats", "neosoul", "ambient", "cinematic"],
+  balafon: ["afrobeats", "amapiano", "house", "ambient"],
+  kora: ["afrobeats", "amapiano", "lofi", "ambient", "cinematic"],
+  xylophone: ["afrobeats", "amapiano", "house", "lofi", "orchestral", "cinematic", "pop"],
+  tubularbell: ["drill", "trap", "phonk", "dubstep", "rap", "rage", "orchestral", "cinematic", "metal"],
 
   // --- synths, placed by the scene that actually made them famous
-  hoover: ["dnb", "dubstep", "techno", "jerseyclub", "phonk", "synthwave"],
-  ms20: ["techno", "dnb", "dubstep", "phonk", "drill"],
-  d50: ["synthwave", "house", "rnb", "ukgarage", "amapiano"],
-  prophet: ["synthwave", "house", "rock", "techno"],
-  obxa: ["synthwave", "rock", "house"],
-  phasedist: ["synthwave", "techno", "ukgarage", "dnb"],
-  jupiter8: ["synthwave", "house", "techno", "lofi", "rnb"],
-  polysix: ["synthwave", "lofi", "house", "neosoul"],
-  ppgwave: ["synthwave", "techno", "dnb", "dubstep", "rock"],
+  hoover: ["dnb", "dubstep", "techno", "jerseyclub", "phonk", "synthwave", "edm", "rage"],
+  ms20: ["techno", "dnb", "dubstep", "phonk", "drill", "edm", "rage", "metal"],
+  d50: ["synthwave", "house", "rnb", "ukgarage", "amapiano", "pop", "edm"],
+  prophet: ["synthwave", "house", "rock", "techno", "pop", "edm", "metal", "cinematic"],
+  obxa: ["synthwave", "rock", "house", "pop", "metal", "cinematic"],
+  phasedist: ["synthwave", "techno", "ukgarage", "dnb", "edm", "pop", "rage"],
+  jupiter8: ["synthwave", "house", "techno", "lofi", "rnb", "pop", "edm", "ambient", "cinematic"],
+  polysix: ["synthwave", "lofi", "house", "neosoul", "pop", "ambient"],
+  ppgwave: ["synthwave", "techno", "dnb", "dubstep", "rock", "edm", "cinematic", "metal"],
   // --- woodwinds. Amapiano in particular is built on live sax and flute
   // over the log drum, and dark flute lines are a UK drill signature.
   // The concert flute on the woodwind track, NOT the lead synth's
   // flute-ish preset, which has always been available everywhere.
-  "woodwind:flute": ["trap", "drill", "rap", "lofi", "afrobeats", "amapiano", "rnb", "neosoul", "hiphop"],
-  altoflute: ["lofi", "neosoul", "rnb", "amapiano"],
-  bassclarinet: ["drill", "neosoul", "lofi", "dnb"],
-  englishhorn: ["neosoul", "lofi", "rnb"],
-  bassoon: ["drill", "dubstep", "neosoul", "rock"],
-  sopranosax: ["amapiano", "neosoul", "rnb", "house", "afrobeats"],
-  shakuhachi: ["lofi", "trap", "drill", "phonk"],
-  bansuri: ["lofi", "afrobeats", "amapiano", "hiphop"],
-  duduk: ["drill", "lofi", "trap", "phonk", "neosoul"],
-  recorder: ["lofi", "afrobeats"],
+  "woodwind:flute": ["trap", "drill", "rap", "lofi", "afrobeats", "amapiano", "rnb", "neosoul", "hiphop", "rage", "pluggnb", "pop", "country", "jazz", "soul", "ambient", "cinematic", "orchestral", "funk"],
+  altoflute: ["lofi", "neosoul", "rnb", "amapiano", "jazz", "soul", "ambient", "cinematic", "orchestral"],
+  bassclarinet: ["drill", "neosoul", "lofi", "dnb", "jazz", "orchestral", "cinematic", "ambient"],
+  englishhorn: ["neosoul", "lofi", "rnb", "orchestral", "cinematic", "ambient", "jazz"],
+  bassoon: ["drill", "dubstep", "neosoul", "rock", "orchestral", "cinematic", "metal"],
+  sopranosax: ["amapiano", "neosoul", "rnb", "house", "afrobeats", "jazz", "funk", "soul", "pop"],
+  shakuhachi: ["lofi", "trap", "drill", "phonk", "ambient", "cinematic", "pluggnb"],
+  bansuri: ["lofi", "afrobeats", "amapiano", "hiphop", "ambient", "cinematic"],
+  duduk: ["drill", "lofi", "trap", "phonk", "neosoul", "cinematic", "ambient", "orchestral"],
+  recorder: ["lofi", "afrobeats", "ambient", "country"],
   // --- lead guitar
-  overdrive: ["rock", "phonk", "synthwave", "dnb", "neosoul"],
-  fuzz: ["rock", "phonk", "dubstep"],
-  wah: ["neosoul", "rnb", "rock", "afrobeats", "amapiano"],
-  sustain: ["rock", "synthwave", "dubstep", "phonk"],
-  octave: ["neosoul", "rnb", "lofi", "amapiano"],
-  cleantone: ["neosoul", "rnb", "lofi", "amapiano", "afrobeats"],
-  harmonics: ["rock", "phonk", "dubstep"],
-  roger: ["rnb", "neosoul", "hiphop", "house", "rap"],
-  gfunk: ["hiphop", "rnb", "phonk", "rap"],
-  robot: ["house", "techno", "rnb", "jerseyclub"],
+  overdrive: ["rock", "phonk", "synthwave", "dnb", "neosoul", "metal", "country", "funk", "pop", "soul"],
+  fuzz: ["rock", "phonk", "dubstep", "metal", "rage", "funk"],
+  wah: ["neosoul", "rnb", "rock", "afrobeats", "amapiano", "funk", "soul", "jazz", "pop"],
+  sustain: ["rock", "synthwave", "dubstep", "phonk", "metal", "cinematic", "ambient"],
+  octave: ["neosoul", "rnb", "lofi", "amapiano", "funk", "soul", "jazz"],
+  cleantone: ["neosoul", "rnb", "lofi", "amapiano", "afrobeats", "jazz", "soul", "country", "pop", "funk", "ambient"],
+  harmonics: ["rock", "phonk", "dubstep", "metal", "ambient", "cinematic"],
+  roger: ["rnb", "neosoul", "hiphop", "house", "rap", "funk", "soul", "pop"],
+  gfunk: ["hiphop", "rnb", "phonk", "rap", "funk", "soul"],
+  robot: ["house", "techno", "rnb", "jerseyclub", "edm", "pop", "funk"],
   // The talkbox vowel path, NOT the plain bright hi-hat.
-  "talkbox:bright": ["house", "rnb", "neosoul", "ukgarage"],
+  "talkbox:bright": ["house", "rnb", "neosoul", "ukgarage", "funk", "soul", "pop", "edm"],
   // --- more documented drum machines
-  drumulator: ["hiphop", "lofi", "rap", "phonk", "house"],
-  drumtraks: ["synthwave", "rnb", "rock", "hiphop"],
-  rx5: ["synthwave", "house", "rnb", "techno", "dnb"],
-  cr8000: ["lofi", "house", "synthwave", "afrobeats"],
-  kr55: ["lofi", "rnb", "neosoul", "hiphop"],
+  drumulator: ["hiphop", "lofi", "rap", "phonk", "house", "pluggnb"],
+  drumtraks: ["synthwave", "rnb", "rock", "hiphop", "pop"],
+  rx5: ["synthwave", "house", "rnb", "techno", "dnb", "pop", "edm"],
+  cr8000: ["lofi", "house", "synthwave", "afrobeats", "pop", "ambient"],
+  kr55: ["lofi", "rnb", "neosoul", "hiphop", "soul", "jazz", "ambient"],
   dr110: ["techno", "house", "phonk", "lofi"],
-  mpc60: ["hiphop", "rap", "lofi", "rnb", "neosoul", "drill"],
+  mpc60: ["hiphop", "rap", "lofi", "rnb", "neosoul", "drill", "pluggnb", "soul", "funk"],
   // --- layering percussion, for the denser end of the complexity dial
-  shekere: ["afrobeats", "amapiano", "house", "neosoul"],
-  ganza: ["afrobeats", "house", "reggaeton", "amapiano"],
-  caxixi: ["afrobeats", "lofi", "neosoul", "amapiano"],
-  udu: ["afrobeats", "amapiano", "lofi", "neosoul"],
-  pandeiro: ["afrobeats", "house", "reggaeton", "neosoul"],
-  tamborim: ["afrobeats", "house", "reggaeton", "amapiano"],
-  repinique: ["afrobeats", "reggaeton", "house"],
-  surdo: ["afrobeats", "reggaeton", "amapiano", "dnb"],
-  bata: ["afrobeats", "amapiano", "house"],
-  cuica: ["afrobeats", "house", "reggaeton"],
+  shekere: ["afrobeats", "amapiano", "house", "neosoul", "funk", "ambient"],
+  ganza: ["afrobeats", "house", "reggaeton", "amapiano", "funk"],
+  caxixi: ["afrobeats", "lofi", "neosoul", "amapiano", "funk", "ambient"],
+  udu: ["afrobeats", "amapiano", "lofi", "neosoul", "ambient", "cinematic"],
+  pandeiro: ["afrobeats", "house", "reggaeton", "neosoul", "funk"],
+  tamborim: ["afrobeats", "house", "reggaeton", "amapiano", "funk"],
+  repinique: ["afrobeats", "reggaeton", "house", "funk"],
+  surdo: ["afrobeats", "reggaeton", "amapiano", "dnb", "funk", "cinematic"],
+  bata: ["afrobeats", "amapiano", "house", "funk"],
+  cuica: ["afrobeats", "house", "reggaeton", "funk"],
   // --- piano and guitar voices
-  felt: ["lofi", "neosoul", "rnb", "amapiano", "synthwave"],
-  tack: ["lofi", "hiphop", "phonk", "rap"],
-  jazzgrand: ["neosoul", "rnb", "house", "lofi", "amapiano"],
-  openchord: ["rock", "lofi", "afrobeats", "neosoul"],
-  resonator: ["rock", "lofi", "phonk", "hiphop"],
-  baritone: ["rock", "phonk", "synthwave", "drill"],
+  felt: ["lofi", "neosoul", "rnb", "amapiano", "synthwave", "ambient", "cinematic", "pop", "soul", "jazz"],
+  tack: ["lofi", "hiphop", "phonk", "rap", "pluggnb", "country"],
+  jazzgrand: ["neosoul", "rnb", "house", "lofi", "amapiano", "jazz", "soul", "funk", "pop"],
+  openchord: ["rock", "lofi", "afrobeats", "neosoul", "country", "pop", "soul", "ambient"],
+  resonator: ["rock", "lofi", "phonk", "hiphop", "country", "metal"],
+  baritone: ["rock", "phonk", "synthwave", "drill", "metal", "rage", "cinematic", "country"],
 };
 
 // A flavor is available to a genre if it is universal, or if that genre is
@@ -277,10 +305,8 @@ const FLAVOR_GENRES = {
 // at home; the same clarinet over trap is not. These two lists are the
 // shapes almost every genre wants, named so they are not retyped nineteen
 // times and quietly diverged.
-const WW_FLUTE = ["flute", "altoflute", "bansuri", "shakuhachi", "duduk", "piccolo",
-                  "panflute", "ocarina", "tinwhistle", "dizi", "ney", "bassflute",
-                  "overblown", "woodflute"];
-const WW_FLUTE_JAZZ = [...WW_FLUTE, "clarinet", "bassclarinet", "sopranosax", "basset"];
+// The per-genre woodwind palette is DERIVED from WOODWIND_ALLOWED, just
+// below GENRE_TRACK_KITS - see the note there.
 
 // The 808 family, in one place. It was written out per genre before, which
 // is how trap ended up listing eight of them TWICE - harmless, but a sign
@@ -304,36 +330,66 @@ const K_HARD_SYNTH_BASS = ["distorted", "growl", "drillslide"];
 const GENRE_TRACK_KITS = {
   // The 808 genres. The bass is an 808 - that is the entire point - so the
   // list is the 808 family plus the two sub variants that still read as one.
-  trap:       { bass: [...K808_ALL, ...K_HARD_SYNTH_BASS], woodwind: WW_FLUTE },
-  rap:        { bass: [...K808_ALL, ...K_HARD_SYNTH_BASS], woodwind: WW_FLUTE },
+  trap:       { bass: [...K808_ALL, ...K_HARD_SYNTH_BASS] },
+  rap:        { bass: [...K808_ALL, ...K_HARD_SYNTH_BASS] },
   // Drill leads with the slide, which is the genre's signature 808 move.
-  drill:      { bass: ["slide808", ...K808_ALL, ...K_HARD_SYNTH_BASS],
-                woodwind: WW_FLUTE },
+  drill:      { bass: ["slide808", ...K808_ALL, ...K_HARD_SYNTH_BASS] },
   // Phonk is the dirty end of the family and has no use for a polite one.
-  phonk:      { bass: [...K808_FILTHY, ...K808_HARD, ...K808_WARM, ...K_HARD_SYNTH_BASS],
-                woodwind: WW_FLUTE },
-  jerseyclub: { bass: [...K808_HARD, ...K808_WARM, ...K808_CLEAN], woodwind: WW_FLUTE },
-  hiphop:     { woodwind: WW_FLUTE_JAZZ },
+  phonk:      { bass: [...K808_FILTHY, ...K808_HARD, ...K808_WARM, ...K_HARD_SYNTH_BASS] },
+  jerseyclub: { bass: [...K808_HARD, ...K808_WARM, ...K808_CLEAN] },
   // Dance genres: the bass is a synth, never an acoustic one.
-  house:      { bass: ["warm", "synth", "sub", "pluck", "moog", "303", "sh101", "m1organbass", "reese"],
-                woodwind: WW_FLUTE_JAZZ },
+  house:      { bass: ["warm", "synth", "sub", "pluck", "moog", "303", "sh101", "m1organbass", "reese"] },
   techno:     { bass: ["303", "sub", "distorted", "reese", "moog", "sh101", "synth", "pluck"] },
-  dnb:        { bass: ["reese", "sub", "growl", "wobble", "distorted", "synth", "moog", "upright"],
-                woodwind: WW_FLUTE },
+  dnb:        { bass: ["reese", "sub", "growl", "wobble", "distorted", "synth", "moog", "upright"] },
   dubstep:    { bass: ["wobble", "growl", "reese", "sub", "distorted", "hard808"] },
-  ukgarage:   { bass: ["sub", "warm", "synth", "pluck", "moog", "sh101", "reese", "m1organbass"],
-                woodwind: WW_FLUTE },
+  ukgarage:   { bass: ["sub", "warm", "synth", "pluck", "moog", "sh101", "reese", "m1organbass"] },
   // Live-band genres: the bass is played by a person.
-  rock:       { bass: ["warm", "upright", "slap", "fretless", "distorted", "moog"] },
-  neosoul:    { bass: ["upright", "warm", "fretless", "slap", "moog", "sub"],
-                woodwind: WW_FLUTE_JAZZ },
-  // The Afro-diasporic and Latin genres take flutes and jazz reeds freely -
-  // a soprano sax over amapiano or a flute over afrobeats is the sound - but
-  // an oboe or a bassoon still belongs to a different record entirely.
-  afrobeats:  { woodwind: WW_FLUTE_JAZZ },
-  amapiano:   { woodwind: WW_FLUTE_JAZZ },
-  reggaeton:  { woodwind: WW_FLUTE_JAZZ },
+  rock:       { bass: ["warm", "upright", "slap", "fretless", "distorted", "moog", "pluck"] },
+  neosoul:    { bass: ["upright", "warm", "fretless", "slap", "moog", "sub", "pluck"] },
+  // The two new 808 genres. Rage lives at the filthy end of the family by
+  // definition; pluggnb is the opposite - a round, barely-driven 808 is the
+  // whole reason the genre reads as soft.
+  rage:       { bass: [...K808_FILTHY, ...K808_HARD, ...K_HARD_SYNTH_BASS] },
+  pluggnb:    { bass: [...K808_WARM, ...K808_CLEAN] },
+  // Live-band and orchestral genres: the bass is played, not synthesised.
+  jazz:       { bass: ["upright", "fretless", "warm", "slap"] },
+  country:    { bass: ["warm", "upright", "fretless", "slap"] },
+  soul:       { bass: ["warm", "fretless", "upright", "slap", "moog"] },
+  funk:       { bass: ["slap", "warm", "fretless", "moog", "synth"] },
+  orchestral: { bass: ["upright", "warm", "sub"] },
+  cinematic:  { bass: ["sub", "upright", "warm", "distorted"] },
+  metal:      { bass: ["distorted", "warm", "growl", "reese"] },
+  ambient:    { bass: ["sub", "warm", "pluck", "fretless"] },
+  edm:        { bass: ["reese", "sub", "synth", "moog", "303", "sh101", "wobble", "warm"] },
+  pop:        { bass: ["synth", "warm", "sub", "pluck", "moog", "sh101"] },
 };
+
+// The woodwind palette is DERIVED from WOODWIND_ALLOWED (js/production.js),
+// not written out a second time here.
+//
+// It used to be two hand-kept constants, WW_FLUTE and WW_FLUTE_JAZZ, sitting
+// alongside a completely separate per-genre family table in production.js -
+// two sources for one rule. Adding twelve genres desynced them immediately:
+// pop, country and funk declared "flute and jazz reeds only" in production.js
+// while patterns.js left their pool wide open, so all three could load an oboe
+// or a contrabassoon. The audit caught it; nothing in the program would have.
+// A family list is now the only place a woodwind decision is written down.
+// Deliberately loud rather than defensive. Skipping the derivation when
+// production.js is absent would leave every genre's woodwind pool wide open
+// and say nothing - and a tool that bundles patterns.js without production.js
+// would then be measuring a program that is not the one that ships. Three of
+// them were doing exactly that.
+if (typeof WOODWIND_ALLOWED === "undefined" || typeof WOODWIND_FAMILIES === "undefined") {
+  throw new Error("patterns.js requires js/production.js to be loaded first");
+}
+for (const [gid, fams] of Object.entries(WOODWIND_ALLOWED)) {
+  // An empty list means the track never plays in that genre at all, which is
+  // enforced by the instrumentation plan, not by a kit palette.
+  if (!fams.length) continue;
+  const kits = [];
+  for (const fam of fams) kits.push(...(WOODWIND_FAMILIES[fam] || []));
+  (GENRE_TRACK_KITS[gid] = GENRE_TRACK_KITS[gid] || {}).woodwind = kits;
+}
 
 function flavorFitsGenre(inst, flavor, styleId) {
   // Called as (flavor, styleId) in older code paths; detect and shift.
@@ -392,13 +448,13 @@ const FLAVOR_TAGS = {
 // idiom, not something an 808 pattern does.
 // Genres built on the 3+3+2 tresillo cell.
 // Genres where a filter sweep is a primary arrangement device.
-const FILTER_SWEEP_GENRES = new Set(["house", "techno", "dubstep", "dnb", "ukgarage", "synthwave"]);
+const FILTER_SWEEP_GENRES = new Set(["house", "techno", "dubstep", "dnb", "ukgarage", "synthwave", "edm", "rage"]);
 
 const DRUMS_SET = new Set(["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "fx"]);
 
 const TRESILLO_GENRES = new Set(["reggaeton", "afrobeats", "amapiano"]);
 
-const GHOST_GENRES = new Set(["rock", "rnb", "neosoul", "hiphop", "lofi", "dnb", "ukgarage"]);
+const GHOST_GENRES = new Set(["rock", "rnb", "neosoul", "hiphop", "lofi", "dnb", "ukgarage", "jazz", "soul", "funk", "country"]);
 
 const FLAVOR_PALETTES = ["warm", "bright", "dark"];
 
@@ -936,7 +992,7 @@ function applyChorusHook(melody, inst, style, barMetas, barRootDegrees) {
   const params = style.melody[inst];
   if (!params || !barMetas.some((b) => b.type === "chorus")) return;
 
-  const register = REGISTER[inst];
+  const register = registerFor(style, inst);
   // Same ensemble discipline as the verse material: the bass hook stays in
   // the bass lane, everything else can sit at or above home register.
   // Octave displacement, for variety between generations. It used to be "up an
@@ -2378,6 +2434,648 @@ const STYLES = {
       },
     },
   },
+
+  // ---------------------------------------------------------------------
+  // Twelve more genres
+  // ---------------------------------------------------------------------
+  // Each carries the same six things every other genre here does, because
+  // those six are what a genre IS to this program: a tempo range, a mode
+  // pool, a chord vocabulary, a drum pattern, a set of instruments it is
+  // allowed to field, and a harmonic rhythm. A genre that only had a name
+  // and a kit list would generate the same music as its neighbour wearing
+  // different sounds, which is the failure this program spent several
+  // rounds measuring its way out of.
+  rage: {
+    name: "Rage",
+    description: "Distorted synth leads over a punishing 808, deliberately sparse - the Opium sound.",
+    tempo: { min: 148, max: 168, default: 158 },
+    swing: 0.02,
+    humanize: { timingMs: 4, velocityJitter: 0.12 },
+    key: "F1",
+    scale: "minor",
+    progressions: [[0,0],[0,6],[0,5,0,6],[0,3],[0,6,5,6]],
+    defaultFlavors: { kick: "808", snare: "trapsnap", hihat: "sizzle", bass: "rage808", lead: "phasedist", pad: "dark", stab: "saw-chord", vocal: "ay" },
+    drums: {
+      instruments: ["kick","snare","hihat","openhat","crash"],
+      main: {
+        core: {
+          kick:    [1,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+          snare:   [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          hihat:   [1,0,1,1, 1,0,1,0, 1,0,1,1, 1,0,1,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1],
+        },
+        optional: {
+          kick:    [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,1,0,0],
+          hihat:   [0,1,0,0, 0,1,0,1, 0,1,0,0, 0,1,0,1],
+          openhat: [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,0],
+        },
+        optionalProbability: 0.34,
+      },
+    },
+    melodic: { monoInstruments: ["bass","lead"], chordInstruments: ["pad","stab","vocal"] },
+    melody: {
+      // Rage is deliberately empty underneath the scream: one long 808 per
+      // chord, almost always the root, so the distortion has room to be the
+      // loudest thing in the record.
+      bass: { motifBars: 1, noteLengths: [[6,3],[8,3],[4,2]], restProbability: 0.45, chordToneProbability: 0.95, chordTonePool: [[0,8],[4,1]], passingTonePool: [[-2,1]], variationProbability: 0.25 },
+      lead: { motifBars: 2, noteLengths: [[2,3],[4,3],[8,1]], restProbability: 0.5, chordToneProbability: 0.85, chordTonePool: [[0,4],[2,2],[4,2]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.3 },
+    },
+    chords: {
+      pad: {
+        core:     [C(0,3,16),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      stab: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,C(0,3,2),0, 0,0,0,0, 0,0,0,0],
+        optionalProbability: 0.3,
+      },
+      vocal: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,C(0,1,1),0],
+        optionalProbability: 0.3,
+      },
+    },
+  },
+  pluggnb: {
+    name: "PluggnB",
+    description: "Detuned bells and soft plucks over a round 808 - plugg's dreamy R&B cousin.",
+    tempo: { min: 128, max: 148, default: 138 },
+    swing: 0.06,
+    humanize: { timingMs: 4, velocityJitter: 0.12 },
+    key: "D#2",
+    scale: "dorian",
+    progressions: [[0,3,5,4],[0,5,3,4],[0,4,5,3],[0,3],[5,4,0,3]],
+    defaultFlavors: { kick: "808", snare: "clap", hihat: "bright", bass: "detuned808", lead: "bell", pad: "airy", piano: "rhodes", stab: "bell-chord", vocal: "ooh" },
+    drums: {
+      instruments: ["kick","snare","hihat","openhat","perc"],
+      main: {
+        core: {
+          kick:    [1,0,0,0, 0,0,1,0, 0,0,1,0, 0,0,0,0],
+          snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat:   [1,0,1,0, 1,0,1,1, 1,0,1,0, 1,0,1,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1],
+        },
+        optional: {
+          kick:    [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,1,0],
+          hihat:   [0,1,0,1, 0,1,0,0, 0,1,0,1, 0,1,0,1],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,1, 0,0,0,0],
+        },
+        optionalProbability: 0.32,
+      },
+    },
+    melodic: { monoInstruments: ["bass","lead"], chordInstruments: ["piano","pad","stab","vocal"] },
+    melody: {
+      // Plugg 808s glide between chord tones rather than restating the root -
+      // the slide IS the part, so more movement than rage and fewer rests.
+      bass: { motifBars: 2, noteLengths: [[4,3],[6,3],[8,2]], restProbability: 0.32, chordToneProbability: 0.9, chordTonePool: [[0,6],[4,2],[7,1]], passingTonePool: [[-2,1],[2,1]], variationProbability: 0.3 },
+      lead: { motifBars: 2, noteLengths: [[2,4],[3,2],[4,2]], restProbability: 0.4, chordToneProbability: 0.85, chordTonePool: [[0,3],[2,3],[4,2],[7,1]], passingTonePool: [[1,1],[3,1],[-1,1]], variationProbability: 0.38 },
+    },
+    chords: {
+      piano: {
+        core:     [C(0,4,8),0,0,0, 0,0,0,0, C(0,4,8),0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      pad: {
+        core:     [C(0,4,16),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      stab: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,C(2,3,2),0, 0,0,0,0, 0,0,0,0],
+        optionalProbability: 0.34,
+      },
+      vocal: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,C(0,2,2),0],
+        optionalProbability: 0.36,
+      },
+    },
+  },
+  pop: {
+    name: "Pop",
+    description: "Bright synths, a piano hook and a four-chord chorus built to be sung back.",
+    tempo: { min: 100, max: 132, default: 118 },
+    swing: 0.02,
+    humanize: { timingMs: 4, velocityJitter: 0.12 },
+    key: "C2",
+    scale: "major",
+    progressions: [[0,4,5,3],[5,3,0,4],[0,3,5,4],[0,4,3,5],[3,4,5,0]],
+    defaultFlavors: { kick: "punch", snare: "clap", hihat: "bright", bass: "synth", lead: "supersaw", piano: "grand", pad: "warm", stab: "pluck-chord", vocal: "ahh" },
+    drums: {
+      instruments: ["kick","snare","hihat","openhat","clap","perc","crash"],
+      main: {
+        core: {
+          kick:    [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,1],
+        },
+        optional: {
+          kick:    [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
+          hihat:   [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+          openhat: [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,0],
+        },
+        optionalProbability: 0.32,
+      },
+    },
+    melodic: { monoInstruments: ["bass","lead"], chordInstruments: ["piano","pad","stab","vocal"] },
+    melody: {
+      // Pop bass is support, not a feature: steady eighths on the root under
+      // the vocal, almost no rests, very little variation bar to bar.
+      bass: { motifBars: 2, noteLengths: [[2,4],[4,3]], restProbability: 0.18, chordToneProbability: 0.9, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.22 },
+      lead: { motifBars: 2, noteLengths: [[2,3],[4,4],[3,2]], restProbability: 0.34, chordToneProbability: 0.8, chordTonePool: [[0,3],[2,3],[4,2],[7,1]], passingTonePool: [[1,2],[3,1],[-1,1]], variationProbability: 0.36 },
+    },
+    chords: {
+      piano: {
+        core:     [C(0,3,4),0,0,0, C(0,3,4),0,0,0, C(0,3,4),0,0,0, C(0,3,4),0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      pad: {
+        core:     [C(0,4,16),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      stab: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, C(0,3,2),0,0,0, 0,0,0,0],
+        optionalProbability: 0.3,
+      },
+      vocal: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,C(0,2,2),0],
+        optionalProbability: 0.3,
+      },
+    },
+  },
+  metal: {
+    name: "Metal",
+    description: "Downtuned distorted guitars, double-kick drums and a Phrygian riff.",
+    tempo: { min: 140, max: 200, default: 168 },
+    swing: 0.00,
+    humanize: { timingMs: 4, velocityJitter: 0.12 },
+    key: "E1",
+    scale: "phrygian",
+    progressions: [[0,1,0,6],[0,0,5,6],[0,6,5,1],[0,1],[0,5,1,0]],
+    defaultFlavors: { kick: "punch", snare: "crack", hihat: "metallic", bass: "distorted", guitar: "power", leadguitar: "metal", tom: "acoustic" },
+    drums: {
+      instruments: ["kick","snare","hihat","tom","crash"],
+      main: {
+        core: {
+          kick:    [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+          snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+          hihat:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optionalProbability: 0.38,
+      },
+    },
+    melodic: { monoInstruments: ["bass","leadguitar"], chordInstruments: ["guitar"] },
+    melody: {
+      // Metal bass doubles the riff. It is not writing a separate line, so it
+      // gets the guitar's note lengths, near-zero rest and low variation.
+      bass: { motifBars: 2, noteLengths: [[1,3],[2,5],[4,1]], restProbability: 0.08, chordToneProbability: 0.92, chordTonePool: [[0,6],[4,1],[7,1]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.2 },
+      leadguitar: { motifBars: 2, noteLengths: [[1,3],[2,4],[4,2]], restProbability: 0.3, chordToneProbability: 0.7, chordTonePool: [[0,3],[2,2],[4,3],[7,1]], passingTonePool: [[1,2],[3,1],[-1,2]], variationProbability: 0.4 },
+    },
+    chords: {
+      guitar: {
+        core:     [C(0,2,2),0,C(0,2,2),0, C(0,2,2),0,C(0,2,2),0, C(0,2,2),0,C(0,2,2),0, C(0,2,2),0,C(0,2,2),0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+    },
+  },
+  jazz: {
+    name: "Jazz",
+    description: "Upright bass, brushed drums, a comping piano and a horn taking the head.",
+    tempo: { min: 110, max: 175, default: 140 },
+    swing: 0.32,
+    humanize: { timingMs: 4, velocityJitter: 0.12 },
+    key: "F2",
+    scale: "dorian",
+    progressions: [[1,4,0,0],[0,3,6,2],[1,4,0,5],[0,1,4,0],[2,5,1,4]],
+    defaultFlavors: { kick: "jazzkick", snare: "brush", hihat: "ride", bass: "upright", piano: "jazzgrand", sax: "tenor", horn: "solotrumpet", perc: "shaker" },
+    drums: {
+      instruments: ["kick","snare","hihat","perc","crash"],
+      main: {
+        core: {
+          kick:    [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+          snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat:   [1,0,0,1, 1,0,0,1, 1,0,0,1, 1,0,0,1],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,0,0,0, 0,0,1,0, 0,0,1,0, 0,0,0,0],
+          hihat:   [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optionalProbability: 0.4,
+      },
+    },
+    melodic: { monoInstruments: ["bass","sax"], chordInstruments: ["piano","horn"] },
+    melody: {
+      // A walking bass: one note per beat, essentially no rests, and a lot of
+      // chromatic approach - the passing tones are the point, not an
+      // occasional decoration, so the pool is weighted far heavier than
+      // anywhere else in the program.
+      bass: { motifBars: 2, noteLengths: [[4,9],[2,1]], restProbability: 0.03, chordToneProbability: 0.66, chordTonePool: [[0,4],[2,2],[4,3],[7,2]], passingTonePool: [[1,2],[-1,2],[3,1],[5,1],[6,1]], variationProbability: 0.55 },
+      sax: { motifBars: 2, noteLengths: [[1,3],[2,4],[3,2],[4,2]], restProbability: 0.34, chordToneProbability: 0.62, chordTonePool: [[0,2],[2,3],[4,2],[6,2]], passingTonePool: [[1,3],[3,2],[-1,3],[5,1]], variationProbability: 0.5 },
+    },
+    chords: {
+      piano: {
+        core:     [0,0,C(0,4,3),0, 0,0,0,0, C(0,4,3),0,0,0, 0,0,C(2,4,2),0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      horn: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, C(0,3,4),0,0,0, 0,0,0,0],
+        optionalProbability: 0.35,
+      },
+    },
+  },
+  edm: {
+    name: "EDM",
+    description: "Supersaw leads, a sidechained bass and a build that exists to drop.",
+    tempo: { min: 124, max: 134, default: 128 },
+    swing: 0.00,
+    humanize: { timingMs: 4, velocityJitter: 0.12 },
+    key: "A1",
+    scale: "minor",
+    progressions: [[0,5,3,4],[0,3,4,5],[5,3,0,4],[0,4],[0,6,3,4]],
+    defaultFlavors: { kick: "fourfloor", snare: "clap", hihat: "bright", bass: "reese", lead: "supersaw", pad: "strings2", stab: "supersaw-chord", arp: "trance", fx: "uplifter" },
+    drums: {
+      instruments: ["kick","snare","hihat","openhat","crash","fx"],
+      main: {
+        core: {
+          kick:    [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+          snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat:   [0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],
+          openhat: [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
+        },
+        optional: {
+          kick:    [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,1,0],
+          hihat:   [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+        },
+        optionalProbability: 0.3,
+      },
+    },
+    melodic: { monoInstruments: ["bass","lead","arp"], chordInstruments: ["pad","stab"] },
+    melody: {
+      // Sidechained eighths under a four-on-the-floor kick - the bass is a
+      // pulse, and the octave jump is the only movement it needs.
+      bass: { motifBars: 1, noteLengths: [[2,5],[4,2],[1,1]], restProbability: 0.14, chordToneProbability: 0.9, chordTonePool: [[0,5],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.2, harmony: { shape: "octave", probability: 0.25, minLen: 2 } },
+      // Sixteenth-note trance arp: near-continuous, almost entirely chord
+      // tones, and barely varied - the filter and the chord change carry
+      // the interest, not the note choice.
+      arp: { motifBars: 1, noteLengths: [[1,6],[2,3]], restProbability: 0.18, chordToneProbability: 0.92, chordTonePool: [[0,3],[2,2],[4,3],[7,2]], passingTonePool: [[1,1]], variationProbability: 0.15 },
+      lead: { motifBars: 2, noteLengths: [[2,3],[4,4],[8,1]], restProbability: 0.3, chordToneProbability: 0.85, chordTonePool: [[0,3],[2,2],[4,3],[7,2]], passingTonePool: [[1,1],[3,1]], variationProbability: 0.3 },
+    },
+    chords: {
+      pad: {
+        core:     [C(0,4,16),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      stab: {
+        core:     [C(0,3,1),0,0,0, C(0,3,1),0,0,0, C(0,3,1),0,0,0, C(0,3,1),0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+    },
+  },
+  country: {
+    name: "Country",
+    description: "Acoustic guitar, a slide lead, brushed drums and a story to tell.",
+    tempo: { min: 88, max: 132, default: 110 },
+    swing: 0.10,
+    humanize: { timingMs: 4, velocityJitter: 0.12 },
+    key: "G2",
+    scale: "major",
+    progressions: [[0,3,4,0],[0,4,5,3],[0,3,0,4],[5,3,0,4],[0,4,0,3]],
+    defaultFlavors: { kick: "acoustic", snare: "acoustic", hihat: "brushhat", bass: "warm", guitar: "acoustic", leadguitar: "twang", piano: "honkytonk", strings: "soul", perc: "tambourine" },
+    drums: {
+      instruments: ["kick","snare","hihat","perc","crash"],
+      main: {
+        core: {
+          kick:    [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
+          hihat:   [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optionalProbability: 0.3,
+      },
+    },
+    melodic: { monoInstruments: ["bass","leadguitar"], chordInstruments: ["guitar","piano","strings"] },
+    melody: {
+      // Root-fifth alternation on the beat: the oldest bass part in the genre
+      // and still the correct one, so the chord-tone pool is root and fifth
+      // and almost nothing else.
+      bass: { motifBars: 2, noteLengths: [[4,5],[2,2]], restProbability: 0.1, chordToneProbability: 0.95, chordTonePool: [[0,6],[4,3]], passingTonePool: [[-1,1],[2,1]], variationProbability: 0.2 },
+      leadguitar: { motifBars: 2, noteLengths: [[2,3],[3,3],[4,2],[6,1]], restProbability: 0.4, chordToneProbability: 0.78, chordTonePool: [[0,3],[2,3],[4,2],[7,1]], passingTonePool: [[1,2],[3,1],[-1,2]], variationProbability: 0.35 },
+    },
+    chords: {
+      guitar: {
+        core:     [C(0,3,4),0,0,0, C(0,3,4),0,0,0, C(0,3,4),0,0,0, C(0,3,4),0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      piano: {
+        core:     [0,0,0,0, 0,0,0,0, C(0,3,4),0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      strings: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [C(0,3,16),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optionalProbability: 0.3,
+      },
+    },
+  },
+  orchestral: {
+    name: "Orchestral",
+    description: "Strings, horns and timpani - written for a room rather than a speaker.",
+    tempo: { min: 66, max: 126, default: 96 },
+    swing: 0.00,
+    humanize: { timingMs: 4, velocityJitter: 0.12 },
+    key: "D2",
+    scale: "major",
+    progressions: [[0,4,5,0],[0,3,4,0],[0,5,3,4],[0,4,0,3],[5,0,3,4]],
+    defaultFlavors: { kick: "acoustic", snare: "acoustic", perc: "timpani", bass: "upright", strings: "orchestral", horn: "frenchhorn", piano: "grand", woodwind: "oboe" },
+    drums: {
+      instruments: ["kick","snare","perc","crash"],
+      main: {
+        core: {
+          kick:    [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          snare:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+          hihat:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optionalProbability: 0.28,
+      },
+    },
+    melodic: { monoInstruments: ["bass","woodwind"], chordInstruments: ["strings","horn","piano"] },
+    melody: {
+      // The double-bass section moves slowly and holds: long values, root-
+      // heavy, and it does not restate its idea every bar.
+      bass: { motifBars: 2, noteLengths: [[8,3],[6,2],[4,2],[16,1]], restProbability: 0.2, chordToneProbability: 0.92, chordTonePool: [[0,6],[4,2],[7,1]], passingTonePool: [[2,1],[-1,1]], variationProbability: 0.25 },
+      woodwind: { motifBars: 4, noteLengths: [[4,3],[6,3],[8,2],[12,1]], restProbability: 0.42, chordToneProbability: 0.78, chordTonePool: [[0,3],[2,2],[4,2],[7,1]], passingTonePool: [[1,2],[3,1],[-1,2]], variationProbability: 0.3, harmony: { shape: "third", probability: 0.45, minLen: 4 } },
+    },
+    chords: {
+      strings: {
+        core:     [C(0,4,16),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      horn: {
+        core:     [0,0,0,0, 0,0,0,0, C(0,3,8),0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      piano: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [C(0,4,8),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optionalProbability: 0.3,
+      },
+    },
+  },
+  cinematic: {
+    name: "Cinematic",
+    description: "Low strings, brass swells and taiko - trailer music, built to loom.",
+    tempo: { min: 70, max: 120, default: 90 },
+    swing: 0.00,
+    humanize: { timingMs: 4, velocityJitter: 0.12 },
+    key: "C2",
+    scale: "minor",
+    progressions: [[0,5,0,6],[0,6,5,0],[0,3,6,5],[0,0,6,5],[0,5]],
+    defaultFlavors: { kick: "deep", snare: "gated", tom: "taiko", perc: "timpani", bass: "sub", strings: "cinematic", horn: "lowbrass", pad: "choir", stab: "orchhit", fx: "downlifter" },
+    drums: {
+      instruments: ["kick","snare","tom","perc","crash","fx"],
+      main: {
+        core: {
+          kick:    [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          snare:   [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          // Taikos answer the kick rather than doubling it - the gap between
+          // the two is what makes trailer percussion feel enormous.
+          tom:     [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,1,0],
+          hihat:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,0,0,0, 0,0,1,0, 0,0,0,0, 0,0,1,0],
+          tom:     [0,0,1,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+          hihat:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optionalProbability: 0.34,
+      },
+    },
+    melodic: { monoInstruments: ["bass","strings"], chordInstruments: ["horn","pad","stab"] },
+    melody: {
+      // A sub pedal under the strings. Whole notes on the root; movement here
+      // would fight the picture, not support it.
+      bass: { motifBars: 2, noteLengths: [[16,3],[8,3]], restProbability: 0.15, chordToneProbability: 0.95, chordTonePool: [[0,8],[4,1]], passingTonePool: [[-2,1]], variationProbability: 0.15 },
+      strings: { motifBars: 4, noteLengths: [[6,3],[8,3],[12,2],[16,1]], restProbability: 0.48, chordToneProbability: 0.85, chordTonePool: [[0,4],[2,2],[4,2]], passingTonePool: [[1,1],[-1,1]], variationProbability: 0.25, harmony: { shape: "third", probability: 0.55, minLen: 6 } },
+    },
+    chords: {
+      horn: {
+        core:     [0,0,0,0, 0,0,0,0, C(0,3,8),0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      pad: {
+        core:     [C(0,3,16),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      stab: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [C(0,3,2),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optionalProbability: 0.3,
+      },
+    },
+  },
+  funk: {
+    name: "Funk",
+    description: "Slap bass, a clavinet on the one, and horns answering the groove.",
+    tempo: { min: 96, max: 120, default: 106 },
+    swing: 0.14,
+    humanize: { timingMs: 4, velocityJitter: 0.12 },
+    key: "E2",
+    scale: "mixolydian",
+    progressions: [[0,0,3,0],[0,3],[0,6,3,0],[0,4,3,0],[0,0]],
+    defaultFlavors: { kick: "punch", snare: "crisp", hihat: "tick", bass: "slap", piano: "clav", guitar: "funk", horn: "hornsection", organ: "drawbar", perc: "cowbell" },
+    drums: {
+      instruments: ["kick","snare","hihat","openhat","perc","crash"],
+      main: {
+        core: {
+          kick:    [1,0,0,0, 0,0,1,0, 0,0,1,0, 0,0,0,0],
+          snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat:   [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,1,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,0,1,0, 0,0,0,1, 0,0,0,0, 0,1,0,0],
+          hihat:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+          openhat: [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,0,1],
+        },
+        optionalProbability: 0.36,
+      },
+    },
+    melodic: { monoInstruments: ["bass"], chordInstruments: ["piano","guitar","horn","organ"] },
+    melody: {
+      // In funk the bass IS the lead: syncopated sixteenths, wide intervals,
+      // heavy rests to leave the one exposed, and the highest variation
+      // rate of any bass part here.
+      bass: { motifBars: 2, noteLengths: [[1,4],[2,4],[3,1]], restProbability: 0.3, chordToneProbability: 0.7, chordTonePool: [[0,4],[4,2],[7,2],[2,1]], passingTonePool: [[1,2],[-1,2],[3,1],[6,1]], variationProbability: 0.5 },
+    },
+    chords: {
+      piano: {
+        core:     [C(0,4,1),0,0,0, 0,0,C(0,4,1),0, 0,0,0,0, 0,0,C(0,4,1),0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      guitar: {
+        core:     [0,0,C(0,3,1),0, 0,0,0,0, C(0,3,1),0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      horn: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, C(0,3,2),0,0,0],
+        optionalProbability: 0.4,
+      },
+      organ: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [C(0,4,8),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optionalProbability: 0.3,
+      },
+    },
+  },
+  soul: {
+    name: "Soul",
+    description: "Rhodes, a Hammond, horn stabs and strings behind a backbeat you can lean on.",
+    tempo: { min: 68, max: 104, default: 86 },
+    swing: 0.17,
+    humanize: { timingMs: 4, velocityJitter: 0.12 },
+    key: "F2",
+    scale: "dorian",
+    progressions: [[0,3,4,0],[0,5,3,4],[1,4,0,0],[0,3,1,4],[5,4,0,3]],
+    defaultFlavors: { kick: "boombap", snare: "fat", hihat: "dark", bass: "warm", piano: "rhodes", organ: "gospel", horn: "section", strings: "soul", perc: "tambourine" },
+    drums: {
+      instruments: ["kick","snare","hihat","perc","crash"],
+      main: {
+        core: {
+          kick:    [1,0,0,0, 0,0,1,0, 0,0,1,0, 0,0,0,0],
+          snare:   [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+          hihat:   [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,0,0,0, 0,0,0,1, 0,0,0,0, 0,0,1,0],
+          hihat:   [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optionalProbability: 0.34,
+      },
+    },
+    melodic: { monoInstruments: ["bass","sax"], chordInstruments: ["piano","organ","horn","strings"] },
+    melody: {
+      // Melodic electric bass - eighths with fills, and enough non-chord tone
+      // to sound like a player answering the vocal rather than a root note
+      // generator.
+      bass: { motifBars: 2, noteLengths: [[2,3],[4,3],[3,2]], restProbability: 0.22, chordToneProbability: 0.8, chordTonePool: [[0,4],[4,2],[7,1],[2,1]], passingTonePool: [[2,1],[-1,1],[1,1]], variationProbability: 0.4 },
+      sax: { motifBars: 2, noteLengths: [[3,3],[4,3],[6,2],[8,1]], restProbability: 0.44, chordToneProbability: 0.74, chordTonePool: [[0,3],[2,3],[4,2],[6,1]], passingTonePool: [[1,2],[3,1],[-1,2]], variationProbability: 0.4, harmony: { shape: "third", probability: 0.4, minLen: 3 } },
+    },
+    chords: {
+      piano: {
+        core:     [C(0,4,6),0,0,0, 0,0,0,0, C(0,4,6),0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      organ: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [C(0,4,16),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optionalProbability: 0.34,
+      },
+      horn: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, 0,0,0,0, C(0,3,2),0,0,0],
+        optionalProbability: 0.38,
+      },
+      strings: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [0,0,0,0, 0,0,0,0, C(2,3,8),0,0,0, 0,0,0,0],
+        optionalProbability: 0.3,
+      },
+    },
+  },
+  ambient: {
+    name: "Ambient",
+    description: "Slow pads, almost no drums, and space treated as the main instrument.",
+    tempo: { min: 56, max: 92, default: 72 },
+    swing: 0.00,
+    humanize: { timingMs: 4, velocityJitter: 0.12 },
+    key: "D2",
+    scale: "lydian",
+    progressions: [[0,3],[0,4],[0,5],[0,3,0,4],[0,0]],
+    defaultFlavors: { kick: "softkick", perc: "shaker", bass: "sub", pad: "airy", strings: "tremolo", piano: "felt", woodwind: "bassflute", fx: "wind" },
+    drums: {
+      instruments: ["kick","perc","fx"],
+      main: {
+        core: {
+          kick:    [1,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+          snare:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+          hihat:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optional: {
+          kick:    [0,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+          hihat:   [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+          openhat: [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        },
+        optionalProbability: 0.22,
+      },
+    },
+    melodic: { monoInstruments: ["bass","piano"], chordInstruments: ["pad","strings"] },
+    melody: {
+      // A drone. One note per phrase, held, essentially never rewritten.
+      bass: { motifBars: 2, noteLengths: [[16,4],[8,2]], restProbability: 0.3, chordToneProbability: 0.95, chordTonePool: [[0,7],[4,2]], passingTonePool: [[-2,1]], variationProbability: 0.1 },
+      piano: { motifBars: 4, noteLengths: [[8,3],[12,3],[16,2]], restProbability: 0.62, chordToneProbability: 0.9, chordTonePool: [[0,4],[2,2],[4,2]], passingTonePool: [[1,1]], variationProbability: 0.18 },
+    },
+    chords: {
+      pad: {
+        core:     [C(0,4,16),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: new Array(STEPS_PER_BAR).fill(0),
+        optionalProbability: 0,
+      },
+      strings: {
+        core:     [0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optional: [C(2,3,16),0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+        optionalProbability: 0.35,
+      },
+    },
+  },
 };
 
 // Each style carries its own key so downstream logic (ghost-note
@@ -2527,7 +3225,7 @@ function pickChordVariety(style) {
     // must never jitter a further octave down - that lands them squarely
     // in the bass's lane and turns the low end to mud, another piece of
     // the "instruments fighting each other" problem.
-    const lowHomed = REGISTER[inst] <= 7;
+    const lowHomed = registerFor(style, inst) <= 7;
     variety[inst] = {
       registerOffset: lowHomed ? pickWeighted([[0, 3], [7, 1]]) : pickWeighted([[-7, 1], [0, 3], [7, 1]]),
       // Complexity adds chord extensions on top of the genre's own
@@ -2943,7 +3641,12 @@ function buildChordBar(style, variant, barRootDegree, chordVariety, prevLowest =
     // handed an unfamiliar chart does, and it lets any instrument hold
     // harmony in any genre instead of the request being an error.
     const cfg = (style.chords && style.chords[inst]) || DEFAULT_CHORD_PART;
-    bar[inst] = resolveChordBarTrack(inst, cfg, barRootDegree, { ...v, prevLowest: prevLowest[inst] });
+    bar[inst] = resolveChordBarTrack(inst, cfg, barRootDegree,
+      // The genre's own register shift rides on top of the per-generation
+      // octave jitter, so a chord part moves with its melodic counterpart
+      // instead of being left an octave below it.
+      { ...v, registerOffset: (v.registerOffset || 0) + (registerFor(style, inst) - (REGISTER[inst] || 0)),
+        prevLowest: prevLowest[inst] });
     for (let i = bar[inst].length - 1; i >= 0; i--) {
       if (bar[inst][i]) { prevLowest[inst] = bar[inst][i].degrees[0]; break; }
     }
@@ -3242,6 +3945,18 @@ const SOLO_POOLS = {
   ukgarage:  [["lead", 3], ["arp", 2], ["sax", 2], ["woodwind", 2]],
   techno:    [["arp", 3], ["lead", 3]],
   neosoul:   [["leadguitar", 3], ["sax", 3], ["woodwind", 2], ["lead", 1], ["marimba", 2], ["talkbox", 1]],
+  rage: [["lead", 5], ["autolead", 3], ["stab", 1]],
+  pluggnb: [["lead", 5], ["autolead", 3], ["piano", 2], ["marimba", 1]],
+  pop: [["lead", 4], ["piano", 3], ["arp", 2], ["leadguitar", 1], ["sax", 1]],
+  metal: [["leadguitar", 6], ["lead", 1], ["organ", 1]],
+  jazz: [["sax", 5], ["piano", 3], ["horn", 2], ["woodwind", 2], ["leadguitar", 1]],
+  edm: [["lead", 5], ["arp", 3], ["autolead", 1]],
+  country: [["leadguitar", 5], ["piano", 2], ["woodwind", 1], ["lead", 1]],
+  orchestral: [["woodwind", 4], ["strings", 3], ["horn", 3], ["piano", 2]],
+  cinematic: [["strings", 4], ["horn", 3], ["woodwind", 2], ["piano", 2]],
+  funk: [["horn", 4], ["organ", 3], ["sax", 3], ["piano", 2], ["leadguitar", 2]],
+  soul: [["sax", 4], ["organ", 3], ["horn", 2], ["piano", 2], ["leadguitar", 2], ["woodwind", 1]],
+  ambient: [["piano", 4], ["woodwind", 3], ["strings", 2], ["marimba", 1]],
 };
 
 // Any instrument can now be drawn into any genre's solo slot, so every one
@@ -3470,6 +4185,18 @@ const GENRE_MODES = {
   ukgarage:  [["dorian", 5], ["minor", 4]],
   amapiano:  [["minor", 5], ["dorian", 4]],
   reggaeton: [["minor", 6], ["phrygian", 2]],
+  rage: [["minor", 5], ["phrygian", 3], ["harmonicminor", 2]],
+  pluggnb: [["dorian", 5], ["minor", 4], ["mixolydian", 1]],
+  pop: [["major", 5], ["mixolydian", 2], ["minor", 2], ["lydian", 1]],
+  metal: [["phrygian", 5], ["minor", 4], ["harmonicminor", 2], ["phrygiandominant", 1]],
+  jazz: [["dorian", 5], ["mixolydian", 3], ["minor", 2], ["melodicminor", 1]],
+  edm: [["minor", 5], ["dorian", 3], ["harmonicminor", 1]],
+  country: [["major", 6], ["mixolydian", 3], ["minor", 1]],
+  orchestral: [["major", 4], ["minor", 4], ["lydian", 2], ["harmonicminor", 1]],
+  cinematic: [["minor", 5], ["phrygian", 3], ["harmonicminor", 2], ["dorian", 1]],
+  funk: [["mixolydian", 5], ["dorian", 4], ["minor", 1]],
+  soul: [["dorian", 5], ["minor", 3], ["mixolydian", 2], ["major", 1]],
+  ambient: [["lydian", 4], ["dorian", 4], ["major", 2], ["minor", 2]],
 };
 
 
@@ -3571,6 +4298,18 @@ const HARMONIC_RHYTHM = {
   hiphop:    [[1, 4], [2, 3]],
   lofi:      [[1, 4], [2, 3]],
   rock:      [[1, 4], [2, 3]],
+  rage: [[2, 5], [4, 3], [1, 2]],
+  pluggnb: [[2, 5], [1, 3]],
+  pop: [[1, 4], [2, 3]],
+  metal: [[1, 4], [2, 4]],
+  jazz: [[1, 6], [2, 1]],
+  edm: [[2, 5], [1, 3]],
+  country: [[1, 4], [2, 3]],
+  orchestral: [[2, 4], [1, 3], [4, 1]],
+  cinematic: [[4, 4], [2, 4], [1, 1]],
+  funk: [[4, 5], [2, 3], [1, 1]],
+  soul: [[1, 5], [2, 3]],
+  ambient: [[4, 5], [2, 3]],
 };
 // The final-chorus lift.
 //
@@ -3710,7 +4449,7 @@ function generateVariationOnce(rawStyle, bars, plan) {
 
   const registerPlan = planRegisterJitters(style.melodic.monoInstruments);
   for (const inst of style.melodic.monoInstruments) {
-    instruments[inst] = generateMonoMelody(REGISTER[inst], structure, barRootDegrees, style.melody[inst], totalSteps, registerPlan[inst], inst === "bass", inst, style.scale, styleRootMidi(style));
+    instruments[inst] = generateMonoMelody(registerFor(style, inst), structure, barRootDegrees, style.melody[inst], totalSteps, registerPlan[inst], inst === "bass", inst, style.scale, styleRootMidi(style));
   }
   declutterMonoCollisions(instruments, style.melodic.monoInstruments);
 
@@ -3924,7 +4663,7 @@ function generateSongVariationOnce(rawStyle, plan) {
   }
   const registerPlan = planRegisterJitters(style.melodic.monoInstruments);
   for (const inst of style.melodic.monoInstruments) {
-    const melody = generateMonoMelody(REGISTER[inst], [], barRootDegrees, style.melody[inst], totalSteps, registerPlan[inst], inst === "bass", inst, style.scale, styleRootMidi(style));
+    const melody = generateMonoMelody(registerFor(style, inst), [], barRootDegrees, style.melody[inst], totalSteps, registerPlan[inst], inst === "bass", inst, style.scale, styleRootMidi(style));
     applyChorusHook(melody, inst, style, barMetas, barRootDegrees);
     for (let i = 0; i < bars; i++) {
       if (activeSets[i].has(inst)) continue;
@@ -4261,7 +5000,7 @@ function refineVariation(style, v, barRootDegrees, totalSteps, passes = 2) {
         // after the ceilings went in: the note was not written by the path
         // that clamps, it was written by the path that polishes.
         const candidate = generateMonoMelody(
-          REGISTER[inst], v.structure, barRootDegrees, style.melody[inst],
+          registerFor(style, inst), v.structure, barRootDegrees, style.melody[inst],
           totalSteps, registerPlan[inst], inst === "bass", inst, style.scale, styleRootMidi(style)
         );
         v.instruments[inst] = candidate;

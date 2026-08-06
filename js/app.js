@@ -167,9 +167,12 @@ const STYLE_ACCENTS = {
   drill: "#c0392b", afrobeats: "#ffa502", dubstep: "#3742fa", rnb: "#ff6b9d",
   phonk: "#8e44ad", jerseyclub: "#00cec9", dnb: "#e17055", synthwave: "#fd79a8", rap: "#ffa801",
   amapiano: "#e1b12c", ukgarage: "#00a8ff", techno: "#9c88ff", neosoul: "#e84393",
+  rage: "#ff4757", pluggnb: "#c88bff", pop: "#ff7ab8", metal: "#8395a7", jazz: "#d4a373",
+  edm: "#00d2d3", country: "#e8b04b", orchestral: "#b8c6db", cinematic: "#6c5ce7",
+  funk: "#f9ca24", soul: "#c0392b", ambient: "#7ed6df",
 };
 
-const SIDECHAIN_DEFAULT_ON = new Set(["trap", "house", "dubstep", "afrobeats", "drill", "phonk", "jerseyclub", "dnb", "synthwave", "rap", "amapiano", "ukgarage", "techno"]);
+const SIDECHAIN_DEFAULT_ON = new Set(["trap", "house", "dubstep", "afrobeats", "drill", "phonk", "jerseyclub", "dnb", "synthwave", "rap", "amapiano", "ukgarage", "techno", "rage", "pluggnb", "edm"]);
 
 const TRACK_COLOR = {
   kick: "#ff6b6b", snare: "#feca57", hihat: "#48dbfb", openhat: "#0abde3", tom: "#ff9f43",
@@ -251,7 +254,7 @@ function randomizeTempo(tempoRange) {
 
 function randomizeSwing(baseSwing) {
   const jitter = (Math.random() * 2 - 1) * 0.04;
-  return Math.max(0, Math.min(0.3, baseSwing + jitter));
+  return Math.max(0, Math.min(0.33, baseSwing + jitter));
 }
 
 function rollTempoKeySwing(baseStyle) {
@@ -1226,9 +1229,10 @@ function reelLoopSeconds() {
     if (any) steps = any.length;
   }
   const stepDur = 60 / Number(tempoSlider.value) / 4;
-  // Swing lengthens every odd step, so half the steps run long.
-  const swing = Number(swingSlider.value) / 100;
-  return steps * stepDur * (1 + swing / 2);
+  // Swing shortens the off-beat by exactly what it lends the down-beat, so a
+  // loop of whole pairs is the plain grid length. This used to add half the
+  // swing on top, which made the reel's clock disagree with the audio.
+  return steps * stepDur;
 }
 
 function formatReelTime(sec) {

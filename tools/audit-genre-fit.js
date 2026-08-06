@@ -74,7 +74,7 @@ const BASS_808_EXTRA = new Set(["sub", "drillslide", "distorted", "growl"]);
 const is808 = (f) => /808/.test(f) || BASS_808_EXTRA.has(f);
 // Genres whose bass IS an 808 and nothing else. An upright double bass in a
 // trap beat is not a variation, it is a different genre.
-const EIGHT_OH_EIGHT_GENRES = new Set(["trap", "rap", "drill", "phonk", "jerseyclub"]);
+const EIGHT_OH_EIGHT_GENRES = new Set(["trap", "rap", "drill", "phonk", "jerseyclub", "rage", "pluggnb"]);
 
 // Kits that carry a strong genre signature of their own, on tracks where the
 // wrong one is as jarring as the wrong instrument. A brushed jazz kick under

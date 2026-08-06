@@ -18,7 +18,7 @@ const vm = require("vm");
 const root = path.join(__dirname, "..");
 const FILES = ["js/theory.js", "js/instruments.js", "js/performance.js", "js/learning.js",
                "js/policy.js", "js/audio-analysis.js", "js/artists.js", "js/midi-export.js",
-               "js/patterns.js", "js/rating.js"];
+               "js/production.js", "js/patterns.js", "js/rating.js"];
 const src = FILES.map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n;\n");
 const sandbox = { module: { exports: {} }, console, JSON };
 vm.createContext(sandbox);

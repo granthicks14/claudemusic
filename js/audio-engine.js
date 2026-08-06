@@ -1,5 +1,18 @@
 const ALL_TRACKS = ["kick", "snare", "hihat", "openhat", "tom", "perc", "crash", "bass", "piano", "lead", "pad", "stab", "guitar", "strings", "horn", "organ", "vocal", "kalimba", "marimba", "arp", "autolead", "sax", "woodwind", "leadguitar", "talkbox", "fx"];
 
+// Per-genre level overrides, applied on top of DEFAULT_TRACK_VOLUME when a
+// style is selected. See applyGenreLevels for why these three exist and the
+// other twenty-eight genres do not.
+const GENRE_TRACK_VOLUME = {
+  // A double bass section sits under the orchestra, not on top of it.
+  orchestral: { bass: 0.6, strings: 0.85, horn: 0.8, woodwind: 0.8, piano: 0.8 },
+  // Trailer music is bass-heavy on purpose, so the pedal keeps more of its
+  // weight than the orchestral one - but not enough to bury the brass.
+  cinematic:  { bass: 0.72, strings: 0.85, horn: 0.85, pad: 0.65, stab: 0.85 },
+  // The drone is a bed, not the piece.
+  ambient:    { bass: 0.6, pad: 0.7, strings: 0.75, piano: 0.85 },
+};
+
 const DEFAULT_TRACK_VOLUME = {
   kick: 1, snare: 0.9, hihat: 0.6, openhat: 0.6, tom: 0.85, perc: 0.55, crash: 0.8,
   // The bass is up from 0.9. It is the one level here changed on evidence:
@@ -328,8 +341,26 @@ class BeatEngine {
     g.setTargetAtTime(1, time + 0.03, 0.12);
   }
 
+  // Clamped: at 0.5 the off-beat would land exactly on the next down-beat,
+  // and past that it would land BEFORE it.
   setSwing(value) {
-    this.swing = value;
+    this.swing = Math.max(0, Math.min(0.45, Number(value) || 0));
+  }
+
+  // How long step `i` lasts, swing included.
+  //
+  // Swing delays the OFF-beat and leaves the DOWN-beat where it is. The old
+  // formula only ever ADDED time, to odd steps, which got both halves of
+  // that wrong: every down-beat after the first drifted late (at swing 0.15
+  // a bar ran 7% longer than the tempo said, so the whole beat played slow),
+  // and because the pair got longer while the off-beat stayed at one step,
+  // the off-beat sat EARLY inside its own pair - a rush, the exact opposite
+  // of swing. A pair now always spans two steps: the down-beat is stretched
+  // by s and the off-beat shortened by the same amount. The grid survives,
+  // and s = 1/3 is exactly triplet swing, which is what the word means.
+  swungStepDuration(i, base) {
+    const d = base === undefined ? this.stepDuration() : base;
+    return d * (i % 2 === 1 ? 1 - this.swing : 1 + this.swing);
   }
 
   setAutomation(inst, points) {
@@ -363,8 +394,11 @@ class BeatEngine {
     }
   }
 
+  // A level the user moved by hand is theirs; a genre change must not quietly
+  // take it back.
   setTrackVolume(inst, value) {
     this.trackState[inst].volume = value;
+    (this.userSetVolume || (this.userSetVolume = {}))[inst] = true;
     this.recomputeGains();
   }
 
@@ -7964,12 +7998,7 @@ class BeatEngine {
         setTimeout(() => this.onStep(stepToSchedule), Math.max(0, delayMs));
       }
 
-      let duration = this.stepDuration();
-      if (stepToSchedule % 2 === 1) {
-        duration += this.swing * this.stepDuration();
-      }
-
-      this.nextNoteTime += duration;
+      this.nextNoteTime += this.swungStepDuration(stepToSchedule);
       this.currentStep = (this.currentStep + 1) % this.stepCount;
     }
     this.timerId = setTimeout(() => this.scheduler(), this.lookahead);
@@ -7998,6 +8027,28 @@ class BeatEngine {
   updateKey(style) {
     this.style = style;
     this.rootMidi = noteNameToMidi(style.key);
+    this.applyGenreLevels(style && style.id);
+  }
+
+  // The default level table is built for a record whose bass IS the record -
+  // an 808 at 1.0, the loudest thing in the mix. That is right for trap and
+  // wrong for an orchestra.
+  //
+  // Measured on the orchestral family: the sub/low bands held 96%+ of the
+  // energy and the midrange - where strings, horns and woodwinds actually
+  // live - came out at 2-4%, roughly 17dB down. The parts were being written
+  // in the right register; they were simply buried under a whole-note sub
+  // pedal running at full level. Only genres that measurably need a different
+  // balance carry an entry; every other genre keeps the default table.
+  applyGenreLevels(styleId) {
+    const over = GENRE_TRACK_VOLUME[styleId] || null;
+    for (const t of ALL_TRACKS) {
+      if (!this.trackState[t]) continue;
+      if (this.userSetVolume && this.userSetVolume[t]) continue;
+      const want = (over && over[t] !== undefined) ? over[t] : DEFAULT_TRACK_VOLUME[t];
+      this.trackState[t].volume = want;
+    }
+    this.recomputeGains();
   }
 
   updateTempo(tempo) {
@@ -8034,10 +8085,9 @@ class BeatEngine {
     const loops = Math.max(1, opts.loops || 1);
 
     const stepDur = 60 / this.tempo / 4;
-    // Swing lengthens the off-steps, so the true bar length is not simply
-    // stepCount * stepDuration.
-    let total = 0;
-    for (let i = 0; i < this.stepCount; i++) total += stepDur * (i % 2 === 1 ? 1 + this.swing : 1);
+    // Swing borrows from the off-beat exactly what it lends to the down-beat,
+    // so a whole number of pairs takes precisely stepCount * stepDuration.
+    const total = stepDur * this.stepCount;
     // A tail so the last hit's release is captured rather than chopped.
     const seconds = total * loops + 2.5;
 
@@ -8062,7 +8112,7 @@ class BeatEngine {
     for (let loop = 0; loop < loops; loop++) {
       for (let step = 0; step < this.stepCount; step++) {
         clone.scheduleStep(step, t);
-        t += stepDur * (step % 2 === 1 ? 1 + this.swing : 1);
+        t += clone.swungStepDuration(step, stepDur);
       }
     }
     const buffer = await offline.startRendering();
